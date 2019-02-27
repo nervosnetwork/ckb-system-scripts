@@ -25,4 +25,9 @@ $(SECP256K1_LIB):
 
 update_schema: c/protocol_reader.h
 
-.PHONY: all update_schema
+clean:
+	rm -rf build/bitcoin_unlock
+	cd deps/flatcc && scripts/cleanall.sh
+	cd deps/secp256k1 && make clean
+
+.PHONY: all update_schema clean
