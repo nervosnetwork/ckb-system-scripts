@@ -442,7 +442,7 @@ int blake2b_init( blake2b_state *S, size_t outlen )
   memset( P->reserved, 0, sizeof( P->reserved ) );
   memset( P->salt,     0, sizeof( P->salt ) );
   memset( P->personal, 0, sizeof( P->personal ) );
-  for (int i = 0; i < BLAKE2S_PERSONALBYTES; ++i) {
+  for (int i = 0; i < BLAKE2B_PERSONALBYTES; ++i) {
     (P->personal)[i] = DEFAULT_PERSONAL[i];
   }
   return blake2b_init_param( S, P );
