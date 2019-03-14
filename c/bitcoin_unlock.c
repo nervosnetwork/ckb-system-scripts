@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "ckb_syscalls.h"
-#include "sha3.h"
+#include "blake2b.h"
 #include "protocol_reader.h"
 
 #undef ns
@@ -33,7 +33,7 @@
 #define SIGHASH_MULTIPLE 0x4
 #define SIGHASH_ANYONECANPAY 0x80
 
-#define SHA3_BLOCK_SIZE 32
+#define BLAKE2B_BLOCK_SIZE 32
 
 #define CUSTOM_ABORT 1
 #define CUSTOM_PRINT_ERR 1
@@ -106,7 +106,7 @@ int secure_atoi(const char* s, int* result)
 #define TX_BUFFER_SIZE 1024 * 1024
 #define TEMP_BUFFER_SIZE 256
 
-void update_h256(sha3_ctx_t *ctx, ns(H256_struct_t) h256)
+void update_h256(blake2b_state *ctx, ns(H256_struct_t) h256)
 {
   uint8_t buf[32];
   buf[0] = ns(H256_u0(h256));
@@ -141,24 +141,24 @@ void update_h256(sha3_ctx_t *ctx, ns(H256_struct_t) h256)
   buf[29] = ns(H256_u29(h256));
   buf[30] = ns(H256_u30(h256));
   buf[31] = ns(H256_u31(h256));
-  sha3_update(ctx, buf, 32);
+  blake2b_update(ctx, buf, 32);
 }
 
-void update_uint32_t(sha3_ctx_t *ctx, uint32_t v)
+void update_uint32_t(blake2b_state *ctx, uint32_t v)
 {
   char buf[32];
   snprintf(buf, 32, "%d", v);
-  sha3_update(ctx, buf, strlen(buf));
+  blake2b_update(ctx, buf, strlen(buf));
 }
 
-void update_uint64_t(sha3_ctx_t *ctx, uint64_t v)
+void update_uint64_t(blake2b_state *ctx, uint64_t v)
 {
   char buf[32];
   snprintf(buf, 32, "%ld", v);
-  sha3_update(ctx, buf, strlen(buf));
+  blake2b_update(ctx, buf, strlen(buf));
 }
 
-void update_out_point(sha3_ctx_t *ctx, ns(OutPoint_table_t) outpoint)
+void update_out_point(blake2b_state *ctx, ns(OutPoint_table_t) outpoint)
 {
   update_h256(ctx, ns(OutPoint_hash(outpoint)));
   update_uint32_t(ctx, ns(OutPoint_index(outpoint)));
@@ -196,10 +196,10 @@ int main(int argc, char* argv[])
     return ERROR_SECP_PARSE_SIGNATURE;
   }
 
-  sha3_ctx_t sha3_ctx;
-  sha3_init(&sha3_ctx, SHA3_BLOCK_SIZE);
+  blake2b_state blake2b_ctx;
+  blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
 
-  sha3_update(&sha3_ctx, argv[3], strlen(argv[3]));
+  blake2b_update(&blake2b_ctx, argv[3], strlen(argv[3]));
   int sighash_type;
   if (!secure_atoi(argv[3], &sighash_type)) {
     return ERROR_PARSE_SIGHASH_TYPE;
@@ -225,25 +225,25 @@ int main(int argc, char* argv[])
     if (!(op = ns(OutPoint_as_root(buf)))) {
       return ERROR_PARSE_SELF_OUT_POINT;
     }
-    update_out_point(&sha3_ctx, op);
+    update_out_point(&blake2b_ctx, op);
     len = TEMP_BUFFER_SIZE;
     if (ckb_load_cell_by_field(buf, &len, 0, 0, CKB_SOURCE_CURRENT, CKB_CELL_FIELD_LOCK_HASH) != CKB_SUCCESS) {
       return ERROR_LOAD_SELF_LOCK_HASH;
     }
-    sha3_update(&sha3_ctx, buf, len);
+    blake2b_update(&blake2b_ctx, buf, len);
   } else {
     /* Hash all inputs */
     ns(CellInput_vec_t) inputs = ns(Transaction_inputs(tx));
     size_t inputs_len = ns(CellInput_vec_len(inputs));
     for (int i = 0; i < inputs_len; i++) {
       ns(CellInput_table_t) input = ns(CellInput_vec_at(inputs, i));
-      update_h256(&sha3_ctx, ns(CellInput_hash(input)));
-      update_uint32_t(&sha3_ctx, ns(CellInput_index(input)));
+      update_h256(&blake2b_ctx, ns(CellInput_hash(input)));
+      update_uint32_t(&blake2b_ctx, ns(CellInput_index(input)));
       volatile uint64_t len = TEMP_BUFFER_SIZE;
       if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_INPUT, CKB_CELL_FIELD_LOCK_HASH) != CKB_SUCCESS) {
         return ERROR_LOAD_LOCK_HASH;
       }
-      sha3_update(&sha3_ctx, buf, len);
+      blake2b_update(&blake2b_ctx, buf, len);
     }
   }
 
@@ -254,11 +254,11 @@ int main(int argc, char* argv[])
         size_t outputs_len = ns(CellOutput_vec_len(outputs));
         for (int i = 0; i < outputs_len; i++) {
           ns(CellOutput_table_t) output = ns(CellOutput_vec_at(outputs, i));
-          update_uint64_t(&sha3_ctx, ns(CellOutput_capacity(output)));
-          update_h256(&sha3_ctx, ns(CellOutput_lock(output)));
+          update_uint64_t(&blake2b_ctx, ns(CellOutput_capacity(output)));
+          update_h256(&blake2b_ctx, ns(CellOutput_lock(output)));
           volatile uint64_t len = TEMP_BUFFER_SIZE;
           if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH) == CKB_SUCCESS) {
-            sha3_update(&sha3_ctx, buf, len);
+            blake2b_update(&blake2b_ctx, buf, len);
           }
         }
       }
@@ -278,11 +278,11 @@ int main(int argc, char* argv[])
           return ERROR_SINGLE_INDEX_IS_INVALID;
         }
         ns(CellOutput_table_t) output = ns(CellOutput_vec_at(outputs, i));
-        update_uint64_t(&sha3_ctx, ns(CellOutput_capacity(output)));
-        update_h256(&sha3_ctx, ns(CellOutput_lock(output)));
+        update_uint64_t(&blake2b_ctx, ns(CellOutput_capacity(output)));
+        update_h256(&blake2b_ctx, ns(CellOutput_lock(output)));
         volatile uint64_t len = TEMP_BUFFER_SIZE;
         if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH) == CKB_SUCCESS) {
-          sha3_update(&sha3_ctx, buf, len);
+          blake2b_update(&blake2b_ctx, buf, len);
         }
       }
       break;
@@ -304,11 +304,11 @@ int main(int argc, char* argv[])
               return ERROR_SINGLE_INDEX_IS_INVALID;
             }
             ns(CellOutput_table_t) output = ns(CellOutput_vec_at(outputs, i));
-            update_uint64_t(&sha3_ctx, ns(CellOutput_capacity(output)));
-            update_h256(&sha3_ctx, ns(CellOutput_lock(output)));
+            update_uint64_t(&blake2b_ctx, ns(CellOutput_capacity(output)));
+            update_h256(&blake2b_ctx, ns(CellOutput_lock(output)));
             volatile uint64_t len = TEMP_BUFFER_SIZE;
             if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH) == CKB_SUCCESS) {
-              sha3_update(&sha3_ctx, buf, len);
+              blake2b_update(&blake2b_ctx, buf, len);
             }
           }
           if (*end == '\0') {
@@ -324,8 +324,8 @@ int main(int argc, char* argv[])
       return ERROR_INVALID_SIGHASH_TYPE;
   }
 
-  unsigned char hash[SHA3_BLOCK_SIZE];
-  sha3_final(hash, &sha3_ctx);
+  unsigned char hash[BLAKE2B_BLOCK_SIZE];
+  blake2b_final(&blake2b_ctx, hash, BLAKE2B_BLOCK_SIZE);
 
   ret = secp256k1_ecdsa_verify(&context, &signature, hash, &pubkey);
   if (ret != 1) {
