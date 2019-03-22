@@ -30,4 +30,6 @@ clean:
 	cd deps/flatcc && scripts/cleanall.sh
 	cd deps/secp256k1 && make clean
 
-.PHONY: all update_schema clean
+dist: clean all
+
+.PHONY: all update_schema clean dist
