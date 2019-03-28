@@ -6,9 +6,9 @@ LDFLAGS := -Wl,-static -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl
 SECP256K1_LIB := deps/secp256k1/.libs/libsecp256k1.a
 FLATCC := deps/flatcc/bin/flatcc
 
-all: build/bitcoin_unlock
+all: build/bitcoin_lock
 
-build/bitcoin_unlock: c/bitcoin_unlock.c c/protocol_reader.h $(SECP256K1_LIB)
+build/bitcoin_lock: c/bitcoin_lock.c c/protocol_reader.h $(SECP256K1_LIB)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 c/protocol_reader.h: c/protocol.fbs $(FLATCC)
@@ -26,7 +26,7 @@ $(SECP256K1_LIB):
 update_schema: c/protocol_reader.h
 
 clean:
-	rm -rf build/bitcoin_unlock
+	rm -rf build/bitcoin_lock
 	cd deps/flatcc && scripts/cleanall.sh
 	cd deps/secp256k1 && make clean
 
