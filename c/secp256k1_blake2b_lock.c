@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
   unsigned char hash[BLAKE2B_BLOCK_SIZE];
   char tx_buf[TX_BUFFER_SIZE];
   char buf[TEMP_BUFFER_SIZE];
-  int ret;
+  volatile int ret;
 
   if (argc != 5 && argc != 6) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
