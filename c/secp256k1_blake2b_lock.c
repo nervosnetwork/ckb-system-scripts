@@ -184,9 +184,6 @@ int main(int argc, char* argv[])
   blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
   blake2b_update(&blake2b_ctx, buf, ret);
   blake2b_final(&blake2b_ctx, hash, BLAKE2B_BLOCK_SIZE);
-  blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
-  blake2b_update(&blake2b_ctx, hash, BLAKE2B_BLOCK_SIZE);
-  blake2b_final(&blake2b_ctx, hash, BLAKE2B_BLOCK_SIZE);
 
   /* tx_buf is not yet used, we can borrow it as a temp buffer */
   if (hex_to_bin(tx_buf, BLAKE2B_BLOCK_SIZE, argv[1]) != BLAKE2B_BLOCK_SIZE) {
