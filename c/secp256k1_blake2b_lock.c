@@ -171,18 +171,18 @@ int main(int argc, char* argv[])
   unsigned char hash[BLAKE2B_BLOCK_SIZE];
   char tx_buf[TX_BUFFER_SIZE];
   char buf[TEMP_BUFFER_SIZE];
-  volatile int ret;
+  int ret, len;
 
   if (argc != 5 && argc != 6) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
   }
 
   /* Check pubkey hash */
-  ret = hex_to_bin(buf, TEMP_BUFFER_SIZE, argv[2]);
-  CHECK_LEN(ret);
+  len = hex_to_bin(buf, TEMP_BUFFER_SIZE, argv[2]);
+  CHECK_LEN(len);
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
-  blake2b_update(&blake2b_ctx, buf, ret);
+  blake2b_update(&blake2b_ctx, buf, len);
   blake2b_final(&blake2b_ctx, hash, BLAKE2B_BLOCK_SIZE);
 
   /* tx_buf is not yet used, we can borrow it as a temp buffer */
@@ -199,7 +199,7 @@ int main(int argc, char* argv[])
   }
 
   secp256k1_pubkey pubkey;
-  ret = secp256k1_ec_pubkey_parse(&context, &pubkey, buf, ret);
+  ret = secp256k1_ec_pubkey_parse(&context, &pubkey, buf, len);
   if (ret == 0) {
     return ERROR_SECP_PARSE_PUBKEY;
   }
