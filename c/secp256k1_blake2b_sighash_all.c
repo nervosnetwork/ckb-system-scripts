@@ -29,12 +29,6 @@
 #define ERROR_PUBKEY_HASH -18
 #define ERROR_PUBKEY_HASH_LENGTH -18
 
-#define SIGHASH_ALL 0x1
-#define SIGHASH_NONE 0x2
-#define SIGHASH_SINGLE 0x3
-#define SIGHASH_MULTIPLE 0x4
-#define SIGHASH_ANYONECANPAY 0x80
-
 #define BLAKE2B_BLOCK_SIZE 32
 
 #define CUSTOM_ABORT 1
@@ -89,18 +83,6 @@ int hex_to_bin(char* buf, size_t buf_len, const char* hex)
     return ERROR_WRONG_HEX_ENCODING;
   }
   return i;
-}
-
-int secure_atoi(const char* s, int* result)
-{
-  char *end = NULL;
-  errno = 0;
-  long temp = strtol(s, &end, 10);
-  if (end != s && errno != ERANGE && temp >= INT_MIN && temp <= INT_MAX) {
-    *result = (int) temp;
-    return 1;
-  }
-  return 0;
 }
 
 #define CHECK_LEN(x) if ((x) <= 0) { return x; }
@@ -173,7 +155,7 @@ int main(int argc, char* argv[])
   char buf[TEMP_BUFFER_SIZE];
   int ret, len;
 
-  if (argc != 5 && argc != 6) {
+  if (argc != 4) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
   }
 
@@ -212,13 +194,6 @@ int main(int argc, char* argv[])
     return ERROR_SECP_PARSE_SIGNATURE;
   }
 
-  blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
-  blake2b_update(&blake2b_ctx, argv[4], strlen(argv[4]));
-  int sighash_type;
-  if (!secure_atoi(argv[4], &sighash_type)) {
-    return ERROR_PARSE_SIGHASH_TYPE;
-  }
-
   volatile uint64_t tx_size = TX_BUFFER_SIZE;
   if (ckb_load_tx(tx_buf, &tx_size, 0) != CKB_SUCCESS) {
     return ERROR_LOAD_TX;
@@ -229,115 +204,32 @@ int main(int argc, char* argv[])
     return ERROR_PARSE_TX;
   }
 
-  if ((sighash_type & SIGHASH_ANYONECANPAY) != 0) {
-    /* Only hash current input */
-    volatile uint64_t len = TEMP_BUFFER_SIZE;
-    if (ckb_load_input_by_field(buf, &len, 0, 0, CKB_SOURCE_CURRENT, CKB_INPUT_FIELD_OUT_POINT) != CKB_SUCCESS) {
-      return ERROR_LOAD_SELF_OUT_POINT;
-    }
-    ns(OutPoint_table_t) op;
-    if (!(op = ns(OutPoint_as_root(buf)))) {
-      return ERROR_PARSE_SELF_OUT_POINT;
-    }
-    update_out_point(&blake2b_ctx, op);
-  } else {
-    /* Hash all inputs */
-    ns(CellInput_vec_t) inputs = ns(Transaction_inputs(tx));
-    size_t inputs_len = ns(CellInput_vec_len(inputs));
-    for (int i = 0; i < inputs_len; i++) {
-      ns(CellInput_table_t) input = ns(CellInput_vec_at(inputs, i));
-      update_h256(&blake2b_ctx, ns(CellInput_hash(input)));
-      update_uint32_t(&blake2b_ctx, ns(CellInput_index(input)));
-    }
+  blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
+
+  /* Hash all inputs */
+  ns(CellInput_vec_t) inputs = ns(Transaction_inputs(tx));
+  size_t inputs_len = ns(CellInput_vec_len(inputs));
+  for (int i = 0; i < inputs_len; i++) {
+    ns(CellInput_table_t) input = ns(CellInput_vec_at(inputs, i));
+    update_h256(&blake2b_ctx, ns(CellInput_hash(input)));
+    update_uint32_t(&blake2b_ctx, ns(CellInput_index(input)));
   }
 
-  switch (sighash_type & (~SIGHASH_ANYONECANPAY)) {
-    case SIGHASH_ALL:
-      {
-        ns(CellOutput_vec_t) outputs = ns(Transaction_outputs(tx));
-        size_t outputs_len = ns(CellOutput_vec_len(outputs));
-        for (int i = 0; i < outputs_len; i++) {
-          ns(CellOutput_table_t) output = ns(CellOutput_vec_at(outputs, i));
-          update_uint64_t(&blake2b_ctx, ns(CellOutput_capacity(output)));
-          volatile uint64_t len = TEMP_BUFFER_SIZE;
-          if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_LOCK_HASH) != CKB_SUCCESS) {
-            return ERROR_LOAD_LOCK_HASH;
-          }
-          blake2b_update(&blake2b_ctx, buf, len);
-          len = TEMP_BUFFER_SIZE;
-          if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH) == CKB_SUCCESS) {
-            blake2b_update(&blake2b_ctx, buf, len);
-          }
-        }
-      }
-      break;
-    case SIGHASH_SINGLE:
-      {
-        if (argc != 5) {
-          return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
-        }
-        ns(CellOutput_vec_t) outputs = ns(Transaction_outputs(tx));
-        size_t outputs_len = ns(CellOutput_vec_len(outputs));
-        int i = -1;
-        if (!secure_atoi(argv[5], &i)) {
-          return ERROR_PARSE_SINGLE_INDEX;
-        }
-        if (i < 0 || i >= outputs_len) {
-          return ERROR_SINGLE_INDEX_IS_INVALID;
-        }
-        ns(CellOutput_table_t) output = ns(CellOutput_vec_at(outputs, i));
-        update_uint64_t(&blake2b_ctx, ns(CellOutput_capacity(output)));
-        volatile uint64_t len = TEMP_BUFFER_SIZE;
-        if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_LOCK_HASH) != CKB_SUCCESS) {
-          return ERROR_LOAD_LOCK_HASH;
-        }
-        blake2b_update(&blake2b_ctx, buf, len);
-        len = TEMP_BUFFER_SIZE;
-        if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH) == CKB_SUCCESS) {
-          blake2b_update(&blake2b_ctx, buf, len);
-        }
-      }
-      break;
-    case SIGHASH_MULTIPLE:
-      {
-        /* Leverages strtol to implement split */
-        if (argc != 5) {
-          return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
-        }
-        ns(CellOutput_vec_t) outputs = ns(Transaction_outputs(tx));
-        size_t outputs_len = ns(CellOutput_vec_len(outputs));
-        const char* ptr = argv[5];
-        size_t len = strlen(ptr);
-        while (ptr - argv[5] < len) {
-          char* end = NULL;
-          int i = (int) strtol(ptr, &end, 10);
-          if (end != ptr) {
-            if (i < 0 || i >= outputs_len) {
-              return ERROR_SINGLE_INDEX_IS_INVALID;
-            }
-            ns(CellOutput_table_t) output = ns(CellOutput_vec_at(outputs, i));
-            update_uint64_t(&blake2b_ctx, ns(CellOutput_capacity(output)));
-            volatile uint64_t len = TEMP_BUFFER_SIZE;
-            if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_LOCK_HASH) != CKB_SUCCESS) {
-              return ERROR_LOAD_LOCK_HASH;
-            }
-            blake2b_update(&blake2b_ctx, buf, len);
-            len = TEMP_BUFFER_SIZE;
-            if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH) == CKB_SUCCESS) {
-              blake2b_update(&blake2b_ctx, buf, len);
-            }
-          }
-          if (*end == '\0') {
-            break;
-          }
-          ptr = end + 1;
-        }
-      }
-      break;
-    case SIGHASH_NONE:
-      break;
-    default:
-      return ERROR_INVALID_SIGHASH_TYPE;
+  /* Hash all outputs */
+  ns(CellOutput_vec_t) outputs = ns(Transaction_outputs(tx));
+  size_t outputs_len = ns(CellOutput_vec_len(outputs));
+  for (int i = 0; i < outputs_len; i++) {
+    ns(CellOutput_table_t) output = ns(CellOutput_vec_at(outputs, i));
+    update_uint64_t(&blake2b_ctx, ns(CellOutput_capacity(output)));
+    volatile uint64_t len = TEMP_BUFFER_SIZE;
+    if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_LOCK_HASH) != CKB_SUCCESS) {
+      return ERROR_LOAD_LOCK_HASH;
+    }
+    blake2b_update(&blake2b_ctx, buf, len);
+    len = TEMP_BUFFER_SIZE;
+    if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH) == CKB_SUCCESS) {
+      blake2b_update(&blake2b_ctx, buf, len);
+    }
   }
 
   blake2b_final(&blake2b_ctx, hash, BLAKE2B_BLOCK_SIZE);
