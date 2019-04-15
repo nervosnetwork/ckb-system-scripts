@@ -148,6 +148,17 @@ void update_out_point(blake2b_state *ctx, ns(OutPoint_table_t) outpoint)
   update_uint32_t(ctx, ns(OutPoint_index(outpoint)));
 }
 
+
+/*
+ * Arguments are listed in the following order:
+ * 0. program name
+ * 1. pubkey hash, double blake2b hash of pubkey, used to shield the real
+ * pubkey in lock script.
+ * 
+ * Witness:
+ * 2. pubkey, real pubkey used to identify token owner
+ * 3. signature, signature used to present ownership
+ */
 int main(int argc, char* argv[])
 {
   unsigned char hash[BLAKE2B_BLOCK_SIZE];
@@ -160,7 +171,7 @@ int main(int argc, char* argv[])
   }
 
   /* Check pubkey hash */
-  len = hex_to_bin(buf, TEMP_BUFFER_SIZE, argv[2]);
+  len = hex_to_bin(buf, TEMP_BUFFER_SIZE, argv[argc - 2]);
   CHECK_LEN(len);
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
@@ -186,7 +197,7 @@ int main(int argc, char* argv[])
     return ERROR_SECP_PARSE_PUBKEY;
   }
 
-  ret = hex_to_bin(buf, TEMP_BUFFER_SIZE, argv[3]);
+  ret = hex_to_bin(buf, TEMP_BUFFER_SIZE, argv[argc - 1]);
   CHECK_LEN(ret);
   secp256k1_ecdsa_signature signature;
   ret = secp256k1_ecdsa_signature_parse_der(&context, &signature, buf, ret);
