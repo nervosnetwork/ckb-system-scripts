@@ -166,6 +166,21 @@ void update_out_point(blake2b_state *ctx, ns(OutPoint_table_t) outpoint)
   update_uint32_t(ctx, ns(OutPoint_index(outpoint)));
 }
 
+/*
+ * Arguments are listed in the following order:
+ * 0. program name
+ * 1. pubkey hash, double blake2b hash of pubkey, used to shield the real
+ * pubkey in lock script.
+ * 2. type, SIGHASH type
+ * 3. output(s), this is only used for SIGHASH_SINGLE and SIGHASH_MULTIPLE types,
+ * for SIGHASH_SINGLE, it stores an integer denoting the index of output to be
+ * signed; for SIGHASH_MULTIPLE, it stores a string of `,` separated array denoting
+ * outputs to sign
+ * 
+ * Witness:
+ * 4. pubkey, real pubkey used to identify token owner
+ * 5. signature, signature used to present ownership
+ */
 int main(int argc, char* argv[])
 {
   unsigned char hash[BLAKE2B_BLOCK_SIZE];
@@ -178,7 +193,7 @@ int main(int argc, char* argv[])
   }
 
   /* Check pubkey hash */
-  len = hex_to_bin(buf, TEMP_BUFFER_SIZE, argv[2]);
+  len = hex_to_bin(buf, TEMP_BUFFER_SIZE, argv[argc - 2]);
   CHECK_LEN(len);
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
@@ -204,7 +219,7 @@ int main(int argc, char* argv[])
     return ERROR_SECP_PARSE_PUBKEY;
   }
 
-  ret = hex_to_bin(buf, TEMP_BUFFER_SIZE, argv[3]);
+  ret = hex_to_bin(buf, TEMP_BUFFER_SIZE, argv[argc - 1]);
   CHECK_LEN(ret);
   secp256k1_ecdsa_signature signature;
   ret = secp256k1_ecdsa_signature_parse_der(&context, &signature, buf, ret);
@@ -213,9 +228,9 @@ int main(int argc, char* argv[])
   }
 
   blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
-  blake2b_update(&blake2b_ctx, argv[4], strlen(argv[4]));
+  blake2b_update(&blake2b_ctx, argv[2], strlen(argv[2]));
   int sighash_type;
-  if (!secure_atoi(argv[4], &sighash_type)) {
+  if (!secure_atoi(argv[2], &sighash_type)) {
     return ERROR_PARSE_SIGHASH_TYPE;
   }
 
@@ -279,7 +294,7 @@ int main(int argc, char* argv[])
         ns(CellOutput_vec_t) outputs = ns(Transaction_outputs(tx));
         size_t outputs_len = ns(CellOutput_vec_len(outputs));
         int i = -1;
-        if (!secure_atoi(argv[5], &i)) {
+        if (!secure_atoi(argv[3], &i)) {
           return ERROR_PARSE_SINGLE_INDEX;
         }
         if (i < 0 || i >= outputs_len) {
@@ -306,9 +321,9 @@ int main(int argc, char* argv[])
         }
         ns(CellOutput_vec_t) outputs = ns(Transaction_outputs(tx));
         size_t outputs_len = ns(CellOutput_vec_len(outputs));
-        const char* ptr = argv[5];
+        const char* ptr = argv[3];
         size_t len = strlen(ptr);
-        while (ptr - argv[5] < len) {
+        while (ptr - argv[3] < len) {
           char* end = NULL;
           int i = (int) strtol(ptr, &end, 10);
           if (end != ptr) {
