@@ -26,8 +26,8 @@
 #define ERROR_SECP_VERIFICATION -15
 #define ERROR_PARSE_SINGLE_INDEX -16
 #define ERROR_SINGLE_INDEX_IS_INVALID -17
-#define ERROR_PUBKEY_HASH -18
-#define ERROR_PUBKEY_HASH_LENGTH -18
+#define ERROR_PUBKEY_BLAKE160_HASH -18
+#define ERROR_PUBKEY_BLAKE160_HASH_LENGTH -18
 
 #define SIGHASH_ALL 0x1
 #define SIGHASH_NONE 0x2
@@ -203,10 +203,10 @@ int main(int argc, char* argv[])
 
   /* tx_buf is not yet used, we can borrow it as a temp buffer */
   if (hex_to_bin(tx_buf, BLAKE160_SIZE, argv[1]) != BLAKE160_SIZE) {
-    return ERROR_PUBKEY_HASH_LENGTH;
+    return ERROR_PUBKEY_BLAKE160_HASH_LENGTH;
   }
   if (memcmp(tx_buf, hash, BLAKE160_SIZE) != 0) {
-    return ERROR_PUBKEY_HASH;
+    return ERROR_PUBKEY_BLAKE160_HASH;
   }
 
   secp256k1_context context;
