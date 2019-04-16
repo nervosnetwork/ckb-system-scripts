@@ -6,12 +6,12 @@ LDFLAGS := -Wl,-static -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl
 SECP256K1_LIB := deps/secp256k1/.libs/libsecp256k1.a
 FLATCC := deps/flatcc/bin/flatcc
 
-all: build/secp256k1_blake2b_lock build/secp256k1_blake2b_sighash_all
+all: build/secp256k1_blake160_lock build/secp256k1_blake160_sighash_all
 
-build/secp256k1_blake2b_lock: c/secp256k1_blake2b_lock.c c/protocol_reader.h $(SECP256K1_LIB)
+build/secp256k1_blake160_lock: c/secp256k1_blake160_lock.c c/protocol_reader.h $(SECP256K1_LIB)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
-build/secp256k1_blake2b_sighash_all: c/secp256k1_blake2b_sighash_all.c c/protocol_reader.h $(SECP256K1_LIB)
+build/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c c/protocol_reader.h $(SECP256K1_LIB)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 c/protocol_reader.h: c/protocol.fbs $(FLATCC)
@@ -29,7 +29,7 @@ $(SECP256K1_LIB):
 update_schema: c/protocol_reader.h
 
 clean:
-	rm -rf build/secp256k1_blake2b_lock build/secp256k1_blake2b_sighash_all
+	rm -rf build/secp256k1_blake160_lock build/secp256k1_blake160_sighash_all
 	cd deps/flatcc && scripts/cleanall.sh
 	cd deps/secp256k1 && make clean
 
