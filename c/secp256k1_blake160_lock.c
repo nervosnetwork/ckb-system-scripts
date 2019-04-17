@@ -26,8 +26,8 @@
 #define ERROR_SECP_VERIFICATION -15
 #define ERROR_PARSE_SINGLE_INDEX -16
 #define ERROR_SINGLE_INDEX_IS_INVALID -17
-#define ERROR_PUBKEY_HASH -18
-#define ERROR_PUBKEY_HASH_LENGTH -18
+#define ERROR_PUBKEY_BLAKE160_HASH -18
+#define ERROR_PUBKEY_BLAKE160_HASH_LENGTH -18
 
 #define SIGHASH_ALL 0x1
 #define SIGHASH_NONE 0x2
@@ -36,6 +36,7 @@
 #define SIGHASH_ANYONECANPAY 0x80
 
 #define BLAKE2B_BLOCK_SIZE 32
+#define BLAKE160_SIZE 20
 
 #define CUSTOM_ABORT 1
 #define CUSTOM_PRINT_ERR 1
@@ -169,7 +170,7 @@ void update_out_point(blake2b_state *ctx, ns(OutPoint_table_t) outpoint)
 /*
  * Arguments are listed in the following order:
  * 0. program name
- * 1. pubkey hash, double blake2b hash of pubkey, used to shield the real
+ * 1. pubkey blake160 hash, blake2b hash of pubkey first 20 bytes, used to shield the real
  * pubkey in lock script.
  * 2. type, SIGHASH type
  * 3. output(s), this is only used for SIGHASH_SINGLE and SIGHASH_MULTIPLE types,
@@ -201,11 +202,11 @@ int main(int argc, char* argv[])
   blake2b_final(&blake2b_ctx, hash, BLAKE2B_BLOCK_SIZE);
 
   /* tx_buf is not yet used, we can borrow it as a temp buffer */
-  if (hex_to_bin(tx_buf, BLAKE2B_BLOCK_SIZE, argv[1]) != BLAKE2B_BLOCK_SIZE) {
-    return ERROR_PUBKEY_HASH_LENGTH;
+  if (hex_to_bin(tx_buf, BLAKE160_SIZE, argv[1]) != BLAKE160_SIZE) {
+    return ERROR_PUBKEY_BLAKE160_HASH_LENGTH;
   }
-  if (memcmp(tx_buf, hash, BLAKE2B_BLOCK_SIZE) != 0) {
-    return ERROR_PUBKEY_HASH;
+  if (memcmp(tx_buf, hash, BLAKE160_SIZE) != 0) {
+    return ERROR_PUBKEY_BLAKE160_HASH;
   }
 
   secp256k1_context context;
