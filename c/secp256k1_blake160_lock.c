@@ -112,6 +112,11 @@ int secure_atoi(const char* s, int* result)
 void update_h256(blake2b_state *ctx, ns(H256_struct_t) h256)
 {
   uint8_t buf[32];
+
+  if (!h256) {
+    return;
+  }
+
   buf[0] = ns(H256_u0(h256));
   buf[1] = ns(H256_u1(h256));
   buf[2] = ns(H256_u2(h256));
@@ -163,7 +168,7 @@ void update_uint64_t(blake2b_state *ctx, uint64_t v)
 
 void update_out_point(blake2b_state *ctx, ns(OutPoint_table_t) outpoint)
 {
-  update_h256(ctx, ns(OutPoint_hash(outpoint)));
+  update_h256(ctx, ns(OutPoint_tx_hash(outpoint)));
   update_uint32_t(ctx, ns(OutPoint_index(outpoint)));
 }
 
@@ -262,7 +267,7 @@ int main(int argc, char* argv[])
     size_t inputs_len = ns(CellInput_vec_len(inputs));
     for (int i = 0; i < inputs_len; i++) {
       ns(CellInput_table_t) input = ns(CellInput_vec_at(inputs, i));
-      update_h256(&blake2b_ctx, ns(CellInput_hash(input)));
+      update_h256(&blake2b_ctx, ns(CellInput_tx_hash(input)));
       update_uint32_t(&blake2b_ctx, ns(CellInput_index(input)));
     }
   }
