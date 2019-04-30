@@ -8,10 +8,10 @@ FLATCC := deps/flatcc/bin/flatcc
 
 all: build/secp256k1_blake160_lock build/secp256k1_blake160_sighash_all
 
-build/secp256k1_blake160_lock: c/secp256k1_blake160_lock.c c/protocol_reader.h $(SECP256K1_LIB)
+build/secp256k1_blake160_lock: c/secp256k1_blake160_lock.c c/protocol_reader.h c/secp256k1_blake160.h $(SECP256K1_LIB)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
-build/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c c/protocol_reader.h $(SECP256K1_LIB)
+build/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c c/protocol_reader.h c/secp256k1_blake160.h $(SECP256K1_LIB)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 c/protocol_reader.h: c/protocol.fbs $(FLATCC)
