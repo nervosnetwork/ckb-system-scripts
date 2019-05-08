@@ -31,6 +31,8 @@
 #define ERROR_SINGLE_INDEX_IS_INVALID -17
 #define ERROR_PUBKEY_BLAKE160_HASH -18
 #define ERROR_PUBKEY_BLAKE160_HASH_LENGTH -18
+#define ERROR_LOAD_SCRIPT_HASH -19
+#define ERROR_LOAD_SINCE -20
 
 #define SIGHASH_ALL 0x1
 #define SIGHASH_NONE 0x2
@@ -40,6 +42,9 @@
 
 #define BLAKE2B_BLOCK_SIZE 32
 #define BLAKE160_SIZE 20
+
+#define PUBKEY_SIZE 33
+#define SIGNATURE_SIZE 64
 
 #define CUSTOM_ABORT 1
 #define CUSTOM_PRINT_ERR 1
@@ -171,32 +176,25 @@ void update_uint64_t(blake2b_state *ctx, uint64_t v)
 
 void update_out_point(blake2b_state *ctx, ns(OutPoint_table_t) outpoint)
 {
+  update_h256(ctx, ns(OutPoint_block_hash(outpoint)));
   update_h256(ctx, ns(OutPoint_tx_hash(outpoint)));
   update_uint32_t(ctx, ns(OutPoint_index(outpoint)));
 }
 
-int verify_sighash_all(const char* serialized_pubkey_hash,
-                       const char* serialized_pubkey,
-                       const char* serialized_signature)
+int verify_sighash_all(const unsigned char* binary_pubkey_hash,
+                       const unsigned char* binary_pubkey,
+                       const unsigned char* binary_signature)
 {
   unsigned char hash[BLAKE2B_BLOCK_SIZE];
-  char tx_buf[TX_BUFFER_SIZE];
-  char buf[TEMP_BUFFER_SIZE];
-  int ret, len;
+  int ret;
 
   /* Check pubkey hash */
-  len = hex_to_bin(buf, TEMP_BUFFER_SIZE, serialized_pubkey);
-  CHECK_LEN(len);
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
-  blake2b_update(&blake2b_ctx, buf, len);
+  blake2b_update(&blake2b_ctx, binary_pubkey, PUBKEY_SIZE);
   blake2b_final(&blake2b_ctx, hash, BLAKE2B_BLOCK_SIZE);
 
-  /* tx_buf is not yet used, we can borrow it as a temp buffer */
-  if (hex_to_bin(tx_buf, BLAKE160_SIZE, serialized_pubkey_hash) != BLAKE160_SIZE) {
-    return ERROR_PUBKEY_BLAKE160_HASH_LENGTH;
-  }
-  if (memcmp(tx_buf, hash, BLAKE160_SIZE) != 0) {
+  if (memcmp(binary_pubkey_hash, hash, BLAKE160_SIZE) != 0) {
     return ERROR_PUBKEY_BLAKE160_HASH;
   }
 
@@ -206,66 +204,24 @@ int verify_sighash_all(const char* serialized_pubkey_hash,
   }
 
   secp256k1_pubkey pubkey;
-  ret = secp256k1_ec_pubkey_parse(&context, &pubkey, buf, len);
+  ret = secp256k1_ec_pubkey_parse(&context, &pubkey, binary_pubkey, PUBKEY_SIZE);
   if (ret == 0) {
     return ERROR_SECP_PARSE_PUBKEY;
   }
 
-  ret = hex_to_bin(buf, TEMP_BUFFER_SIZE, serialized_signature);
-  CHECK_LEN(ret);
   secp256k1_ecdsa_signature signature;
-  ret = secp256k1_ecdsa_signature_parse_der(&context, &signature, buf, ret);
+  ret = secp256k1_ecdsa_signature_parse_compact(&context, &signature, binary_signature);
   if (ret == 0) {
     return ERROR_SECP_PARSE_SIGNATURE;
   }
 
-  volatile uint64_t tx_size = TX_BUFFER_SIZE;
-  if (ckb_load_tx(tx_buf, &tx_size, 0) != CKB_SUCCESS) {
+  uint64_t size = BLAKE2B_BLOCK_SIZE;
+  if (ckb_load_tx_hash(hash, &size, 0) != CKB_SUCCESS || size != BLAKE2B_BLOCK_SIZE) {
     return ERROR_LOAD_TX;
   }
 
-  /*
-   * NOTE: we could've saved this tx structure somewhere, or pass it
-   * in as a parameter to allow sharing of the data, but consider the
-   * fact that signature is passed via witness, we can add a syscall
-   * to expose transaction hash and sign the whole thing together instead
-   * of signing each individual field here. Hence we are sticking with
-   * the simple route here, and only load the whole transaction within
-   * this function.
-   */
-  ns(Transaction_table_t) tx;
-  if (!(tx = ns(Transaction_as_root(tx_buf)))) {
-    return ERROR_PARSE_TX;
-  }
-
   blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
-
-  /* Hash all inputs */
-  ns(CellInput_vec_t) inputs = ns(Transaction_inputs(tx));
-  size_t inputs_len = ns(CellInput_vec_len(inputs));
-  for (int i = 0; i < inputs_len; i++) {
-    ns(CellInput_table_t) input = ns(CellInput_vec_at(inputs, i));
-    update_h256(&blake2b_ctx, ns(CellInput_tx_hash(input)));
-    update_uint32_t(&blake2b_ctx, ns(CellInput_index(input)));
-  }
-
-  /* Hash all outputs */
-  ns(CellOutput_vec_t) outputs = ns(Transaction_outputs(tx));
-  size_t outputs_len = ns(CellOutput_vec_len(outputs));
-  for (int i = 0; i < outputs_len; i++) {
-    ns(CellOutput_table_t) output = ns(CellOutput_vec_at(outputs, i));
-    update_uint64_t(&blake2b_ctx, ns(CellOutput_capacity(output)));
-    volatile uint64_t len = TEMP_BUFFER_SIZE;
-    if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_LOCK_HASH) != CKB_SUCCESS) {
-      return ERROR_LOAD_LOCK_HASH;
-    }
-    blake2b_update(&blake2b_ctx, buf, len);
-    len = TEMP_BUFFER_SIZE;
-    if (ckb_load_cell_by_field(buf, &len, 0, i, CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH) == CKB_SUCCESS) {
-      blake2b_update(&blake2b_ctx, buf, len);
-    }
-  }
-
+  blake2b_update(&blake2b_ctx, hash, BLAKE2B_BLOCK_SIZE);
   blake2b_final(&blake2b_ctx, hash, BLAKE2B_BLOCK_SIZE);
 
   ret = secp256k1_ecdsa_verify(&context, &signature, hash, &pubkey);
@@ -285,14 +241,14 @@ int verify_sighash_all(const char* serialized_pubkey_hash,
  * for SIGHASH_SINGLE, it stores an integer denoting the index of output to be
  * signed; for SIGHASH_MULTIPLE, it stores a string of `,` separated array denoting
  * outputs to sign
- * 
+ *
  * Witness:
  * 4. pubkey, real pubkey used to identify token owner
  * 5. signature, signature used to present ownership
  */
 int verify_bitcoin_sighash(int argc, char* argv[])
 {
-  unsigned char hash[BLAKE2B_BLOCK_SIZE];
+  unsigned char hash[BLAKE2B_BLOCK_SIZE], script_hash[BLAKE2B_BLOCK_SIZE];
   char tx_buf[TX_BUFFER_SIZE];
   char buf[TEMP_BUFFER_SIZE];
   int ret, len;
@@ -302,18 +258,12 @@ int verify_bitcoin_sighash(int argc, char* argv[])
   }
 
   /* Check pubkey hash */
-  len = hex_to_bin(buf, TEMP_BUFFER_SIZE, argv[argc - 2]);
-  CHECK_LEN(len);
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
-  blake2b_update(&blake2b_ctx, buf, len);
+  blake2b_update(&blake2b_ctx, argv[argc - 2], PUBKEY_SIZE);
   blake2b_final(&blake2b_ctx, hash, BLAKE2B_BLOCK_SIZE);
 
-  /* tx_buf is not yet used, we can borrow it as a temp buffer */
-  if (hex_to_bin(tx_buf, BLAKE160_SIZE, argv[1]) != BLAKE160_SIZE) {
-    return ERROR_PUBKEY_BLAKE160_HASH_LENGTH;
-  }
-  if (memcmp(tx_buf, hash, BLAKE160_SIZE) != 0) {
+  if (memcmp(argv[1], hash, BLAKE160_SIZE) != 0) {
     return ERROR_PUBKEY_BLAKE160_HASH;
   }
 
@@ -323,15 +273,13 @@ int verify_bitcoin_sighash(int argc, char* argv[])
   }
 
   secp256k1_pubkey pubkey;
-  ret = secp256k1_ec_pubkey_parse(&context, &pubkey, buf, len);
+  ret = secp256k1_ec_pubkey_parse(&context, &pubkey, argv[argc - 2], PUBKEY_SIZE);
   if (ret == 0) {
     return ERROR_SECP_PARSE_PUBKEY;
   }
 
-  ret = hex_to_bin(buf, TEMP_BUFFER_SIZE, argv[argc - 1]);
-  CHECK_LEN(ret);
   secp256k1_ecdsa_signature signature;
-  ret = secp256k1_ecdsa_signature_parse_der(&context, &signature, buf, ret);
+  ret = secp256k1_ecdsa_signature_parse_compact(&context, &signature, argv[argc - 1]);
   if (ret == 0) {
     return ERROR_SECP_PARSE_SIGNATURE;
   }
@@ -348,30 +296,44 @@ int verify_bitcoin_sighash(int argc, char* argv[])
     return ERROR_LOAD_TX;
   }
 
+  volatile uint64_t script_size = BLAKE2B_BLOCK_SIZE;
+  if (ckb_load_script_hash(script_hash, &script_size, 0) != CKB_SUCCESS || script_size != BLAKE2B_BLOCK_SIZE) {
+    return ERROR_LOAD_SCRIPT_HASH;
+  }
+
   ns(Transaction_table_t) tx;
   if (!(tx = ns(Transaction_as_root(tx_buf)))) {
     return ERROR_PARSE_TX;
   }
 
   if ((sighash_type & SIGHASH_ANYONECANPAY) != 0) {
-    /* Only hash current input */
-    volatile uint64_t len = TEMP_BUFFER_SIZE;
-    if (ckb_load_input_by_field(buf, &len, 0, 0, CKB_SOURCE_CURRENT, CKB_INPUT_FIELD_OUT_POINT) != CKB_SUCCESS) {
-      return ERROR_LOAD_SELF_OUT_POINT;
+    /* Only hash current input groups */
+    ns(CellInput_vec_t) inputs = ns(Transaction_inputs(tx));
+    size_t inputs_len = ns(CellInput_vec_len(inputs));
+    for (int i = 0; i < inputs_len; i++) {
+      volatile uint64_t len = BLAKE2B_BLOCK_SIZE;
+      if (ckb_load_cell_by_field(hash, &len, 0, i, CKB_SOURCE_INPUT, CKB_CELL_FIELD_LOCK_HASH) != CKB_SUCCESS || len != BLAKE2B_BLOCK_SIZE) {
+        return ERROR_LOAD_SCRIPT_HASH;
+      }
+
+      if (memcmp(hash, script_hash, BLAKE2B_BLOCK_SIZE) == 0) {
+        ns(CellInput_table_t) input = ns(CellInput_vec_at(inputs, i));
+        update_h256(&blake2b_ctx, ns(CellInput_block_hash(input)));
+        update_h256(&blake2b_ctx, ns(CellInput_tx_hash(input)));
+        update_uint32_t(&blake2b_ctx, ns(CellInput_index(input)));
+        update_uint64_t(&blake2b_ctx, ns(CellInput_since(input)));
+      }
     }
-    ns(OutPoint_table_t) op;
-    if (!(op = ns(OutPoint_as_root(buf)))) {
-      return ERROR_PARSE_SELF_OUT_POINT;
-    }
-    update_out_point(&blake2b_ctx, op);
   } else {
     /* Hash all inputs */
     ns(CellInput_vec_t) inputs = ns(Transaction_inputs(tx));
     size_t inputs_len = ns(CellInput_vec_len(inputs));
     for (int i = 0; i < inputs_len; i++) {
       ns(CellInput_table_t) input = ns(CellInput_vec_at(inputs, i));
+      update_h256(&blake2b_ctx, ns(CellInput_block_hash(input)));
       update_h256(&blake2b_ctx, ns(CellInput_tx_hash(input)));
       update_uint32_t(&blake2b_ctx, ns(CellInput_index(input)));
+      update_uint64_t(&blake2b_ctx, ns(CellInput_since(input)));
     }
   }
 
