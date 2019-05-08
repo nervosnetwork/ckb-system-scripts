@@ -512,13 +512,14 @@ __flatbuffers_define_struct_field(1, Ckb_Protocol_Header, parent_hash, Ckb_Proto
 __flatbuffers_define_scalar_field(2, Ckb_Protocol_Header, timestamp, flatbuffers_uint64, uint64_t, UINT64_C(0))
 __flatbuffers_define_scalar_field(3, Ckb_Protocol_Header, number, flatbuffers_uint64, uint64_t, UINT64_C(0))
 __flatbuffers_define_struct_field(4, Ckb_Protocol_Header, transactions_root, Ckb_Protocol_H256_struct_t, 0)
-__flatbuffers_define_struct_field(5, Ckb_Protocol_Header, proposals_root, Ckb_Protocol_H256_struct_t, 0)
-__flatbuffers_define_struct_field(6, Ckb_Protocol_Header, witnesses_root, Ckb_Protocol_H256_struct_t, 0)
+__flatbuffers_define_struct_field(5, Ckb_Protocol_Header, witnesses_root, Ckb_Protocol_H256_struct_t, 0)
+__flatbuffers_define_struct_field(6, Ckb_Protocol_Header, proposals_hash, Ckb_Protocol_H256_struct_t, 0)
 __flatbuffers_define_table_field(7, Ckb_Protocol_Header, difficulty, Ckb_Protocol_Bytes_table_t, 0)
 __flatbuffers_define_scalar_field(8, Ckb_Protocol_Header, nonce, flatbuffers_uint64, uint64_t, UINT64_C(0))
 __flatbuffers_define_table_field(9, Ckb_Protocol_Header, proof, Ckb_Protocol_Bytes_table_t, 0)
 __flatbuffers_define_struct_field(10, Ckb_Protocol_Header, uncles_hash, Ckb_Protocol_H256_struct_t, 0)
 __flatbuffers_define_scalar_field(11, Ckb_Protocol_Header, uncles_count, flatbuffers_uint32, uint32_t, UINT32_C(0))
+__flatbuffers_define_scalar_field(12, Ckb_Protocol_Header, epoch, flatbuffers_uint64, uint64_t, UINT64_C(0))
 
 struct Ckb_Protocol_Block_table { uint8_t unused__; };
 
@@ -576,8 +577,9 @@ static inline Ckb_Protocol_OutPoint_table_t Ckb_Protocol_OutPoint_vec_at(Ckb_Pro
 __flatbuffers_offset_vec_at(Ckb_Protocol_OutPoint_table_t, vec, i, 0)
 __flatbuffers_table_as_root(Ckb_Protocol_OutPoint)
 
-__flatbuffers_define_struct_field(0, Ckb_Protocol_OutPoint, tx_hash, Ckb_Protocol_H256_struct_t, 0)
-__flatbuffers_define_scalar_field(1, Ckb_Protocol_OutPoint, index, flatbuffers_uint32, uint32_t, UINT32_C(0))
+__flatbuffers_define_struct_field(0, Ckb_Protocol_OutPoint, block_hash, Ckb_Protocol_H256_struct_t, 0)
+__flatbuffers_define_struct_field(1, Ckb_Protocol_OutPoint, tx_hash, Ckb_Protocol_H256_struct_t, 0)
+__flatbuffers_define_scalar_field(2, Ckb_Protocol_OutPoint, index, flatbuffers_uint32, uint32_t, UINT32_C(0))
 
 struct Ckb_Protocol_CellInput_table { uint8_t unused__; };
 
@@ -587,10 +589,11 @@ static inline Ckb_Protocol_CellInput_table_t Ckb_Protocol_CellInput_vec_at(Ckb_P
 __flatbuffers_offset_vec_at(Ckb_Protocol_CellInput_table_t, vec, i, 0)
 __flatbuffers_table_as_root(Ckb_Protocol_CellInput)
 
-__flatbuffers_define_struct_field(0, Ckb_Protocol_CellInput, tx_hash, Ckb_Protocol_H256_struct_t, 0)
-__flatbuffers_define_scalar_field(1, Ckb_Protocol_CellInput, index, flatbuffers_uint32, uint32_t, UINT32_C(0))
-__flatbuffers_define_scalar_field(2, Ckb_Protocol_CellInput, since, flatbuffers_uint64, uint64_t, UINT64_C(0))
-__flatbuffers_define_vector_field(3, Ckb_Protocol_CellInput, args, Ckb_Protocol_Bytes_vec_t, 0)
+__flatbuffers_define_struct_field(0, Ckb_Protocol_CellInput, block_hash, Ckb_Protocol_H256_struct_t, 0)
+__flatbuffers_define_struct_field(1, Ckb_Protocol_CellInput, tx_hash, Ckb_Protocol_H256_struct_t, 0)
+__flatbuffers_define_scalar_field(2, Ckb_Protocol_CellInput, index, flatbuffers_uint32, uint32_t, UINT32_C(0))
+__flatbuffers_define_scalar_field(3, Ckb_Protocol_CellInput, since, flatbuffers_uint64, uint64_t, UINT64_C(0))
+__flatbuffers_define_vector_field(4, Ckb_Protocol_CellInput, args, Ckb_Protocol_Bytes_vec_t, 0)
 
 struct Ckb_Protocol_CellOutput_table { uint8_t unused__; };
 
