@@ -183,7 +183,8 @@ void update_out_point(blake2b_state *ctx, ns(OutPoint_table_t) outpoint)
 
 int verify_sighash_all(const unsigned char* binary_pubkey_hash,
                        const unsigned char* binary_pubkey,
-                       const unsigned char* binary_signature)
+                       const unsigned char* binary_signature,
+                       size_t signature_size)
 {
   unsigned char hash[BLAKE2B_BLOCK_SIZE];
   int ret;
@@ -210,7 +211,7 @@ int verify_sighash_all(const unsigned char* binary_pubkey_hash,
   }
 
   secp256k1_ecdsa_signature signature;
-  ret = secp256k1_ecdsa_signature_parse_compact(&context, &signature, binary_signature);
+  ret = secp256k1_ecdsa_signature_parse_der(&context, &signature, binary_signature, signature_size);
   if (ret == 0) {
     return ERROR_SECP_PARSE_SIGNATURE;
   }
