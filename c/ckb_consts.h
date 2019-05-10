@@ -6,6 +6,9 @@
 #define SYS_ckb_load_cell 2053
 #define SYS_ckb_load_cell_by_field 2054
 #define SYS_ckb_load_input_by_field 2055
+#define SYS_ckb_load_header 2056
+#define SYS_ckb_load_tx_hash 2057
+#define SYS_ckb_load_script_hash 2058
 #define SYS_ckb_debug 2177
 
 #define CKB_SUCCESS 0
@@ -23,7 +26,7 @@
 #define CKB_CELL_FIELD_TYPE 4
 #define CKB_CELL_FIELD_TYPE_HASH 5
 
-#define CKB_INPUT_FIELD_UNLOCK 0
+#define CKB_INPUT_FIELD_ARGS 0
 #define CKB_INPUT_FIELD_OUT_POINT 1
 
 #endif  /* CKB_CONSTS_H_ */
