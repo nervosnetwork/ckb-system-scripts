@@ -6,6 +6,7 @@
 #define SYS_ckb_load_script_hash 2062
 #define SYS_ckb_load_cell 2071
 #define SYS_ckb_load_header 2072
+#define SYS_ckb_load_input 2073
 #define SYS_ckb_load_cell_by_field 2081
 #define SYS_ckb_load_input_by_field 2083
 #define SYS_ckb_debug 2177

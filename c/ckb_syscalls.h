@@ -49,7 +49,7 @@ int ckb_load_cell(void* addr, volatile uint64_t* len, size_t offset, size_t inde
 int ckb_load_input(void* addr, volatile uint64_t* len, size_t offset,
                            size_t index, size_t source)
 {
-  return syscall(SYS_ckb_load_cell_by_field, addr, len, offset, index, source, 0);
+  return syscall(SYS_ckb_load_input, addr, len, offset, index, source, 0);
 }
 
 int ckb_load_header(void* addr, volatile uint64_t* len, size_t offset,
