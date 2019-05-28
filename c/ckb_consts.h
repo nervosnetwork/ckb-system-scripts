@@ -7,6 +7,7 @@
 #define SYS_ckb_load_cell 2071
 #define SYS_ckb_load_header 2072
 #define SYS_ckb_load_input 2073
+#define SYS_ckb_load_witness 2074
 #define SYS_ckb_load_cell_by_field 2081
 #define SYS_ckb_load_input_by_field 2083
 #define SYS_ckb_debug 2177
@@ -18,6 +19,8 @@
 #define CKB_SOURCE_INPUT 1
 #define CKB_SOURCE_OUTPUT 2
 #define CKB_SOURCE_DEP 3
+#define CKB_SOURCE_GROUP_INPUT 0x0100000000000001
+#define CKB_SOURCE_GROUP_OUTPUT 0x0100000000000002
 
 #define CKB_CELL_FIELD_CAPACITY 0
 #define CKB_CELL_FIELD_DATA 1
