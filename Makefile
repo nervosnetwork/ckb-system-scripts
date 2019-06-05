@@ -14,7 +14,7 @@ build/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c c/proto
 $(SECP256K1_LIB):
 	cd deps/secp256k1 && \
 		./autogen.sh && \
-		CC=$(CC) LD=$(LD) ./configure --with-bignum=no --enable-ecmult-static-precomputation --enable-endomorphism --host=$(TARGET) && \
+		CC=$(CC) LD=$(LD) ./configure --with-bignum=no --enable-ecmult-static-precomputation --enable-endomorphism --enable-module-recovery --host=$(TARGET) && \
 		make libsecp256k1.la
 
 c/protocol_reader.h: c/protocol.fbs $(FLATCC)
