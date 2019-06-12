@@ -24,6 +24,12 @@ c/protocol_reader.h: c/protocol.fbs $(FLATCC)
 $(FLATCC):
 	cd deps/flatcc && scripts/initbuild.sh make && scripts/build.sh
 
+ci:
+	docker run --rm -v `pwd`:/code xxuejie/riscv-gnu-toolchain-rv64imac:xenial-20190606 bash -c "cd /code && make"
+	mkdir -p tests/tmp
+	cp build/secp256k1_blake160_sighash_all tests/tmp/
+	cd tests && cargo test
+
 clean:
 	rm -rf build/secp256k1_blake160_sighash_all
 	cd deps/flatcc && scripts/cleanall.sh
