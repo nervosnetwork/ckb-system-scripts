@@ -14,7 +14,7 @@ build/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c c/proto
 $(SECP256K1_LIB):
 	cd deps/secp256k1 && \
 		./autogen.sh && \
-		CC=$(CC) LD=$(LD) ./configure --with-bignum=no --enable-ecmult-static-precomputation --enable-endomorphism --host=$(TARGET) && \
+		CC=$(CC) LD=$(LD) ./configure --with-bignum=no --enable-ecmult-static-precomputation --enable-endomorphism --enable-module-recovery --host=$(TARGET) && \
 		make libsecp256k1.la
 
 c/protocol_reader.h: c/protocol.fbs $(FLATCC)
@@ -23,6 +23,12 @@ c/protocol_reader.h: c/protocol.fbs $(FLATCC)
 
 $(FLATCC):
 	cd deps/flatcc && scripts/initbuild.sh make && scripts/build.sh
+
+ci:
+	docker run --rm -v `pwd`:/code xxuejie/riscv-gnu-toolchain-rv64imac:xenial-20190606 bash -c "cd /code && make"
+	mkdir -p tests/tmp
+	cp build/secp256k1_blake160_sighash_all tests/tmp/
+	cd tests && cargo test
 
 clean:
 	rm -rf build/secp256k1_blake160_sighash_all
