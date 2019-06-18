@@ -16,7 +16,7 @@ const MAX_CYCLES: u64 = std::u64::MAX;
 
 lazy_static! {
     pub static ref SIGHASH_ALL_BIN: Bytes =
-        Bytes::from(&include_bytes!("../tmp/secp256k1_blake160_sighash_all")[..]);
+        Bytes::from(&include_bytes!("../specs/cells/secp256k1_blake160_sighash_all")[..]);
 }
 
 #[derive(Default)]

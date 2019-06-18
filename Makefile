@@ -26,9 +26,9 @@ $(FLATCC):
 
 ci:
 	docker run --rm -v `pwd`:/code xxuejie/riscv-gnu-toolchain-rv64imac:xenial-20190606 bash -c "cd /code && make"
-	mkdir -p tests/tmp
-	cp build/secp256k1_blake160_sighash_all tests/tmp/
-	cd tests && cargo test
+	cp -f build/secp256k1_blake160_sighash_all specs/cells/
+	git diff --exit-code
+	cargo test --all
 
 clean:
 	rm -rf build/secp256k1_blake160_sighash_all
