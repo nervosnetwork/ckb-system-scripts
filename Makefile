@@ -26,11 +26,8 @@ $(FLATCC):
 
 ci:
 	docker run --rm -v `pwd`:/code xxuejie/riscv-gnu-toolchain-rv64imac:xenial-20190606 bash -c "cd /code && make"
-	# remove after binary update
-	mkdir -p tests/tmp
-	cp build/secp256k1_blake160_sighash_all tests/tmp/
-	# cp -f build/secp256k1_blake160_sighash_all specs/cells/
-	# git diff --exit-code
+	cp -f build/secp256k1_blake160_sighash_all specs/cells/
+	git diff --exit-code
 	cargo test --all
 
 clean:

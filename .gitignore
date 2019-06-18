@@ -55,6 +55,6 @@ build/
 c/flatbuffers_common_reader.h
 c/protocol_reader.h
 
-./target
+target
 ./tmp
 .idea/

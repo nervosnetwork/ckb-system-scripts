@@ -36,7 +36,7 @@ fn main() {
     blake2b.finalize(&mut hash);
 
     assert_eq!(
-        "f1951123466e4479842387a66fabfd6b65fc87fd84ae8e6cd3053edb27fff2fd",
+        "94334bdda40b69bae067d84937aa6bbccf8acd0df6626d4b9ac70d4612a11933",
         &faster_hex::hex_string(&hash).unwrap()
     );
 
