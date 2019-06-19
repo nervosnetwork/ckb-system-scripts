@@ -1,8 +1,8 @@
 #ifndef CKB_SYSCALLS_H_
 #define CKB_SYSCALLS_H_
 
+#include <stddef.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 #include "ckb_consts.h"
 
