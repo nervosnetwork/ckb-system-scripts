@@ -12,12 +12,10 @@ const PATH_PREFIX: &str = "specs/cells/";
 const BUF_SIZE: usize = 8 * 1024;
 const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 
-const BINARIES: &[(&str, &str)] = &[
-    (
-        "secp256k1_blake160_sighash_all",
-        "94334bdda40b69bae067d84937aa6bbccf8acd0df6626d4b9ac70d4612a11933",
-    ),
-];
+const BINARIES: &[(&str, &str)] = &[(
+    "secp256k1_blake160_sighash_all",
+    "94334bdda40b69bae067d84937aa6bbccf8acd0df6626d4b9ac70d4612a11933",
+)];
 
 fn main() {
     let mut bundled = includedir_codegen::start("BUNDLED_CELL");
