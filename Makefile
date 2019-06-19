@@ -30,6 +30,24 @@ ci:
 	git diff --exit-code
 	cargo test --all
 
+publish:
+	git diff --exit-code Cargo.toml
+	sed -i.bak 's/.*git =/# &/' Cargo.toml
+	cargo publish --allow-dirty
+	git checkout Cargo.toml Cargo.lock
+	rm -f Cargo.toml.bak
+
+package:
+	git diff --exit-code Cargo.toml
+	sed -i.bak 's/.*git =/# &/' Cargo.toml
+	cargo package --allow-dirty
+	git checkout Cargo.toml Cargo.lock
+	rm -f Cargo.toml.bak
+
+package-clean:
+	git checkout Cargo.toml Cargo.lock
+	rm -rf Cargo.toml.bak target/package/
+
 clean:
 	rm -rf build/secp256k1_blake160_sighash_all
 	cd deps/flatcc && scripts/cleanall.sh
