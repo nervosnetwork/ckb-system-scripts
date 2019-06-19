@@ -47,6 +47,7 @@ table Header {
     uncles_hash:            H256;
     uncles_count:           uint32;
     epoch:                  uint64;
+    dao:                    Bytes;
 }
 
 table Block {
@@ -84,7 +85,6 @@ table CellInput {
     tx_hash:        H256;
     index:          uint32;
     since:          uint64;
-    args:           [Bytes];
 }
 
 table CellOutput {
@@ -240,4 +240,26 @@ table TimeMessage {
 
 table Time {
     timestamp: uint64;
+}
+
+table AlertMessage {
+    payload:        Alert;
+}
+
+table Alert {
+    id: uint32;
+    cancel: uint32;
+    min_version: Bytes;
+    max_version: Bytes;
+    priority: uint32;
+    signatures: [Bytes];
+    notice_until: uint64;
+    message: Bytes;
+}
+
+table Identify {
+  // network name
+  name: string;
+  // flag
+  flag: uint64;
 }
