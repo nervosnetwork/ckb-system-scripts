@@ -19,7 +19,7 @@ const BINARIES: &[(&str, &str)] = &[
     ),
     (
         "dao",
-        "0fe8ddd199ba79bddfe59af415b656844b8642a1fb0e6ae839e08445973e037b",
+        "717ead81722d6a14581ceb475b487d35d1dad93d37acdfb17d2bb25906cb8ba1",
     ),
 ];
 
