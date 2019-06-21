@@ -1,50 +1,14 @@
+use super::{sign_tx, DummyDataLoader, MAX_CYCLES, SIGHASH_ALL_BIN};
 use ckb_core::{
-    cell::{CellMeta, CellMetaBuilder, ResolvedOutPoint, ResolvedTransaction},
-    extras::BlockExt,
+    cell::{CellMetaBuilder, ResolvedOutPoint, ResolvedTransaction},
     script::Script,
-    transaction::{CellInput, CellOutPoint, CellOutput, OutPoint, Transaction, TransactionBuilder},
+    transaction::{CellInput, CellOutput, OutPoint, Transaction, TransactionBuilder},
     Bytes, Capacity,
 };
-use ckb_script::{DataLoader, ScriptConfig, ScriptError, TransactionScriptsVerifier};
+use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
 use crypto::secp::{Generator, Privkey};
-use lazy_static::lazy_static;
 use numext_fixed_hash::H256;
 use rand::{thread_rng, Rng};
-use std::collections::HashMap;
-
-const MAX_CYCLES: u64 = std::u64::MAX;
-
-lazy_static! {
-    pub static ref SIGHASH_ALL_BIN: Bytes =
-        Bytes::from(&include_bytes!("../specs/cells/secp256k1_blake160_sighash_all")[..]);
-}
-
-#[derive(Default)]
-struct DummyDataLoader {
-    cells: HashMap<CellOutPoint, CellOutput>,
-}
-
-impl DummyDataLoader {
-    fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl DataLoader for DummyDataLoader {
-    // load CellOutput
-    fn lazy_load_cell_output(&self, cell: &CellMeta) -> CellOutput {
-        cell.cell_output.clone().unwrap_or_else(|| {
-            self.cells
-                .get(&cell.out_point)
-                .cloned()
-                .expect("must exists")
-        })
-    }
-    // load BlockExt
-    fn get_block_ext(&self, _hash: &H256) -> Option<BlockExt> {
-        unreachable!()
-    }
-}
 
 fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Vec<Bytes>) -> Transaction {
     let previous_tx_hash = {
@@ -95,19 +59,6 @@ fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Vec<Bytes>
             Default::default(),
             None,
         ))
-        .build()
-}
-
-fn sign_tx(tx: Transaction, key: &Privkey) -> Transaction {
-    // calculate message
-    let mut blake2b = hash::new_blake2b();
-    let mut message = [0u8; 32];
-    blake2b.update(&tx.hash()[..]);
-    blake2b.finalize(&mut message);
-    let message = H256::from(message);
-    let sig = key.sign_recoverable(&message).expect("sign");
-    TransactionBuilder::from_transaction(tx)
-        .witness(vec![Bytes::from(sig.serialize())])
         .build()
 }
 
