@@ -16,6 +16,7 @@
 #define ERROR_SECP_SERIALIZE_PUBKEY -9
 #define ERROR_BUFFER_NOT_ENOUGH -10
 #define ERROR_ENCODING -11
+#define ERROR_WITNESS_TOO_LONG -12
 
 #define BLAKE2B_BLOCK_SIZE 32
 #define BLAKE160_SIZE 20
@@ -126,6 +127,9 @@ int main(int argc, char* argv[])
     ret = ckb_load_witness(witness, &len, 0, index, CKB_SOURCE_GROUP_INPUT);
     if (ret != CKB_SUCCESS) {
       return ERROR_SYSCALL;
+    }
+    if (len > WITNESS_SIZE) {
+      return ERROR_WITNESS_TOO_LONG;
     }
 
     if (!(witness_table = ns(Witness_as_root(witness)))) {

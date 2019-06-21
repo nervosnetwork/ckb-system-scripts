@@ -220,3 +220,42 @@ fn test_signing_wrong_tx_hash() {
         .verify(MAX_CYCLES);
     assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-3)));
 }
+
+#[test]
+fn test_super_long_witness() {
+    let mut data_loader = DummyDataLoader::new();
+    let key_gen = Generator::new();
+    let privkey = key_gen.random_privkey();
+    let pubkey = privkey.pubkey().expect("pubkey");
+    // compute pubkey hash
+    let pubkey_hash = {
+        let ser_pk = pubkey.serialize();
+        hash::blake2b_256(ser_pk)[..20].to_vec()
+    };
+    let tx = gen_tx(
+        &mut data_loader,
+        SIGHASH_ALL_BIN.clone(),
+        vec![pubkey_hash.into()],
+    );
+
+    let mut buffer: Vec<u8> = vec![];
+    buffer.resize(40000, 1);
+    let super_long_message = Bytes::from(&buffer[..]);
+
+    let mut blake2b = hash::new_blake2b();
+    let mut message = [0u8; 32];
+    blake2b.update(&tx.hash()[..]);
+    blake2b.update(&super_long_message[..]);
+    blake2b.finalize(&mut message);
+    let message = H256::from(message);
+    let sig = privkey.sign_recoverable(&message).expect("sign");
+    let tx = TransactionBuilder::from_transaction(tx)
+        .witness(vec![Bytes::from(sig.serialize()), super_long_message])
+        .build();
+
+    let resolved_tx = build_resolved_tx(&tx, SIGHASH_ALL_BIN.len());
+    let script_config = ScriptConfig::default();
+    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
+        .verify(MAX_CYCLES);
+    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-12)));
+}
