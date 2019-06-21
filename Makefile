@@ -58,4 +58,4 @@ clean:
 
 dist: clean all
 
-.PHONY: all update_schema clean dist all-via-docker
+.PHONY: all all-via-docker dist clean package-clean package publish
