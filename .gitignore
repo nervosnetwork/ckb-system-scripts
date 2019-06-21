@@ -58,3 +58,4 @@ c/protocol_reader.h
 target
 ./tmp
 .idea/
+/specs/cells

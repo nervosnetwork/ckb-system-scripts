@@ -6,9 +6,15 @@ LDFLAGS := -Wl,-static -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl
 SECP256K1_LIB := deps/secp256k1/.libs/libsecp256k1.a
 FLATCC := deps/flatcc/bin/flatcc
 
-all: build/secp256k1_blake160_sighash_all
+# docker pull xxuejie/riscv-gnu-toolchain-rv64imac:xenial-20190606
+BUILDER_DOCKER := xxuejie/riscv-gnu-toolchain-rv64imac@sha256:4f71556b7ea8f450243e2b2483bca046da1c0d76c2d34d120aa0fbf1a0688ec0
 
-build/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c c/protocol_reader.h $(SECP256K1_LIB)
+all: specs/cells/secp256k1_blake160_sighash_all
+
+all-via-docker:
+	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
+
+specs/cells/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c c/protocol_reader.h $(SECP256K1_LIB)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 $(SECP256K1_LIB):
@@ -24,11 +30,23 @@ c/protocol_reader.h: c/protocol.fbs $(FLATCC)
 $(FLATCC):
 	cd deps/flatcc && scripts/initbuild.sh make && scripts/build.sh
 
-ci:
-	docker run --rm -v `pwd`:/code xxuejie/riscv-gnu-toolchain-rv64imac:xenial-20190606 bash -c "cd /code && make"
-	cp -f build/secp256k1_blake160_sighash_all specs/cells/
-	git diff --exit-code
-	cargo test --all
+publish:
+	git diff --exit-code Cargo.toml
+	sed -i.bak 's/.*git =/# &/' Cargo.toml
+	cargo publish --allow-dirty
+	git checkout Cargo.toml Cargo.lock
+	rm -f Cargo.toml.bak
+
+package:
+	git diff --exit-code Cargo.toml
+	sed -i.bak 's/.*git =/# &/' Cargo.toml
+	cargo package --allow-dirty
+	git checkout Cargo.toml Cargo.lock
+	rm -f Cargo.toml.bak
+
+package-clean:
+	git checkout Cargo.toml Cargo.lock
+	rm -rf Cargo.toml.bak target/package/
 
 clean:
 	rm -rf build/secp256k1_blake160_sighash_all
@@ -37,4 +55,4 @@ clean:
 
 dist: clean all
 
-.PHONY: all update_schema clean dist
+.PHONY: all update_schema clean dist all-via-docker

@@ -242,7 +242,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ckb-system-cells"
+name = "ckb-system-scripts"
 version = "0.1.0"
 dependencies = [
  "blake2b-rs 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
