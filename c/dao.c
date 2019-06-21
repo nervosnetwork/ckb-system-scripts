@@ -22,7 +22,7 @@
 #define LOCK_PERIOD_BLOCKS 10
 #define MATURITY_BLOCKS 5
 
-#define MIN(a, b) (((a) > (b)) ? (b) : (a))
+#define MAX(a, b) (((a) < (b)) ? (b) : (a))
 
 static int extract_bytes(ns(Bytes_table_t) bytes, unsigned char *buffer,
                          volatile size_t *s) {
@@ -126,7 +126,7 @@ static int calculate_dao_input_capacity(size_t input_index,
   uint64_t windowleft = LOCK_PERIOD_BLOCKS -
                         (withdraw_number - deposit_number) % LOCK_PERIOD_BLOCKS;
   uint64_t minimal_since =
-      withdraw_number + MIN(MATURITY_BLOCKS, windowleft) + 1;
+      withdraw_number + MAX(MATURITY_BLOCKS, windowleft) + 1;
 
   volatile uint64_t input_since = 0;
   len = 8;
