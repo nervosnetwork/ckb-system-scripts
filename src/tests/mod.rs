@@ -7,8 +7,8 @@ use ckb_core::{
     transaction::{CellOutPoint, CellOutput, Transaction, TransactionBuilder, Witness},
     Bytes,
 };
+use ckb_crypto::secp::Privkey;
 use ckb_script::DataLoader;
-use crypto::secp::Privkey;
 use lazy_static::lazy_static;
 use numext_fixed_hash::H256;
 use std::collections::HashMap;
@@ -55,7 +55,7 @@ pub fn sign_tx(tx: Transaction, key: &Privkey) -> Transaction {
         .enumerate()
         .map(|(i, _)| {
             let witness = tx.witnesses().get(i).cloned().unwrap_or(vec![]);
-            let mut blake2b = hash::new_blake2b();
+            let mut blake2b = ckb_hash::new_blake2b();
             let mut message = [0u8; 32];
             blake2b.update(&tx.hash()[..]);
             for data in &witness {

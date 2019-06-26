@@ -7,9 +7,9 @@ use ckb_core::{
     transaction::{CellInput, CellOutput, OutPoint, Transaction, TransactionBuilder},
     BlockNumber, Bytes, Capacity,
 };
+use ckb_crypto::secp::{Generator, Privkey};
+use ckb_dao_utils::pack_dao_data;
 use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
-use crypto::secp::{Generator, Privkey};
-use dao_utils::pack_dao_data;
 use numext_fixed_hash::H256;
 use rand::{thread_rng, Rng};
 
@@ -87,7 +87,7 @@ fn gen_lock() -> (Privkey, Vec<Bytes>) {
     // compute pubkey hash
     let pubkey_hash = {
         let ser_pk = pubkey.serialize();
-        hash::blake2b_256(ser_pk)[..20].to_vec()
+        ckb_hash::blake2b_256(ser_pk)[..20].to_vec()
     };
     let lock_args = vec![pubkey_hash.into()];
     (privkey, lock_args)
@@ -540,7 +540,7 @@ fn test_dao_missing_invalid_withdraw_header() {
     let script_config = ScriptConfig::default();
     let verify_result =
         TransactionScriptsVerifier::new(&rtx, &data_loader, &script_config).verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-13)));
+    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-14)));
 }
 
 #[test]
@@ -596,7 +596,7 @@ fn test_dao_missing_invalid_since() {
     let script_config = ScriptConfig::default();
     let verify_result =
         TransactionScriptsVerifier::new(&rtx, &data_loader, &script_config).verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-13)));
+    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-14)));
 }
 
 #[test]
@@ -652,5 +652,5 @@ fn test_dao_invalid_withdraw_amount() {
     let script_config = ScriptConfig::default();
     let verify_result =
         TransactionScriptsVerifier::new(&rtx, &data_loader, &script_config).verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-14)));
+    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-15)));
 }

@@ -5,8 +5,8 @@ use ckb_core::{
     transaction::{CellInput, CellOutput, OutPoint, Transaction, TransactionBuilder},
     Bytes, Capacity,
 };
+use ckb_crypto::secp::{Generator, Privkey};
 use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
-use crypto::secp::{Generator, Privkey};
 use numext_fixed_hash::H256;
 use rand::{thread_rng, Rng};
 
@@ -64,7 +64,7 @@ fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Vec<Bytes>
 
 fn sign_tx_hash(tx: Transaction, key: &Privkey, tx_hash: &[u8]) -> Transaction {
     // calculate message
-    let mut blake2b = hash::new_blake2b();
+    let mut blake2b = ckb_hash::new_blake2b();
     let mut message = [0u8; 32];
     blake2b.update(tx_hash);
     blake2b.finalize(&mut message);
@@ -103,7 +103,7 @@ fn test_sighash_all_unlock() {
     // compute pubkey hash
     let pubkey_hash = {
         let ser_pk = pubkey.serialize();
-        hash::blake2b_256(ser_pk)[..20].to_vec()
+        ckb_hash::blake2b_256(ser_pk)[..20].to_vec()
     };
     let tx = gen_tx(
         &mut data_loader,
@@ -128,7 +128,7 @@ fn test_signing_with_wrong_key() {
     // compute pubkey hash
     let pubkey_hash = {
         let ser_pk = pubkey.serialize();
-        hash::blake2b_256(ser_pk)[..20].to_vec()
+        ckb_hash::blake2b_256(ser_pk)[..20].to_vec()
     };
     let tx = gen_tx(
         &mut data_loader,
@@ -152,7 +152,7 @@ fn test_signing_wrong_tx_hash() {
     // compute pubkey hash
     let pubkey_hash = {
         let ser_pk = pubkey.serialize();
-        hash::blake2b_256(ser_pk)[..20].to_vec()
+        ckb_hash::blake2b_256(ser_pk)[..20].to_vec()
     };
     let tx = gen_tx(
         &mut data_loader,
@@ -181,7 +181,7 @@ fn test_super_long_witness() {
     // compute pubkey hash
     let pubkey_hash = {
         let ser_pk = pubkey.serialize();
-        hash::blake2b_256(ser_pk)[..20].to_vec()
+        ckb_hash::blake2b_256(ser_pk)[..20].to_vec()
     };
     let tx = gen_tx(
         &mut data_loader,
@@ -193,7 +193,7 @@ fn test_super_long_witness() {
     buffer.resize(40000, 1);
     let super_long_message = Bytes::from(&buffer[..]);
 
-    let mut blake2b = hash::new_blake2b();
+    let mut blake2b = ckb_hash::new_blake2b();
     let mut message = [0u8; 32];
     blake2b.update(&tx.hash()[..]);
     blake2b.update(&super_long_message[..]);
