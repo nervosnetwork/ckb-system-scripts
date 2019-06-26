@@ -1,3 +1,58 @@
+/*
+ * This file provides the type script for NervosDAO logic. To deposit
+ * to NervosDAO, one simply needs to create a new cell with this script
+ * as the type script(for the exact code hash to use please refer to
+ * the most current CKB version). While you can certainly used the official
+ * secp256k1-blake160 lock script to guard your cell, you are also free
+ * to use any other lock script, as long as the lock script satisfies the
+ * following conditions:
+ *
+ * 1. The lock script won't use the witness argument at index 1(offset by 0,
+ * so this is actually the 2nd argument in witness).
+ * 2. The lock script ensures the witness argument at index 1 won't be tampered,
+ * one example to ensure this, is that the lock script can include this argument
+ * in signature calculation steps.
+ *
+ * No further actions are needed to keep your capacities locked in NervosDAO.
+ *
+ * To withdraw from NervosDAO, one needs to create a new transaction with
+ * the NervosDAO cell as one of the inputs. The OutPoint used to reference
+ * the NervosDAO cell should have block_hash correctly set, so this script
+ * can load the header of the deposit block which contains the locked NervosDAO
+ * cell. He/she should also specify an existing header denoted as the withdraw
+ * block. This script will calculate the interest from the deposit block to
+ * this withdraw block.
+ * The withdraw block should be included in one of the transaction deps using
+ * block_hash field. The index of the withdraw block in the deps field, should
+ * be serialized into 64-bit unsigned little endian integer, and put as the
+ * witness argument at index 1 in the corresponding witness for the locked
+ * NervosDAO input.
+ *
+ * If the above steps feel confusing to you, you can also refer to one of our
+ * official CKB SDK to learn how to deposit to and withdraw from NervosDAO.
+ *
+ * NervosDAO relies on a special field in the block header named dao to provide
+ * needed statistic data to calculate NervosDAO interests. Specifically, 3 fields
+ * will be kept in DAO field in the block header:
+ *
+ * * AR: accumulated rate of NervosDAO
+ * * C: All issued capacities in CKB (not including current block)
+ * * U: All occupied capacities in CKB (including current block)
+ *
+ * Please refer to CKB implementation for how to calculate AR, C and U.
+ *
+ * To calculate the interest of NervosDAO, we first separate the capacities in
+ * the deposit cell as +free_capacity+ and +occupied_capacity+: Free capacity is
+ * calculated as the total capacity minus occupied capacity. Then the maximum
+ * capacity one can withdraw for the NervosDAO input is calculated as:
+ *
+ * occupied_capacity + free_capacity * AR_withdraw / AR_deposit
+ *
+ * Notice one is free to include normal inputs in a transaction containing
+ * NervosDAO inputs, he/she is also free to include multiple NervosDAO inputs
+ * in one transaction. This type script will calculate the correct total
+ * capacities in all cases.
+ */
 #include "ckb_syscalls.h"
 #include "protocol_reader.h"
 
@@ -9,9 +64,10 @@
 #define ERROR_SYSCALL -4
 #define ERROR_BUFFER_NOT_ENOUGH -10
 #define ERROR_ENCODING -11
-#define ERROR_OVERFLOW -12
-#define ERROR_INVALID_WITHDRAW_BLOCK -13
-#define ERROR_INCORRECT_CAPACITY -14
+#define ERROR_WITNESS_TOO_LONG -12
+#define ERROR_OVERFLOW -13
+#define ERROR_INVALID_WITHDRAW_BLOCK -14
+#define ERROR_INCORRECT_CAPACITY -15
 
 #define HASH_SIZE 32
 #define DAO_SIZE 32
@@ -55,6 +111,9 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
   ret = ckb_load_witness(witness, &len, 0, input_index, CKB_SOURCE_INPUT);
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
+  }
+  if (len > WITNESS_SIZE) {
+    return ERROR_WITNESS_TOO_LONG;
   }
   ns(Witness_table_t) witness_table = ns(Witness_as_root(witness));
   if (witness_table == NULL) {
@@ -136,6 +195,10 @@ static int calculate_dao_input_capacity(size_t input_index,
     return ret;
   }
 
+  /* Right now NervosDAO only supports absolute block number since */
+  if (input_since >> 56 != 0) {
+    return ERROR_INVALID_WITHDRAW_BLOCK;
+  }
   if (input_since < minimal_since) {
     return ERROR_INVALID_WITHDRAW_BLOCK;
   }
