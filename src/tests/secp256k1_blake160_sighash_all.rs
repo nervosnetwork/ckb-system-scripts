@@ -1,7 +1,7 @@
 use super::{sign_tx, DummyDataLoader, MAX_CYCLES, SIGHASH_ALL_BIN};
 use ckb_core::{
     cell::{CellMetaBuilder, ResolvedOutPoint, ResolvedTransaction},
-    script::Script,
+    script::{Script, ScriptHashType},
     transaction::{CellInput, CellOutput, OutPoint, Transaction, TransactionBuilder},
     Bytes, Capacity,
 };
@@ -31,24 +31,25 @@ fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Vec<Bytes>
     // dep contract code
     let dep_cell = CellOutput::new(
         Capacity::bytes(script_data.len()).expect("script capacity"),
-        script_data,
+        CellOutput::calculate_data_hash(&script_data),
         Default::default(),
         None,
     );
-    let dep_cell_data_hash = dep_cell.data_hash();
-    dummy
-        .cells
-        .insert(contract_out_point.clone().cell.unwrap(), dep_cell);
+    let dep_cell_data_hash = dep_cell.data_hash().to_owned();
+    dummy.cells.insert(
+        contract_out_point.clone().cell.unwrap(),
+        (dep_cell, script_data),
+    );
     // input unlock script
     let previous_output_cell = CellOutput::new(
         capacity,
         Default::default(),
-        Script::new(lock_args, dep_cell_data_hash),
+        Script::new(lock_args, dep_cell_data_hash, ScriptHashType::Data),
         None,
     );
     dummy.cells.insert(
         previous_out_point.clone().cell.unwrap(),
-        previous_output_cell,
+        (previous_output_cell, Bytes::new()),
     );
     TransactionBuilder::default()
         .input(CellInput::new(previous_out_point.clone(), 0))
@@ -59,6 +60,7 @@ fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Vec<Bytes>
             Default::default(),
             None,
         ))
+        .output_data(Bytes::new())
         .build()
 }
 
@@ -75,18 +77,21 @@ fn sign_tx_hash(tx: Transaction, key: &Privkey, tx_hash: &[u8]) -> Transaction {
         .build()
 }
 
-fn build_resolved_tx<'a>(tx: &'a Transaction, data_size: usize) -> ResolvedTransaction<'a> {
-    let previous_out_point = tx.inputs()[0].previous_output.clone();
-    let deps_out_point = tx.deps()[0].clone();
-    let capacity = tx.outputs()[0].capacity;
-    let dep_cell = CellMetaBuilder::default()
-        .out_point(deps_out_point.clone().cell.unwrap())
-        .capacity(Capacity::bytes(data_size).expect("script capacity"))
+fn build_resolved_tx<'a>(
+    data_loader: &DummyDataLoader,
+    tx: &'a Transaction,
+) -> ResolvedTransaction<'a> {
+    let previous_out_point = tx.inputs()[0].previous_output.clone().cell.unwrap();
+    let deps_out_point = tx.deps()[0].clone().cell.unwrap();
+    let (dep_output, dep_data) = data_loader.cells.get(&deps_out_point).unwrap();
+    let dep_cell = CellMetaBuilder::from_cell_output(dep_output.to_owned(), dep_data.to_owned())
+        .out_point(deps_out_point)
         .build();
-    let input_cell = CellMetaBuilder::default()
-        .out_point(previous_out_point.clone().cell.unwrap())
-        .capacity(capacity)
-        .build();
+    let (input_output, input_data) = data_loader.cells.get(&previous_out_point).unwrap();
+    let input_cell =
+        CellMetaBuilder::from_cell_output(input_output.to_owned(), input_data.to_owned())
+            .out_point(previous_out_point)
+            .build();
     ResolvedTransaction {
         transaction: tx,
         resolved_deps: vec![ResolvedOutPoint::cell_only(dep_cell)],
@@ -111,7 +116,7 @@ fn test_sighash_all_unlock() {
         vec![pubkey_hash.into()],
     );
     let tx = sign_tx(tx, &privkey);
-    let resolved_tx = build_resolved_tx(&tx, SIGHASH_ALL_BIN.len());
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let script_config = ScriptConfig::default();
     let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
         .verify(MAX_CYCLES);
@@ -136,7 +141,7 @@ fn test_signing_with_wrong_key() {
         vec![pubkey_hash.into()],
     );
     let tx = sign_tx(tx, &wrong_privkey);
-    let resolved_tx = build_resolved_tx(&tx, SIGHASH_ALL_BIN.len());
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let script_config = ScriptConfig::default();
     let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
         .verify(MAX_CYCLES);
@@ -165,7 +170,7 @@ fn test_signing_wrong_tx_hash() {
         rng.fill(&mut rand_tx_hash);
         sign_tx_hash(tx, &privkey, &rand_tx_hash[..])
     };
-    let resolved_tx = build_resolved_tx(&tx, SIGHASH_ALL_BIN.len());
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let script_config = ScriptConfig::default();
     let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
         .verify(MAX_CYCLES);
@@ -204,7 +209,7 @@ fn test_super_long_witness() {
         .witness(vec![Bytes::from(sig.serialize()), super_long_message])
         .build();
 
-    let resolved_tx = build_resolved_tx(&tx, SIGHASH_ALL_BIN.len());
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let script_config = ScriptConfig::default();
     let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
         .verify(MAX_CYCLES);

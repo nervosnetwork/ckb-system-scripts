@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
      * size of 8 bytes, which is both predictable, and also provides minimal
      * cycle consumption.
      */
-    ret = ckb_load_cell_by_field(NULL, &len, 0, index, CKB_SOURCE_GROUP_INPUT,
+    ret = ckb_load_input_by_field(NULL, &len, 0, index, CKB_SOURCE_GROUP_INPUT,
                                  CKB_INPUT_FIELD_SINCE);
     if (ret == CKB_INDEX_OUT_OF_BOUND) {
       return 0;

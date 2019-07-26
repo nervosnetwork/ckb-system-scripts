@@ -23,7 +23,7 @@ lazy_static! {
 
 #[derive(Default)]
 pub struct DummyDataLoader {
-    pub cells: HashMap<CellOutPoint, CellOutput>,
+    pub cells: HashMap<CellOutPoint, (CellOutput, Bytes)>,
 }
 
 impl DummyDataLoader {
@@ -33,13 +33,13 @@ impl DummyDataLoader {
 }
 
 impl DataLoader for DummyDataLoader {
-    // load CellOutput
-    fn lazy_load_cell_output(&self, cell: &CellMeta) -> CellOutput {
-        cell.cell_output.clone().unwrap_or_else(|| {
+    // load Cell Data
+    fn load_cell_data(&self, cell: &CellMeta) -> Option<Bytes> {
+        cell.mem_cell_data.clone().or_else(|| {
             self.cells
                 .get(&cell.out_point)
+                .map(|(_, data)| data)
                 .cloned()
-                .expect("must exists")
         })
     }
     // load BlockExt
