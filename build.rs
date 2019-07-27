@@ -15,11 +15,11 @@ const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 const BINARIES: &[(&str, &str)] = &[
     (
         "secp256k1_blake160_sighash_all",
-        "54811ce986d5c3e57eaafab22cdd080e32209e39590e204a99b32935f835a13c",
+        "a76801d09a0eabbfa545f1577084b6f3bafb0b6250e7f5c89efcfd4e3499fb55",
     ),
     (
         "dao",
-        "0450e0eb0ad787135c1243e5730f72fa3bc8837e232e928c7f4b1efdd6692582",
+        "5afa210bb091cc0936d4baccbc30dbaef028b9fc864c95d2da7672693a3540cc",
     ),
 ];
 
