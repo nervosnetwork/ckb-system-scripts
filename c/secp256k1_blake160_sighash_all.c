@@ -1,5 +1,5 @@
-#include "ckb_syscalls.h"
 #include "blake2b.h"
+#include "ckb_syscalls.h"
 #include "protocol_reader.h"
 
 #undef ns
@@ -17,6 +17,8 @@
 #define ERROR_BUFFER_NOT_ENOUGH -10
 #define ERROR_ENCODING -11
 #define ERROR_WITNESS_TOO_LONG -12
+#define ERROR_SECP_ILLEGAL_CALLBACK -16
+#define ERROR_SECP_ERROR_CALLBACK -17
 
 #define BLAKE2B_BLOCK_SIZE 32
 #define BLAKE160_SIZE 20
@@ -26,31 +28,44 @@
 /* 32 KB */
 #define WITNESS_SIZE 32768
 
-/* Stripping as much unneeded bytes from secp256k1 as possible */
-#define CUSTOM_ABORT 1
-#define CUSTOM_PRINT_ERR 1
-
-void custom_abort()
-{
-  syscall(SYS_exit, ERROR_SECP_ABORT, 0, 0, 0, 0, 0);
-}
-
-int custom_print_err(const char * arg, ...)
-{
-  (void) arg;
-  return 0;
-}
-
-#include <secp256k1_static.h>
 /*
  * We are including secp256k1 implementation directly so gcc can strip
  * unused functions. For some unknown reasons, if we link in libsecp256k1.a
  * directly, the final binary will include all functions rather than those used.
  */
+#define HAVE_CONFIG_H 1
+#define USE_EXTERNAL_DEFAULT_CALLBACKS
 #include <secp256k1.c>
 
-static int extract_bytes(ns(Bytes_table_t) bytes, unsigned char *buffer, volatile size_t *s)
-{
+void secp256k1_default_illegal_callback_fn(const char* str, void* data) {
+  (void)str;
+  (void)data;
+  ckb_exit(ERROR_SECP_ILLEGAL_CALLBACK);
+}
+
+void secp256k1_default_error_callback_fn(const char* str, void* data) {
+  (void)str;
+  (void)data;
+  ckb_exit(ERROR_SECP_ERROR_CALLBACK);
+}
+
+int secp256k1_custom_verify_only_initialize(
+    secp256k1_context* context, secp256k1_ge_storage (*pre_g)[],
+    secp256k1_ge_storage (*pre_g_128)[]) {
+  context->illegal_callback = default_illegal_callback;
+  context->error_callback = default_error_callback;
+
+  secp256k1_ecmult_context_init(&context->ecmult_ctx);
+  secp256k1_ecmult_gen_context_init(&context->ecmult_gen_ctx);
+
+  context->ecmult_ctx.pre_g = pre_g;
+  context->ecmult_ctx.pre_g_128 = pre_g_128;
+
+  return 1;
+}
+
+static int extract_bytes(ns(Bytes_table_t) bytes, unsigned char* buffer,
+                         volatile size_t* s) {
   flatbuffers_uint8_vec_t seq = ns(Bytes_seq(bytes));
   size_t len = flatbuffers_uint8_vec_len(seq);
 
@@ -69,15 +84,14 @@ static int extract_bytes(ns(Bytes_table_t) bytes, unsigned char *buffer, volatil
 /*
  * Arguments are listed in the following order:
  * 0. program name
- * 1. pubkey blake160 hash, blake2b hash of pubkey first 20 bytes, used to shield the real
- * pubkey in lock script.
+ * 1. pubkey blake160 hash, blake2b hash of pubkey first 20 bytes, used to
+ * shield the real pubkey in lock script.
  *
  * Witness:
  * 1. signature, signature used to present ownership
  * 2. signature size, in little endian 64 bit unsigned integer
  */
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
   int ret;
   int recid;
   size_t index = 0;
@@ -94,7 +108,11 @@ int main(int argc, char* argv[])
   }
 
   secp256k1_context context;
-  if (secp256k1_context_initialize(&context, SECP256K1_CONTEXT_VERIFY) == 0) {
+  ret = secp256k1_custom_verify_only_initialize(
+      &context,
+      (secp256k1_ge_storage(*)[]) & secp256k1_ecmult_static_pre_context,
+      (secp256k1_ge_storage(*)[]) & secp256k1_ecmult_static_pre128_context);
+  if (ret == 0) {
     return ERROR_SECP_INITIALIZE;
   }
 
@@ -114,7 +132,7 @@ int main(int argc, char* argv[])
      * cycle consumption.
      */
     ret = ckb_load_input_by_field(NULL, &len, 0, index, CKB_SOURCE_GROUP_INPUT,
-                                 CKB_INPUT_FIELD_SINCE);
+                                  CKB_INPUT_FIELD_SINCE);
     if (ret == CKB_INDEX_OUT_OF_BOUND) {
       return 0;
     }
@@ -151,7 +169,8 @@ int main(int argc, char* argv[])
     recid = temp[RECID_INDEX];
     /* Recover pubkey */
     secp256k1_ecdsa_recoverable_signature signature;
-    if (secp256k1_ecdsa_recoverable_signature_parse_compact(&context, &signature, temp, recid) == 0) {
+    if (secp256k1_ecdsa_recoverable_signature_parse_compact(
+            &context, &signature, temp, recid) == 0) {
       return ERROR_SECP_PARSE_SIGNATURE;
     }
     blake2b_state blake2b_ctx;
@@ -175,7 +194,8 @@ int main(int argc, char* argv[])
 
     /* Check pubkey hash */
     size_t pubkey_size = PUBKEY_SIZE;
-    if (secp256k1_ec_pubkey_serialize(&context, temp, &pubkey_size, &pubkey, SECP256K1_EC_COMPRESSED) != 1 ) {
+    if (secp256k1_ec_pubkey_serialize(&context, temp, &pubkey_size, &pubkey,
+                                      SECP256K1_EC_COMPRESSED) != 1) {
       return ERROR_SECP_SERIALIZE_PUBKEY;
     }
 

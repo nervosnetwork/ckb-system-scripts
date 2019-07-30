@@ -1,7 +1,7 @@
 TARGET := riscv64-unknown-elf
 CC := $(TARGET)-gcc
 LD := $(TARGET)-gcc
-CFLAGS := -O2 -mcmodel=medlow -DSECP256K1_CUSTOM_FUNCS -I deps/flatcc/include -I deps/secp256k1/src -I deps/secp256k1 -I c -Wall -Werror -Wno-nonnull-compare
+CFLAGS := -O3 -Ideps/flatcc/include -I deps/secp256k1/src -I deps/secp256k1 -I c -Wall -Werror -Wno-nonnull-compare
 LDFLAGS := -Wl,-static -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-s
 SECP256K1_LIB := deps/secp256k1/.libs/libsecp256k1.a
 FLATCC := deps/flatcc/bin/flatcc
