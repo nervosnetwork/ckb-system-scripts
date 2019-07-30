@@ -21,6 +21,10 @@ const BINARIES: &[(&str, &str)] = &[
         "dao",
         "5afa210bb091cc0936d4baccbc30dbaef028b9fc864c95d2da7672693a3540cc",
     ),
+    (
+        "type_id",
+        "43530dc79e79f183a7b3fdf329b41e6a1df26c02c6f2923e42f9d915332790cb",
+    ),
 ];
 
 fn main() {

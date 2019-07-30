@@ -9,7 +9,7 @@ FLATCC := deps/flatcc/bin/flatcc
 # docker pull xxuejie/riscv-gnu-toolchain-rv64imac:xenial-20190606
 BUILDER_DOCKER := xxuejie/riscv-gnu-toolchain-rv64imac@sha256:4f71556b7ea8f450243e2b2483bca046da1c0d76c2d34d120aa0fbf1a0688ec0
 
-all: specs/cells/secp256k1_blake160_sighash_all specs/cells/dao
+all: specs/cells/secp256k1_blake160_sighash_all specs/cells/dao specs/cells/type_id
 
 all-via-docker:
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
@@ -18,6 +18,9 @@ specs/cells/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 specs/cells/dao: c/dao.c c/protocol_reader.h
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+
+specs/cells/type_id: c/type_id.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 $(SECP256K1_LIB):
@@ -52,7 +55,7 @@ package-clean:
 	rm -rf Cargo.toml.bak target/package/
 
 clean:
-	rm -rf build/secp256k1_blake160_sighash_all
+	rm -rf specs/cells/{secp256k1_blake160_sighash_all,dao,type_id}
 	cd deps/flatcc && scripts/cleanall.sh
 	cd deps/secp256k1 && make clean
 
