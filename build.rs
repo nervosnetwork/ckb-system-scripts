@@ -23,7 +23,7 @@ const BINARIES: &[(&str, &str)] = &[
     ),
     (
         "type_id",
-        "43530dc79e79f183a7b3fdf329b41e6a1df26c02c6f2923e42f9d915332790cb",
+        "564cee7258938752fb5a23386c57f750a9c2c22ea4aea80a04781131bddc8a8b",
     ),
 ];
 

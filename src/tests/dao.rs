@@ -1,4 +1,7 @@
-use super::{sign_tx, DummyDataLoader, DAO_BIN, MAX_CYCLES, SIGHASH_ALL_BIN};
+use super::{
+    dao_code_hash, gen_lock, script_cell, secp_code_hash, sign_tx, DummyDataLoader, DAO_BIN,
+    MAX_CYCLES, SIGHASH_ALL_BIN,
+};
 use byteorder::{ByteOrder, LittleEndian};
 use ckb_core::{
     cell::{CellMetaBuilder, ResolvedOutPoint, ResolvedTransaction},
@@ -7,40 +10,10 @@ use ckb_core::{
     transaction::{CellInput, CellOutput, OutPoint, Transaction, TransactionBuilder},
     BlockNumber, Bytes, Capacity,
 };
-use ckb_crypto::secp::{Generator, Privkey};
 use ckb_dao_utils::pack_dao_data;
 use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
 use numext_fixed_hash::H256;
 use rand::{thread_rng, Rng};
-
-fn script_cell(script_data: &Bytes) -> (CellOutput, OutPoint) {
-    let tx_hash = {
-        let mut rng = thread_rng();
-        let mut buf = [0u8; 32];
-        rng.fill(&mut buf);
-        H256::from(&buf)
-    };
-    let out_point = OutPoint::new_cell(tx_hash, 0);
-
-    let cell = CellOutput::new(
-        Capacity::bytes(script_data.len()).expect("script capacity"),
-        CellOutput::calculate_data_hash(script_data),
-        Default::default(),
-        None,
-    );
-
-    (cell, out_point)
-}
-
-fn secp_code_hash() -> H256 {
-    let (cell, _) = script_cell(&SIGHASH_ALL_BIN);
-    cell.data_hash().to_owned()
-}
-
-fn dao_code_hash() -> H256 {
-    let (cell, _) = script_cell(&DAO_BIN);
-    cell.data_hash().to_owned()
-}
 
 fn gen_dao_cell(
     dummy: &mut DummyDataLoader,
@@ -79,19 +52,6 @@ fn gen_header(number: BlockNumber, ar: u64) -> Header {
             Capacity::shannons(0),
         ))
         .build()
-}
-
-fn gen_lock() -> (Privkey, Vec<Bytes>) {
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
-    let pubkey = privkey.pubkey().expect("pubkey");
-    // compute pubkey hash
-    let pubkey_hash = {
-        let ser_pk = pubkey.serialize();
-        ckb_hash::blake2b_256(ser_pk)[..20].to_vec()
-    };
-    let lock_args = vec![pubkey_hash.into()];
-    (privkey, lock_args)
 }
 
 fn complete_tx(

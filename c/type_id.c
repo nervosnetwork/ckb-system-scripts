@@ -32,7 +32,7 @@
 #define BLAKE2B_BLOCK_SIZE 32
 #define INPUT_SIZE 4096
 
-int extract_cell(unsigned char* current_script_hash, size_t source,
+int extract_cell(const unsigned char* current_script_hash, size_t source,
                  size_t* index) {
   size_t matched_cell = SIZE_MAX, i = 0;
   int looping = 1;
@@ -41,6 +41,7 @@ int extract_cell(unsigned char* current_script_hash, size_t source,
     unsigned char hash[BLAKE2B_BLOCK_SIZE];
     int ret = ckb_load_cell_by_field(hash, &len, 0, i, source,
                                      CKB_CELL_FIELD_TYPE_HASH);
+
     switch (ret) {
       case CKB_SUCCESS:
         if (len != BLAKE2B_BLOCK_SIZE) {
@@ -108,7 +109,7 @@ int main(int argc, char* argv[]) {
     for (; looping && i < SIZE_MAX; i++) {
       len = INPUT_SIZE;
       unsigned char input[INPUT_SIZE];
-      ret = ckb_load_input(input, &len, 0, 0, CKB_SOURCE_INPUT);
+      ret = ckb_load_input(input, &len, 0, i, CKB_SOURCE_INPUT);
       switch (ret) {
         case CKB_SUCCESS:
           if (len > INPUT_SIZE) {
