@@ -20,11 +20,11 @@ faster-hex = "0.3"
 
 [dev-dependencies]
 byteorder = "1.3.1"
-ckb-core = { git = "https://github.com/jjyr/ckb.git", rev = "4cb971dce7c9267d2349b2924cb2544ef1d49ce2" }
-ckb-script = { git = "https://github.com/jjyr/ckb.git", rev = "4cb971dce7c9267d2349b2924cb2544ef1d49ce2" }
-ckb-crypto = { git = "https://github.com/jjyr/ckb.git", rev = "4cb971dce7c9267d2349b2924cb2544ef1d49ce2" }
-ckb-dao-utils = { git = "https://github.com/jjyr/ckb.git", rev = "4cb971dce7c9267d2349b2924cb2544ef1d49ce2" }
-ckb-hash = { git = "https://github.com/jjyr/ckb.git", rev = "4cb971dce7c9267d2349b2924cb2544ef1d49ce2" }
+ckb-core = { git = "https://github.com/nervosnetwork/ckb.git", rev = "e718d4c046669b6e49d4673bdc2a16e08e7609f9" }
+ckb-script = { git = "https://github.com/nervosnetwork/ckb.git", rev = "e718d4c046669b6e49d4673bdc2a16e08e7609f9" }
+ckb-crypto = { git = "https://github.com/nervosnetwork/ckb.git", rev = "e718d4c046669b6e49d4673bdc2a16e08e7609f9" }
+ckb-dao-utils = { git = "https://github.com/nervosnetwork/ckb.git", rev = "e718d4c046669b6e49d4673bdc2a16e08e7609f9" }
+ckb-hash = { git = "https://github.com/nervosnetwork/ckb.git", rev = "e718d4c046669b6e49d4673bdc2a16e08e7609f9" }
 numext-fixed-hash = "0.1.4"
 rand = "0.6.5"
 lazy_static = "1.3.0"
