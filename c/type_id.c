@@ -1,21 +1,25 @@
 /*
  * This file provides a type script acting as a cell ID which stays
- * unchanged in case of cell transformations. Basically, it guarentees the
- * following rules are met in a cell transformation:
+ * unchanged in case of cell transformations. Basically, it allows 3 types
+ * of cell transformation:
  *
- * * If there's already an input cell existed in the transaction with current
- * script hash, there can only be one output cell containing the exact same
- * script hash.
- * * If there's no existing input cell containing current script hash, the
- * script would run a blake2b hash on all inputs in current transaction. If
- * the resulting hash and the first script argument are identical, the script
- * succeeds, otherwise, the script fails.
+ * 1. A new cell with current type script is created
+ * 2. An old cell with current type script is consumed to create a new
+ * cell with the same type script
+ * 3. A cell with current type script is destroyed
  *
- * With those 2 rules, we can view the type script hash of such a cell as the
- * cell ID. The first rule ensures that the cell ID can only be transferred to
- * one new cell by consuming the old cell, while the second rule ensures that
- * no one can forge IDs arbitrarily. When combined together, the two rules here
- * can ensure a cell has a unique ID within the running CKB system.
+ * In all cases, there should be at most one input cell and one output cell
+ * which use current type script, this is validated in extract_cell.
+ *
+ * Case 1 also requires one additional rule: the script fetches all input
+ * structure in current transaction, and run a blake2b hash on them. It then
+ * validates that the resulting blake2b hash matches the first and only argument
+ * of current script.
+ *
+ * Case 2 and 3 do not require any new validation rule.
+ *
+ * With those rules, we can ensure the existence of unique cell IDs(which is type
+ * script hash) in CKB.
  */
 #include "blake2b.h"
 #include "ckb_syscalls.h"
@@ -100,7 +104,7 @@ int main(int argc, char* argv[]) {
   }
 
   if (matched_input_cell == SIZE_MAX && matched_output_cell != SIZE_MAX) {
-    /* We have a new cell creation here, test the second rule */
+    /* We are at case 1 here, there's one additional hash validation needed */
     blake2b_state blake2b_ctx;
     blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
 
