@@ -234,6 +234,64 @@ fn test_type_id_termination() {
 }
 
 #[test]
+fn test_type_id_invalid_creation_length() {
+    let mut data_loader = DummyDataLoader::new();
+    let (privkey, lock_args) = gen_lock();
+
+    let (input_cell, input_out_point, _) = gen_cell(
+        &mut data_loader,
+        capacity_bytes!(1000),
+        lock_args.clone(),
+        None,
+    );
+    let input_cell_meta = CellMetaBuilder::from_cell_output(input_cell, Bytes::new())
+        .out_point(input_out_point.clone().cell.unwrap())
+        .build();
+    let cell_input = CellInput::new(input_out_point, 0);
+    let resolved_inputs = vec![ResolvedOutPoint::cell_only(input_cell_meta)];
+    let mut resolved_deps = vec![];
+
+    let type_id_args = {
+        let mut builder = FlatBufferBuilder::new();
+        let offset = FbsCellInput::build(&mut builder, &cell_input);
+        builder.finish(offset, None);
+        let data = builder.finished_data();
+
+        let hash = blake2b_256(&data);
+        let mut buf = vec![];
+        buf.extend_from_slice(&hash[..]);
+        buf.extend_from_slice(b"abc");
+        vec![Bytes::from(buf)]
+    };
+
+    let (output_cell, _, output_data) = gen_cell(
+        &mut data_loader,
+        capacity_bytes!(990),
+        vec![],
+        Some(type_id_args.clone()),
+    );
+    let builder = TransactionBuilder::default()
+        .input(cell_input)
+        .output(output_cell)
+        .output_data(output_data);
+    let (tx, mut resolved_deps2) = complete_tx(&mut data_loader, builder);
+    let tx = sign_tx(tx, &privkey);
+    for dep in resolved_deps2.drain(..) {
+        resolved_deps.push(dep);
+    }
+    let rtx = ResolvedTransaction {
+        transaction: &tx,
+        resolved_inputs,
+        resolved_deps,
+    };
+
+    let script_config = ScriptConfig::default();
+    let verify_result =
+        TransactionScriptsVerifier::new(&rtx, &data_loader, &script_config).verify(MAX_CYCLES);
+    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-23)));
+}
+
+#[test]
 fn test_type_id_invalid_creation() {
     let mut data_loader = DummyDataLoader::new();
     let (privkey, lock_args) = gen_lock();

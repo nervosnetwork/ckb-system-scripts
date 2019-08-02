@@ -86,4 +86,21 @@ int ckb_debug(const char* s)
   return syscall(SYS_ckb_debug, s, 0, 0, 0, 0, 0);
 }
 
+size_t ckb_argv_length(char* argv[], int index)
+{
+  if (index > 0) {
+    return ((size_t) argv[index - 1]) - ((size_t) argv[index]) - 1;
+  } else {
+    /*
+     * We could've used strlen but this can shrink the code size for a rare
+     * action.
+     */
+    size_t i = 0;
+    while (argv[0][i] != '\0') {
+      i++;
+    }
+    return i + 1;
+  }
+}
+
 #endif  /* CKB_SYSCALLS_H_ */

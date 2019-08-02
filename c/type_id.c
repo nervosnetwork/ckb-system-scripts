@@ -132,23 +132,8 @@ int main(int argc, char* argv[]) {
     unsigned char input_hash[BLAKE2B_BLOCK_SIZE];
     blake2b_final(&blake2b_ctx, input_hash, BLAKE2B_BLOCK_SIZE);
 
-    /*
-     * TODO: there is a quirk right now: even though we test the first
-     * 32 bytes of argv[1] to see if it matches input hash. An attacker
-     * could still append bytes to argv[1] to create different hashes
-     * hoping for a collision. The real problem here, is with argv there
-     * is no way to know the correct length of an argument. Since we have
-     * some revising work planning for CKB, we will defer to a later time
-     * to see how we can tackle this problem. Some initial ideas right now:
-     *
-     * 1. Limit argv to only include null-terminated strings
-     * 2. Use a different way(maybe a syscall) to pass script arguments
-     * 3. Load the actual script into VM memory and deserialize the structure
-     * ourselves. Notice with flatbuffer and slightly complicated logic we
-     * can do this now, but I choose to leave it out for now to see if we
-     * can find a better way.
-     */
-    if (memcmp(input_hash, argv[1], 32) != 0) {
+    if ((ckb_argv_length(argv, 1) != 32) ||
+        (memcmp(input_hash, argv[1], 32) != 0)) {
       return ERROR_INVALID_INPUT_HASH;
     }
   }
