@@ -6,9 +6,9 @@ CKB's system scripts, which included in the system cells in the genesis block.
 
 ## Quick Start
 
-```
+```shell
 git submodule init
 git submodule update
-make build
+make all-via-docker
 cargo test --all
 ```

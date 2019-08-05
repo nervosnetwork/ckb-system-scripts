@@ -1,4 +1,4 @@
-use super::{sign_tx, DummyDataLoader, DAO_BIN, MAX_CYCLES, SIGHASH_ALL_BIN};
+use super::{rand_tx_hash, sign_tx, DummyDataLoader, DAO_BIN, MAX_CYCLES, SIGHASH_ALL_BIN};
 use byteorder::{ByteOrder, LittleEndian};
 use ckb_core::{
     cell::{CellMetaBuilder, ResolvedOutPoint, ResolvedTransaction},
@@ -11,15 +11,9 @@ use ckb_crypto::secp::{Generator, Privkey};
 use ckb_dao_utils::pack_dao_data;
 use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
 use numext_fixed_hash::H256;
-use rand::{thread_rng, Rng};
 
 fn script_cell(script_data: &Bytes) -> (CellOutput, OutPoint) {
-    let tx_hash = {
-        let mut rng = thread_rng();
-        let mut buf = [0u8; 32];
-        rng.fill(&mut buf);
-        H256::from(&buf)
-    };
+    let tx_hash = rand_tx_hash();
     let out_point = OutPoint::new_cell(tx_hash, 0);
 
     let cell = CellOutput::new(
@@ -48,12 +42,7 @@ fn gen_dao_cell(
     header: &Header,
     lock_args: Vec<Bytes>,
 ) -> (CellOutput, OutPoint) {
-    let tx_hash = {
-        let mut rng = thread_rng();
-        let mut buf = [0u8; 32];
-        rng.fill(&mut buf);
-        H256::from(&buf)
-    };
+    let tx_hash = rand_tx_hash();
     let out_point = OutPoint::new(header.hash().clone(), tx_hash, 0);
 
     let cell = CellOutput::new(
@@ -392,6 +381,7 @@ fn test_dao_missing_deposit_header() {
         .build();
 
     let resolved_inputs = vec![ResolvedOutPoint::cell_only(input_cell_meta)];
+    // Missing deposit_header in deps
     let mut resolved_deps = vec![ResolvedOutPoint::header_only(withdraw_header.clone())];
 
     let mut b = [0; 8];
@@ -442,6 +432,7 @@ fn test_dao_missing_withdraw_header() {
         .out_point(previous_out_point.clone().cell.unwrap())
         .build();
 
+    // Missing withdraw header in deps
     let resolved_inputs = vec![ResolvedOutPoint::cell_and_header(
         input_cell_meta,
         deposit_header,
@@ -479,11 +470,12 @@ fn test_dao_missing_withdraw_header() {
 }
 
 #[test]
-fn test_dao_missing_invalid_withdraw_header() {
+fn test_dao_invalid_withdraw_header() {
     let mut data_loader = DummyDataLoader::new();
     let (privkey, lock_args) = gen_lock();
 
     let deposit_header = gen_header(1000, 10000000);
+    // Invalid withdraw header
     let withdraw_header = gen_header(999, 10000000);
     let (cell, previous_out_point) = gen_dao_cell(
         &mut data_loader,
@@ -534,7 +526,7 @@ fn test_dao_missing_invalid_withdraw_header() {
 }
 
 #[test]
-fn test_dao_missing_invalid_since() {
+fn test_dao_invalid_since() {
     let mut data_loader = DummyDataLoader::new();
     let (privkey, lock_args) = gen_lock();
 
@@ -560,6 +552,7 @@ fn test_dao_missing_invalid_since() {
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
     let witness = vec![Bytes::from(&b[..])];
+    // Invalid since: 1900
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 1900))
         .output(CellOutput::new(

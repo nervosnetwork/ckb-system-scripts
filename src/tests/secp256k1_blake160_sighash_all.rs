@@ -1,4 +1,4 @@
-use super::{sign_tx, DummyDataLoader, MAX_CYCLES, SIGHASH_ALL_BIN};
+use super::{rand_tx_hash, sign_tx, DummyDataLoader, MAX_CYCLES, SIGHASH_ALL_BIN};
 use ckb_core::{
     cell::{CellMetaBuilder, ResolvedOutPoint, ResolvedTransaction},
     script::{Script, ScriptHashType},
@@ -8,24 +8,13 @@ use ckb_core::{
 use ckb_crypto::secp::{Generator, Privkey};
 use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
 use numext_fixed_hash::H256;
-use rand::{thread_rng, Rng};
 
 fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Vec<Bytes>) -> Transaction {
-    let previous_tx_hash = {
-        let mut rng = thread_rng();
-        let mut buf = [0u8; 32];
-        rng.fill(&mut buf);
-        H256::from(&buf)
-    };
+    let previous_tx_hash = rand_tx_hash();
     let previous_index = 0;
     let capacity = Capacity::shannons(42);
     let previous_out_point = OutPoint::new_cell(previous_tx_hash, previous_index);
-    let contract_tx_hash = {
-        let mut rng = thread_rng();
-        let mut buf = [0u8; 32];
-        rng.fill(&mut buf);
-        H256::from(&buf)
-    };
+    let contract_tx_hash = rand_tx_hash();
     let contract_index = 0;
     let contract_out_point = OutPoint::new_cell(contract_tx_hash.clone(), contract_index);
     // dep contract code
@@ -165,10 +154,8 @@ fn test_signing_wrong_tx_hash() {
         vec![pubkey_hash.into()],
     );
     let tx = {
-        let mut rand_tx_hash = [0u8; 32];
-        let mut rng = thread_rng();
-        rng.fill(&mut rand_tx_hash);
-        sign_tx_hash(tx, &privkey, &rand_tx_hash[..])
+        let tx_hash = rand_tx_hash();
+        sign_tx_hash(tx, &privkey, tx_hash.as_ref())
     };
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let script_config = ScriptConfig::default();
