@@ -31,6 +31,11 @@ __internal_syscall(long n, long _a0, long _a1, long _a2, long _a3, long _a4, lon
 #define syscall(n, a, b, c, d, e, f) \
         __internal_syscall(n, (long)(a), (long)(b), (long)(c), (long)(d), (long)(e), (long)(f))
 
+int ckb_exit(int8_t code)
+{
+  return syscall(SYS_exit, code, 0, 0, 0, 0, 0);
+}
+
 int ckb_load_tx_hash(void* addr, volatile uint64_t* len, size_t offset)
 {
   return syscall(SYS_ckb_load_tx_hash, addr, len, offset, 0, 0, 0);
@@ -47,7 +52,7 @@ int ckb_load_cell(void* addr, volatile uint64_t* len, size_t offset, size_t inde
 }
 
 int ckb_load_input(void* addr, volatile uint64_t* len, size_t offset,
-                           size_t index, size_t source)
+                   size_t index, size_t source)
 {
   return syscall(SYS_ckb_load_input, addr, len, offset, index, source, 0);
 }
