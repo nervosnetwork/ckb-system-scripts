@@ -1,6 +1,7 @@
 #include "blake2b.h"
 #include "ckb_syscalls.h"
 #include "protocol_reader.h"
+#include "secp256k1_helper.h"
 
 #undef ns
 #define ns(x) FLATBUFFERS_WRAP_NAMESPACE(Ckb_Protocol, x)
@@ -17,8 +18,6 @@
 #define ERROR_BUFFER_NOT_ENOUGH -10
 #define ERROR_ENCODING -11
 #define ERROR_WITNESS_TOO_LONG -12
-#define ERROR_SECP_ILLEGAL_CALLBACK -16
-#define ERROR_SECP_ERROR_CALLBACK -17
 
 #define BLAKE2B_BLOCK_SIZE 32
 #define BLAKE160_SIZE 20
@@ -27,42 +26,6 @@
 #define RECID_INDEX 64
 /* 32 KB */
 #define WITNESS_SIZE 32768
-
-/*
- * We are including secp256k1 implementation directly so gcc can strip
- * unused functions. For some unknown reasons, if we link in libsecp256k1.a
- * directly, the final binary will include all functions rather than those used.
- */
-#define HAVE_CONFIG_H 1
-#define USE_EXTERNAL_DEFAULT_CALLBACKS
-#include <secp256k1.c>
-
-void secp256k1_default_illegal_callback_fn(const char* str, void* data) {
-  (void)str;
-  (void)data;
-  ckb_exit(ERROR_SECP_ILLEGAL_CALLBACK);
-}
-
-void secp256k1_default_error_callback_fn(const char* str, void* data) {
-  (void)str;
-  (void)data;
-  ckb_exit(ERROR_SECP_ERROR_CALLBACK);
-}
-
-int secp256k1_custom_verify_only_initialize(
-    secp256k1_context* context, secp256k1_ge_storage (*pre_g)[],
-    secp256k1_ge_storage (*pre_g_128)[]) {
-  context->illegal_callback = default_illegal_callback;
-  context->error_callback = default_error_callback;
-
-  secp256k1_ecmult_context_init(&context->ecmult_ctx);
-  secp256k1_ecmult_gen_context_init(&context->ecmult_gen_ctx);
-
-  context->ecmult_ctx.pre_g = pre_g;
-  context->ecmult_ctx.pre_g_128 = pre_g_128;
-
-  return 1;
-}
 
 static int extract_bytes(ns(Bytes_table_t) bytes, unsigned char* buffer,
                          volatile size_t* s) {
@@ -102,18 +65,16 @@ int main(int argc, char* argv[]) {
   unsigned char witness[WITNESS_SIZE];
   ns(Witness_table_t) witness_table;
   ns(Bytes_vec_t) args;
+  uint8_t secp_data[CKB_SECP256K1_DATA_SIZE];
 
   if (argc != 2) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
   }
 
   secp256k1_context context;
-  ret = secp256k1_custom_verify_only_initialize(
-      &context,
-      (secp256k1_ge_storage(*)[]) & secp256k1_ecmult_static_pre_context,
-      (secp256k1_ge_storage(*)[]) & secp256k1_ecmult_static_pre128_context);
-  if (ret == 0) {
-    return ERROR_SECP_INITIALIZE;
+  ret = ckb_secp256k1_custom_verify_only_initialize(&context, secp_data);
+  if (ret != 0) {
+    return ret;
   }
 
   len = BLAKE2B_BLOCK_SIZE;

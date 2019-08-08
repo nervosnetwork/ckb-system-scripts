@@ -1,4 +1,4 @@
-use super::{sign_tx, DummyDataLoader, DAO_BIN, MAX_CYCLES, SIGHASH_ALL_BIN};
+use super::{sign_tx, DummyDataLoader, DAO_BIN, MAX_CYCLES, SECP256K1_DATA_BIN, SIGHASH_ALL_BIN};
 use byteorder::{ByteOrder, LittleEndian};
 use ckb_core::{
     cell::{CellMetaBuilder, ResolvedOutPoint, ResolvedTransaction},
@@ -99,11 +99,16 @@ fn complete_tx(
     builder: TransactionBuilder,
 ) -> (Transaction, Vec<ResolvedOutPoint>) {
     let (secp_cell, secp_out_point) = script_cell(&SIGHASH_ALL_BIN);
+    let (secp_data_cell, secp_data_out_point) = script_cell(&SECP256K1_DATA_BIN);
     let (dao_cell, dao_out_point) = script_cell(&DAO_BIN);
 
     let secp_cell_meta =
         CellMetaBuilder::from_cell_output(secp_cell.clone(), SIGHASH_ALL_BIN.clone())
             .out_point(secp_out_point.clone().cell.unwrap())
+            .build();
+    let secp_data_cell_meta =
+        CellMetaBuilder::from_cell_output(secp_data_cell.clone(), SECP256K1_DATA_BIN.clone())
+            .out_point(secp_data_out_point.clone().cell.unwrap())
             .build();
     let dao_cell_meta = CellMetaBuilder::from_cell_output(dao_cell.clone(), DAO_BIN.clone())
         .out_point(dao_out_point.clone().cell.unwrap())
@@ -114,14 +119,23 @@ fn complete_tx(
         (secp_cell, SIGHASH_ALL_BIN.clone()),
     );
     dummy.cells.insert(
+        secp_data_out_point.clone().cell.unwrap(),
+        (secp_data_cell, SECP256K1_DATA_BIN.clone()),
+    );
+    dummy.cells.insert(
         dao_out_point.clone().cell.unwrap(),
         (dao_cell, DAO_BIN.clone()),
     );
 
-    let tx = builder.dep(secp_out_point).dep(dao_out_point).build();
+    let tx = builder
+        .dep(secp_out_point)
+        .dep(secp_data_out_point)
+        .dep(dao_out_point)
+        .build();
 
     let mut resolved_deps = vec![];
     resolved_deps.push(ResolvedOutPoint::cell_only(secp_cell_meta));
+    resolved_deps.push(ResolvedOutPoint::cell_only(secp_data_cell_meta));
     resolved_deps.push(ResolvedOutPoint::cell_only(dao_cell_meta));
 
     (tx, resolved_deps)

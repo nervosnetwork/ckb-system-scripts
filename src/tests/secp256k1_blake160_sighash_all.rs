@@ -1,4 +1,4 @@
-use super::{sign_tx, DummyDataLoader, MAX_CYCLES, SIGHASH_ALL_BIN};
+use super::{sign_tx, DummyDataLoader, MAX_CYCLES, SECP256K1_DATA_BIN, SIGHASH_ALL_BIN};
 use ckb_core::{
     cell::{CellMetaBuilder, ResolvedOutPoint, ResolvedTransaction},
     script::{Script, ScriptHashType},
@@ -40,6 +40,26 @@ fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Vec<Bytes>
         contract_out_point.clone().cell.unwrap(),
         (dep_cell, script_data),
     );
+    // secp256k1 data
+    let secp256k1_data_out_point = {
+        let tx_hash = {
+            let mut rng = thread_rng();
+            let mut buf = [0u8; 32];
+            rng.fill(&mut buf);
+            H256::from(&buf)
+        };
+        OutPoint::new_cell(tx_hash, 0)
+    };
+    let secp256k1_data_cell = CellOutput::new(
+        Capacity::bytes(SECP256K1_DATA_BIN.len()).expect("data capacity"),
+        CellOutput::calculate_data_hash(&SECP256K1_DATA_BIN),
+        Default::default(),
+        None,
+    );
+    dummy.cells.insert(
+        secp256k1_data_out_point.clone().cell.unwrap(),
+        (secp256k1_data_cell, SECP256K1_DATA_BIN.clone()),
+    );
     // input unlock script
     let previous_output_cell = CellOutput::new(
         capacity,
@@ -54,6 +74,7 @@ fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Vec<Bytes>
     TransactionBuilder::default()
         .input(CellInput::new(previous_out_point.clone(), 0))
         .dep(contract_out_point)
+        .dep(secp256k1_data_out_point)
         .output(CellOutput::new(
             capacity,
             Default::default(),
@@ -82,11 +103,19 @@ fn build_resolved_tx<'a>(
     tx: &'a Transaction,
 ) -> ResolvedTransaction<'a> {
     let previous_out_point = tx.inputs()[0].previous_output.clone().cell.unwrap();
-    let deps_out_point = tx.deps()[0].clone().cell.unwrap();
-    let (dep_output, dep_data) = data_loader.cells.get(&deps_out_point).unwrap();
-    let dep_cell = CellMetaBuilder::from_cell_output(dep_output.to_owned(), dep_data.to_owned())
-        .out_point(deps_out_point)
-        .build();
+    let resolved_deps = tx
+        .deps()
+        .iter()
+        .map(|dep| {
+            let deps_out_point = dep.clone().cell.unwrap();
+            let (dep_output, dep_data) = data_loader.cells.get(&deps_out_point).unwrap();
+            let dep_cell =
+                CellMetaBuilder::from_cell_output(dep_output.to_owned(), dep_data.to_owned())
+                    .out_point(deps_out_point)
+                    .build();
+            ResolvedOutPoint::cell_only(dep_cell)
+        })
+        .collect();
     let (input_output, input_data) = data_loader.cells.get(&previous_out_point).unwrap();
     let input_cell =
         CellMetaBuilder::from_cell_output(input_output.to_owned(), input_data.to_owned())
@@ -94,7 +123,7 @@ fn build_resolved_tx<'a>(
             .build();
     ResolvedTransaction {
         transaction: tx,
-        resolved_deps: vec![ResolvedOutPoint::cell_only(dep_cell)],
+        resolved_deps,
         resolved_inputs: vec![ResolvedOutPoint::cell_only(input_cell)],
     }
 }
