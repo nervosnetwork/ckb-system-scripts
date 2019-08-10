@@ -24,6 +24,7 @@ build/secp256k1_data_info.h: build/dump_secp256k1_data
 	$<
 
 build/dump_secp256k1_data: c/dump_secp256k1_data.c $(SECP256K1_SRC)
+	mkdir -p build
 	gcc $(CFLAGS) -o $@ $<
 
 $(SECP256K1_SRC):
