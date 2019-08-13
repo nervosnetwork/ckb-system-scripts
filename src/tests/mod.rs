@@ -1,5 +1,6 @@
 mod dao;
 mod secp256k1_blake160_sighash_all;
+mod secp256k1_ripemd160_sha256_sighash_all;
 
 use ckb_core::{
     cell::CellMeta,
@@ -18,6 +19,9 @@ pub const MAX_CYCLES: u64 = std::u64::MAX;
 lazy_static! {
     pub static ref SIGHASH_ALL_BIN: Bytes =
         Bytes::from(&include_bytes!("../../specs/cells/secp256k1_blake160_sighash_all")[..]);
+    pub static ref BITCOIN_P2PKH_BIN: Bytes = Bytes::from(
+        &include_bytes!("../../specs/cells/secp256k1_ripemd160_sha256_sighash_all")[..]
+    );
     pub static ref DAO_BIN: Bytes = Bytes::from(&include_bytes!("../../specs/cells/dao")[..]);
 }
 
