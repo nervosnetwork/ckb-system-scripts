@@ -1,11 +1,11 @@
-use super::{sign_tx, DummyDataLoader, BITCOIN_P2PKH_BIN, SECP256K1_DATA_BIN, MAX_CYCLES};
+use super::{sign_tx, DummyDataLoader, BITCOIN_P2PKH_BIN, MAX_CYCLES, SECP256K1_DATA_BIN};
 use ckb_core::{
     cell::{CellMetaBuilder, ResolvedTransaction},
     script::{Script, ScriptHashType},
     transaction::{CellDep, CellInput, CellOutput, OutPoint, Transaction, TransactionBuilder},
     Bytes, Capacity,
 };
-use ckb_crypto::secp::{Generator, Privkey, Pubkey};
+use ckb_crypto::secp::{Generator, Pubkey};
 use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
 use numext_fixed_hash::{h160, h256, H160, H256};
 use rand::{thread_rng, Rng};
@@ -87,20 +87,6 @@ fn gen_tx(
             None,
         ))
         .output_data(Bytes::new())
-        .build()
-}
-
-fn sign_tx_hash(tx: Transaction, key: &Privkey, tx_hash: &[u8]) -> Transaction {
-    // calculate message
-    let mut blake2b = ckb_hash::new_blake2b();
-    let mut message = [0u8; 32];
-    blake2b.update(tx_hash);
-    blake2b.finalize(&mut message);
-    let message = H256::from(message);
-    let sig = key.sign_recoverable(&message).expect("sign");
-    TransactionBuilder::from_transaction(tx)
-        .witness(vec![Bytes::from(sig.serialize())])
-        .witness(vec![Bytes::from("fdafd")])
         .build()
 }
 
@@ -250,17 +236,22 @@ fn test_signing_wrong_tx_hash() {
         vec![pubkey_hash.into()],
         vec![pubkey.into()],
     );
-    let tx = {
-        let mut rand_tx_hash = [0u8; 32];
-        let mut rng = thread_rng();
-        rng.fill(&mut rand_tx_hash);
-        sign_tx_hash(tx, &privkey, &rand_tx_hash[..])
-    };
+    let tx = sign_tx(tx, &privkey);
+    // Change tx hash
+    let tx = TransactionBuilder::from_transaction(tx)
+        .output(CellOutput::new(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            None,
+        ))
+        .build();
+
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let script_config = ScriptConfig::default();
     let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
         .verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-3)));
+    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-9)));
 }
 
 #[test]
@@ -290,6 +281,7 @@ fn test_super_long_witness() {
     let message = H256::from(message);
     let sig = privkey.sign_recoverable(&message).expect("sign");
     let tx = TransactionBuilder::from_transaction(tx)
+        .witnesses_clear()
         .witness(vec![Bytes::from(sig.serialize()), super_long_message])
         .build();
 
