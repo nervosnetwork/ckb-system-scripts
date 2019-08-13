@@ -133,7 +133,7 @@ fn sha256(data: &[u8]) -> H256 {
 
 fn pubkey_uncompressed(pubkey: &Pubkey) -> Vec<u8> {
     let mut serialized = vec![4u8; 65];
-    &mut serialized[1..65].copy_from_slice(pubkey.as_ref());
+    serialized[1..65].copy_from_slice(pubkey.as_ref());
     serialized
 }
 

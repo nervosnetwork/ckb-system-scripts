@@ -60,7 +60,6 @@ static int extract_bytes(ns(Bytes_table_t) bytes, unsigned char* buffer,
  */
 int main(int argc, char* argv[]) {
   int ret;
-  int recid;
   size_t index = 0;
   uint64_t signature_size = 0;
   volatile uint64_t len = 0;
@@ -163,18 +162,9 @@ int main(int argc, char* argv[]) {
       return ERROR_ENCODING;
     }
 
-    /* The 65th byte is recid according to contract spec.*/
-    recid = temp[RECID_INDEX];
-    secp256k1_ecdsa_recoverable_signature recoverable_signature;
-    if (secp256k1_ecdsa_recoverable_signature_parse_compact(
-            &context, &recoverable_signature, temp, recid) == 0) {
-      return ERROR_SECP_PARSE_SIGNATURE;
-    }
-
     secp256k1_ecdsa_signature signature;
-    if (secp256k1_ecdsa_recoverable_signature_convert(
-            &context, &signature, &recoverable_signature) == 0) {
-      return ERROR_SECP_PARSE_SIGNATURE;
+    if (secp256k1_ecdsa_signature_parse_compact(&context, &signature, temp) == 0) {
+        return ERROR_SECP_PARSE_SIGNATURE;
     }
 
     blake2b_state blake2b_ctx;

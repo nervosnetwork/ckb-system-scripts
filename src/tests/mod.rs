@@ -67,7 +67,7 @@ pub fn sign_tx(tx: Transaction, key: &Privkey) -> Transaction {
         .iter()
         .enumerate()
         .map(|(i, _)| {
-            let witness = tx.witnesses().get(i).cloned().unwrap_or(vec![]);
+            let witness = tx.witnesses().get(i).cloned().unwrap_or_default();
             let mut blake2b = ckb_hash::new_blake2b();
             let mut message = [0u8; 32];
             blake2b.update(&tx.hash()[..]);
