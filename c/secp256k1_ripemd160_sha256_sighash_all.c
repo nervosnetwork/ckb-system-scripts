@@ -11,7 +11,7 @@
 
 #define ERROR_UNKNOWN -1
 #define ERROR_WRONG_NUMBER_OF_ARGUMENTS -2
-#define ERROR_PUBKEY_BLAKE160_HASH -3
+#define ERROR_PUBKEY_RIPEMD160_HASH -3
 #define ERROR_SYSCALL -4
 #define ERROR_SECP_ABORT -5
 #define ERROR_SECP_INITIALIZE -6
@@ -25,7 +25,6 @@
 #define BLAKE2B_BLOCK_SIZE 32
 #define RIPEMD160_SIZE 20
 #define SHA256_SIZE 32
-#define PUBKEY_SIZE 33
 #define TEMP_SIZE 1024
 #define RECID_INDEX 64
 /* 32 KB */
@@ -55,9 +54,9 @@ static int extract_bytes(ns(Bytes_table_t) bytes, unsigned char* buffer,
  * shield the real pubkey in lock script.
  *
  * Witness:
- * 2. pubkey, real pubkey used to identify token owner
  * 3. signature, signature used to present ownership
  * 4. signature size, in little endian 64 bit unsigned integer
+ * 5. pubkey, real pubkey used to identify token owner
  */
 int main(int argc, char* argv[]) {
   int ret;
@@ -88,7 +87,7 @@ int main(int argc, char* argv[]) {
     return ERROR_SYSCALL;
   }
 
-    while (1) {
+  while (1) {
     len = 0;
     /*
      * Actually we don't need this syscall, we are just making it to grab all
@@ -126,14 +125,12 @@ int main(int argc, char* argv[]) {
 
     /* check pubkey hash */
     len = TEMP_SIZE;
-    ret = extract_bytes(ns(Bytes_vec_at(args, 0)), temp, &len);
+    ret = extract_bytes(ns(Bytes_vec_at(args, 1)), temp, &len);
     if (ret != CKB_SUCCESS) {
       return ERROR_ENCODING;
     }
     sha256_state sha256_ctx;
     ripemd160_state ripe160_ctx;
-
-    len = PUBKEY_SIZE;
 
     sha256_init(&sha256_ctx);
     sha256_update(&sha256_ctx, temp, len);
@@ -144,12 +141,12 @@ int main(int argc, char* argv[]) {
     ripemd160_finalize(&ripe160_ctx, temp);
 
     if (memcmp(argv[1], temp, RIPEMD160_SIZE) != 0) {
-      return ERROR_PUBKEY_BLAKE160_HASH;
+      return ERROR_PUBKEY_RIPEMD160_HASH;
     }
 
     /* load pubkey */
     len = TEMP_SIZE;
-    ret = extract_bytes(ns(Bytes_vec_at(args, 0)), temp, &len);
+    ret = extract_bytes(ns(Bytes_vec_at(args, 1)), temp, &len);
     if (ret != CKB_SUCCESS) {
       return ERROR_ENCODING;
     }
@@ -161,20 +158,29 @@ int main(int argc, char* argv[]) {
 
     /* Load signature */
     len = TEMP_SIZE;
-    ret = extract_bytes(ns(Bytes_vec_at(args, 1)), temp, &len);
+    ret = extract_bytes(ns(Bytes_vec_at(args, 0)), temp, &len);
     if (ret != CKB_SUCCESS) {
       return ERROR_ENCODING;
     }
 
+    /* The 65th byte is recid according to contract spec.*/
+    recid = temp[RECID_INDEX];
+    secp256k1_ecdsa_recoverable_signature recoverable_signature;
+    if (secp256k1_ecdsa_recoverable_signature_parse_compact(
+            &context, &recoverable_signature, temp, recid) == 0) {
+      return ERROR_SECP_PARSE_SIGNATURE;
+    }
+
     secp256k1_ecdsa_signature signature;
-    if (secp256k1_ecdsa_signature_parse_der(&context, &signature, temp, len) == 0) {
+    if (secp256k1_ecdsa_recoverable_signature_convert(
+            &context, &signature, &recoverable_signature) == 0) {
       return ERROR_SECP_PARSE_SIGNATURE;
     }
 
     blake2b_state blake2b_ctx;
     blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
     blake2b_update(&blake2b_ctx, tx_hash, BLAKE2B_BLOCK_SIZE);
-    for (size_t i = 2; i < ns(Bytes_vec_len(args)); i++) {
+    for (size_t i = 1; i < ns(Bytes_vec_len(args)); i++) {
       len = TEMP_SIZE;
       ret = extract_bytes(ns(Bytes_vec_at(args, i)), temp, &len);
       if (ret != CKB_SUCCESS) {

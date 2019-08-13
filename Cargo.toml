@@ -28,3 +28,5 @@ ckb-hash = { git = "https://github.com/nervosnetwork/ckb.git", rev = "9235afcc6c
 numext-fixed-hash = "0.1.4"
 rand = "0.6.5"
 lazy_static = "1.3.0"
+ripemd160 = "0.8.0"
+sha2 = "0.8.0"
