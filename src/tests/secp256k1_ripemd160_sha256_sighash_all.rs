@@ -201,6 +201,56 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey() {
 }
 
 #[test]
+fn test_sighash_all_unlock_with_uncompressed_pubkey_and_non_recoverable_signature() {
+    let mut data_loader = DummyDataLoader::new();
+    let key_gen = Generator::new();
+    let privkey = key_gen.random_privkey();
+    let pubkey = pubkey_uncompressed(&privkey.pubkey().expect("pubkey"));
+    let pubkey_hash = pubkey_hash(&pubkey);
+
+    let tx = gen_tx(
+        &mut data_loader,
+        BITCOIN_P2PKH_BIN.clone(),
+        vec![pubkey_hash.into()],
+        vec![],
+    );
+    // Create non-recoverable signature
+    let tx = {
+        let mut blake2b = ckb_hash::new_blake2b();
+        let mut message = [0u8; 32];
+        blake2b.update(&tx.hash()[..]);
+        blake2b.update(pubkey.as_slice());
+        blake2b.finalize(&mut message);
+
+        let context = &ckb_crypto::secp::SECP256K1;
+        let message = secp256k1::Message::from_slice(&message).unwrap();
+        let privkey = secp256k1::key::SecretKey::from_slice(privkey.as_bytes()).unwrap();
+        let signature = context.sign(&message, &privkey);
+        let signature = Bytes::from(&signature.serialize_compact()[..]);
+
+        // This is the recoverable signature
+        // let message = H256::from(message);
+        // let signature = Bytes::from(
+        //     privkey
+        //         .sign_recoverable(&message)
+        //         .expect("sign")
+        //         .serialize(),
+        // );
+
+        TransactionBuilder::from_transaction(tx)
+            .witnesses_clear()
+            .witness(vec![signature, pubkey.into()])
+            .build()
+    };
+
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let script_config = ScriptConfig::default();
+    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
+        .verify(MAX_CYCLES);
+    verify_result.expect("pass verification");
+}
+
+#[test]
 fn test_signing_with_wrong_key() {
     let mut data_loader = DummyDataLoader::new();
     let key_gen = Generator::new();
