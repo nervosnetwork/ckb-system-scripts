@@ -4,7 +4,8 @@ mod secp256k1_blake160_sighash_all;
 use ckb_core::{
     cell::CellMeta,
     extras::BlockExt,
-    transaction::{CellOutPoint, CellOutput, Transaction, TransactionBuilder, Witness},
+    header::Header,
+    transaction::{CellOutput, OutPoint, Transaction, TransactionBuilder, Witness},
     Bytes,
 };
 use ckb_crypto::secp::Privkey;
@@ -25,7 +26,8 @@ lazy_static! {
 
 #[derive(Default)]
 pub struct DummyDataLoader {
-    pub cells: HashMap<CellOutPoint, (CellOutput, Bytes)>,
+    pub cells: HashMap<OutPoint, (CellOutput, Bytes)>,
+    pub headers: HashMap<H256, Header>,
 }
 
 impl DummyDataLoader {
@@ -47,6 +49,11 @@ impl DataLoader for DummyDataLoader {
     // load BlockExt
     fn get_block_ext(&self, _hash: &H256) -> Option<BlockExt> {
         unreachable!()
+    }
+
+    // load header
+    fn get_header(&self, block_hash: &H256) -> Option<Header> {
+        self.headers.get(block_hash).cloned()
     }
 }
 

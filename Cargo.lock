@@ -122,15 +122,13 @@ dependencies = [
 [[package]]
 name = "ckb-core"
 version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
 dependencies = [
  "bincode 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit-vec 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "ckb-hash 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-merkle-tree 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-occupied-capacity 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-util 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
+ "ckb-hash 0.19.0-pre",
+ "ckb-merkle-tree 0.19.0-pre",
+ "ckb-occupied-capacity 0.19.0-pre",
  "crossbeam-channel 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "faster-hex 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -144,7 +142,6 @@ dependencies = [
 [[package]]
 name = "ckb-crypto"
 version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
 dependencies = [
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "faster-hex 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -157,17 +154,15 @@ dependencies = [
 [[package]]
 name = "ckb-dao-utils"
 version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
 dependencies = [
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "ckb-core 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
+ "ckb-core 0.19.0-pre",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "ckb-hash"
 version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
 dependencies = [
  "blake2b-rs 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -175,7 +170,6 @@ dependencies = [
 [[package]]
 name = "ckb-logger"
 version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
 dependencies = [
  "ansi_term 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "backtrace 0.3.34 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -193,9 +187,8 @@ dependencies = [
 [[package]]
 name = "ckb-merkle-tree"
 version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
 dependencies = [
- "ckb-hash 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
+ "ckb-hash 0.19.0-pre",
  "merkle-cbt 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "numext-fixed-hash 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -203,17 +196,15 @@ dependencies = [
 [[package]]
 name = "ckb-occupied-capacity"
 version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
 dependencies = [
- "ckb-occupied-capacity-core 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-occupied-capacity-macros 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
+ "ckb-occupied-capacity-core 0.19.0-pre",
+ "ckb-occupied-capacity-macros 0.19.0-pre",
  "proc-macro-hack 0.5.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "ckb-occupied-capacity-core"
 version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
 dependencies = [
  "serde 1.0.98 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.98 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -222,9 +213,8 @@ dependencies = [
 [[package]]
 name = "ckb-occupied-capacity-macros"
 version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
 dependencies = [
- "ckb-occupied-capacity-core 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
+ "ckb-occupied-capacity-core 0.19.0-pre",
  "proc-macro-hack 0.5.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 0.15.43 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -233,10 +223,9 @@ dependencies = [
 [[package]]
 name = "ckb-protocol"
 version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
 dependencies = [
- "ckb-core 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-merkle-tree 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
+ "ckb-core 0.19.0-pre",
+ "ckb-merkle-tree 0.19.0-pre",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "flatbuffers 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "flatbuffers-verifier 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -247,14 +236,13 @@ dependencies = [
 [[package]]
 name = "ckb-script"
 version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
 dependencies = [
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "ckb-core 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-hash 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-logger 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-protocol 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-script-data-loader 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
+ "ckb-core 0.19.0-pre",
+ "ckb-hash 0.19.0-pre",
+ "ckb-logger 0.19.0-pre",
+ "ckb-protocol 0.19.0-pre",
+ "ckb-script-data-loader 0.19.0-pre",
  "ckb-vm 0.15.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "faster-hex 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "flatbuffers 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -267,9 +255,8 @@ dependencies = [
 [[package]]
 name = "ckb-script-data-loader"
 version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
 dependencies = [
- "ckb-core 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
+ "ckb-core 0.19.0-pre",
  "numext-fixed-hash 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -279,11 +266,11 @@ version = "0.3.0"
 dependencies = [
  "blake2b-rs 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "ckb-core 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-crypto 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-dao-utils 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-hash 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
- "ckb-script 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)",
+ "ckb-core 0.19.0-pre",
+ "ckb-crypto 0.19.0-pre",
+ "ckb-dao-utils 0.19.0-pre",
+ "ckb-hash 0.19.0-pre",
+ "ckb-script 0.19.0-pre",
  "faster-hex 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "includedir 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "includedir_codegen 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -291,16 +278,6 @@ dependencies = [
  "numext-fixed-hash 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "phf 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "ckb-util"
-version = "0.19.0-pre"
-source = "git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea#d50c0294746be23f68a2c13192557745355df1ea"
-dependencies = [
- "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "linked-hash-map 0.5.1 (git+https://github.com/nervosnetwork/linked-hash-map?rev=df27f21)",
- "parking_lot 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -395,11 +372,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "faster-hex"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "fixedbitset"
-version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -502,11 +474,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "libc"
 version = "0.2.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "linked-hash-map"
-version = "0.5.1"
-source = "git+https://github.com/nervosnetwork/linked-hash-map?rev=df27f21#df27f2194df66d3c652b0fb661da707cc167c9d1"
 
 [[package]]
 name = "lock_api"
@@ -670,11 +637,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ordermap"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
 name = "owning_ref"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -696,23 +658,11 @@ name = "parking_lot_core"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "backtrace 0.3.34 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.60 (registry+https://github.com/rust-lang/crates.io-index)",
- "petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "smallvec 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "thread-id 3.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "petgraph"
-version = "0.4.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "fixedbitset 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "ordermap 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1049,16 +999,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "thread-id"
-version = "3.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "libc 0.2.60 (registry+https://github.com/rust-lang/crates.io-index)",
- "redox_syscall 0.1.56 (registry+https://github.com/rust-lang/crates.io-index)",
- "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "thread_local"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1149,19 +1089,6 @@ dependencies = [
 "checksum cc 1.0.38 (registry+https://github.com/rust-lang/crates.io-index)" = "ce400c638d48ee0e9ab75aef7997609ec57367ccfe1463f21bf53c3eca67bf46"
 "checksum cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "b486ce3ccf7ffd79fdeb678eac06a9e6c09fc88d33836340becb8fffe87c5e33"
 "checksum chrono 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)" = "77d81f58b7301084de3b958691458a53c3f7e0b1d702f77e550b6a88e3a88abe"
-"checksum ckb-core 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
-"checksum ckb-crypto 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
-"checksum ckb-dao-utils 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
-"checksum ckb-hash 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
-"checksum ckb-logger 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
-"checksum ckb-merkle-tree 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
-"checksum ckb-occupied-capacity 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
-"checksum ckb-occupied-capacity-core 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
-"checksum ckb-occupied-capacity-macros 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
-"checksum ckb-protocol 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
-"checksum ckb-script 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
-"checksum ckb-script-data-loader 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
-"checksum ckb-util 0.19.0-pre (git+https://github.com/nervosnetwork/ckb.git?rev=d50c0294746be23f68a2c13192557745355df1ea)" = "<none>"
 "checksum ckb-vm 0.15.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f089b008f8fa02e44b409b2c24ee9a9f65216f24cebeccc598162d3a44a675ad"
 "checksum ckb-vm-definitions 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fd297669e4783ddca472fa00e7d2117b2d1dcb67cca814d5dd222852b8dba088"
 "checksum cloudabi 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
@@ -1173,7 +1100,6 @@ dependencies = [
 "checksum failure_derive 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "ea1063915fd7ef4309e222a5a07cf9c319fb9c7836b1f89b85458672dbb127e1"
 "checksum faster-hex 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2ea2e4ecc921ec2cbb8b10f0d400fe448554779d2ac5e0bfbb065836d9d8483a"
 "checksum faster-hex 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a5b8cccaafb5aae8c282692e5590f341925edea6c696e8715ff0d973320b2646"
-"checksum fixedbitset 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "86d4de0081402f5e88cdac65c8dcdcc73118c1a7a465e2a05f0da05843a8ea33"
 "checksum flatbuffers 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2fc1af59fd8248b59beb048d614a869ce211315c195f5412334e47f5b7e22726"
 "checksum flatbuffers-verifier 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "6aa84480528a2ba6a8007690655a5d7d083037d98bdf4b7246baf1b336bb44c5"
 "checksum flate2 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)" = "550934ad4808d5d39365e5d61727309bf18b3b02c6c56b729cb92e7dd84bc3d8"
@@ -1187,7 +1113,6 @@ dependencies = [
 "checksum iovec 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "dbe6e417e7d0975db6512b90796e8ce223145ac4e33c377e4a42882a0e88bb08"
 "checksum lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc5729f27f159ddd61f4df6228e827e86643d4d3e7c32183cb30a1c08f604a14"
 "checksum libc 0.2.60 (registry+https://github.com/rust-lang/crates.io-index)" = "d44e80633f007889c7eff624b709ab43c92d708caad982295768a7b13ca3b5eb"
-"checksum linked-hash-map 0.5.1 (git+https://github.com/nervosnetwork/linked-hash-map?rev=df27f21)" = "<none>"
 "checksum lock_api 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "62ebf1391f6acad60e5c8b43706dde4582df75c06698ab44511d15016bc2442c"
 "checksum log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)" = "14b6052be84e6b71ab17edffc2eeabf5c2c3ae1fdb464aae35ac50c67a44e1f7"
 "checksum memchr 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "88579771288728879b57485cc7d6b07d648c9f0141eb955f8ab7f9d45394468e"
@@ -1205,11 +1130,9 @@ dependencies = [
 "checksum numext-fixed-uint 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "84f38aa6a49599f6cf38edbf3af3da0eda190ed3f3889afa5f4cb13be5673259"
 "checksum numext-fixed-uint-core 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "dbae90b098c4ac5d5fd2fb48430c9141b7fac42e5fee31ee008c7880ec83adac"
 "checksum numext-fixed-uint-hack 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "aba196a4ea541560fb7e44d328c87f25f024c727eeb09df4bb53610a575cfed7"
-"checksum ordermap 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "a86ed3f5f244b372d6b1a00b72ef7f8876d0bc6a78a4c9985c53614041512063"
 "checksum owning_ref 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "49a4b8ea2179e6a2e27411d3bca09ca6dd630821cf6894c6c7c8467a8ee7ef13"
 "checksum parking_lot 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ab41b4aed082705d1056416ae4468b6ea99d52599ecf3169b00088d43113e337"
 "checksum parking_lot_core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "94c8c7923936b28d546dfd14d4472eaf34c99b14e1c973a32b3e6d4eb04298c9"
-"checksum petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)" = "9c3659d1ee90221741f65dd128d9998311b0e40c5d3c23a62445938214abce4f"
 "checksum phf 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)" = "b3da44b85f8e8dfaec21adae67f95d93244b2ecf6ad2a692320598dcc8e6dd18"
 "checksum phf_codegen 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)" = "b03e85129e324ad4166b06b2c7491ae27fe3ec353af72e72cd1654c7225d517e"
 "checksum phf_generator 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)" = "09364cc93c159b8b06b1f4dd8a4398984503483891b0c26b867cf431fb132662"
@@ -1251,7 +1174,6 @@ dependencies = [
 "checksum syn 0.15.43 (registry+https://github.com/rust-lang/crates.io-index)" = "ee06ea4b620ab59a2267c6b48be16244a3389f8bfa0986bdd15c35b890b00af3"
 "checksum synstructure 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)" = "02353edf96d6e4dc81aea2d8490a7e9db177bf8acb0e951c24940bf866cb313f"
 "checksum termcolor 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "96d6098003bde162e4277c70665bd87c326f5a0c3f3fbfb285787fa482d54e6e"
-"checksum thread-id 3.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c7fbf4c9d56b320106cd64fd024dadfa0be7cb4706725fc44a7d7ce952d820c1"
 "checksum thread_local 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c6b53e329000edc2b34dbe8545fd20e55a333362d0a321909685a19bd28c3f1b"
 "checksum time 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)" = "db8dcfca086c1143c9270ac42a2bbd8a7ee477b78ac8e45b19abfb0cbede4b6f"
 "checksum unicode-xid 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc72304796d0818e357ead4e000d19c9c174ab23dc11093ac919054d20a6a7fc"
