@@ -11,7 +11,7 @@ use ckb_core::{
 use ckb_crypto::secp::Privkey;
 use ckb_script::DataLoader;
 use lazy_static::lazy_static;
-use numext_fixed_hash::H256;
+use numext_fixed_hash::{H160, H256};
 use std::collections::HashMap;
 
 pub const MAX_CYCLES: u64 = std::u64::MAX;
@@ -57,7 +57,13 @@ impl DataLoader for DummyDataLoader {
     }
 }
 
-pub fn sign_tx(tx: Transaction, key: &Privkey) -> Transaction {
+pub fn blake160(message: &[u8]) -> H160 {
+    H160::from_slice(&ckb_hash::blake2b_256(message)[..20]).unwrap()
+}
+
+pub fn multi_sign_tx(tx: Transaction, keys: &[&Privkey]) -> Transaction
+where
+{
     let signed_witnesses: Vec<Witness> = tx
         .inputs()
         .iter()
@@ -72,8 +78,10 @@ pub fn sign_tx(tx: Transaction, key: &Privkey) -> Transaction {
             }
             blake2b.finalize(&mut message);
             let message = H256::from(message);
-            let sig = key.sign_recoverable(&message).expect("sign");
-            let mut signed_witness = vec![Bytes::from(sig.serialize())];
+            let mut signed_witness: Vec<_> = keys
+                .iter()
+                .map(|key| Bytes::from(key.sign_recoverable(&message).expect("sign").serialize()))
+                .collect();
             for data in &witness {
                 signed_witness.push(data.clone());
             }
@@ -85,4 +93,8 @@ pub fn sign_tx(tx: Transaction, key: &Privkey) -> Transaction {
         .witnesses_clear()
         .witnesses(signed_witnesses)
         .build()
+}
+
+pub fn sign_tx(tx: Transaction, key: &Privkey) -> Transaction {
+    multi_sign_tx(tx, &[key])
 }
