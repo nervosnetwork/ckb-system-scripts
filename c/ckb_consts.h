@@ -10,6 +10,8 @@
 #define SYS_ckb_load_witness 2074
 #define SYS_ckb_load_cell_by_field 2081
 #define SYS_ckb_load_input_by_field 2083
+#define SYS_ckb_load_cell_data_as_code 2091
+#define SYS_ckb_load_cell_data 2092
 #define SYS_ckb_debug 2177
 
 #define CKB_SUCCESS 0
@@ -18,7 +20,8 @@
 
 #define CKB_SOURCE_INPUT 1
 #define CKB_SOURCE_OUTPUT 2
-#define CKB_SOURCE_DEP 3
+#define CKB_SOURCE_CELL_DEP 3
+#define CKB_SOURCE_HEADER_DEP 4
 #define CKB_SOURCE_GROUP_INPUT 0x0100000000000001
 #define CKB_SOURCE_GROUP_OUTPUT 0x0100000000000002
 
@@ -33,4 +36,4 @@
 #define CKB_INPUT_FIELD_OUT_POINT 0
 #define CKB_INPUT_FIELD_SINCE 1
 
-#endif  /* CKB_CONSTS_H_ */
+#endif /* CKB_CONSTS_H_ */

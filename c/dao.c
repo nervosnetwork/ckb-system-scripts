@@ -160,7 +160,7 @@ static int calculate_dao_input_capacity(size_t input_index,
   unsigned char withdraw_header_buffer[HEADER_SIZE];
   len = HEADER_SIZE;
   ret = ckb_load_header(withdraw_header_buffer, &len, 0, withdraw_index,
-                        CKB_SOURCE_DEP);
+                        CKB_SOURCE_HEADER_DEP);
   if (ret != CKB_SUCCESS) {
     return ret;
   }

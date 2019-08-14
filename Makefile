@@ -1,7 +1,7 @@
 TARGET := riscv64-unknown-elf
 CC := $(TARGET)-gcc
 LD := $(TARGET)-gcc
-CFLAGS := -O3 -Ideps/flatcc/include -I deps/secp256k1/src -I deps/secp256k1 -I c -Wall -Werror -Wno-nonnull-compare
+CFLAGS := -O3 -Ideps/flatcc/include -I deps/secp256k1/src -I deps/secp256k1 -I c -I build -Wall -Werror -Wno-nonnull-compare -Wno-unused-function
 LDFLAGS := -Wl,-static -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-s
 SECP256K1_SRC := deps/secp256k1/src/ecmult_static_pre_context.h
 FLATCC := deps/flatcc/bin/flatcc
@@ -14,11 +14,18 @@ all: specs/cells/secp256k1_blake160_sighash_all specs/cells/dao
 all-via-docker:
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
 
-specs/cells/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c c/protocol_reader.h $(SECP256K1_SRC)
+specs/cells/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c c/protocol_reader.h build/secp256k1_data_info.h $(SECP256K1_SRC)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 specs/cells/dao: c/dao.c c/protocol_reader.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+
+build/secp256k1_data_info.h: build/dump_secp256k1_data
+	$<
+
+build/dump_secp256k1_data: c/dump_secp256k1_data.c $(SECP256K1_SRC)
+	mkdir -p build
+	gcc $(CFLAGS) -o $@ $<
 
 $(SECP256K1_SRC):
 	cd deps/secp256k1 && \
@@ -52,7 +59,9 @@ package-clean:
 	rm -rf Cargo.toml.bak target/package/
 
 clean:
-	rm -rf build/secp256k1_blake160_sighash_all
+	rm -rf specs/cells/secp256k1_blake160_sighash_all specs/cells/dao
+	rm -rf build/secp256k1_data_info.h build/dump_secp256k1_data
+	rm -rf specs/cells/secp256k1_data
 	cd deps/flatcc && scripts/cleanall.sh
 	cd deps/secp256k1 && make clean
 
