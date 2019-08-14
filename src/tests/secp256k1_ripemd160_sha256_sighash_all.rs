@@ -1,11 +1,13 @@
-use super::{sign_tx, DummyDataLoader, BITCOIN_P2PKH_BIN, MAX_CYCLES, SECP256K1_DATA_BIN};
+use super::{DummyDataLoader, BITCOIN_P2PKH_BIN, MAX_CYCLES, SECP256K1_DATA_BIN};
 use ckb_core::{
     cell::{CellMetaBuilder, ResolvedTransaction},
     script::{Script, ScriptHashType},
-    transaction::{CellDep, CellInput, CellOutput, OutPoint, Transaction, TransactionBuilder},
+    transaction::{
+        CellDep, CellInput, CellOutput, OutPoint, Transaction, TransactionBuilder, Witness,
+    },
     Bytes, Capacity,
 };
-use ckb_crypto::secp::{Generator, Pubkey};
+use ckb_crypto::secp::{Generator, Privkey, Pubkey};
 use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
 use numext_fixed_hash::{h160, h256, H160, H256};
 use rand::{thread_rng, Rng};
@@ -87,6 +89,30 @@ fn gen_tx(
             None,
         ))
         .output_data(Bytes::new())
+        .build()
+}
+
+// Special signature method, inconsistent with the default lock behavior,
+// witness signature only sign transaction hash
+pub fn sign_tx(tx: Transaction, key: &Privkey) -> Transaction {
+    let signed_witnesses: Vec<Witness> = tx
+        .inputs()
+        .iter()
+        .enumerate()
+        .map(|(i, _)| {
+            let witness = tx.witnesses().get(i).cloned().unwrap_or_default();
+            let sig = key.sign_recoverable(&tx.hash()).expect("sign");
+            let mut signed_witness = vec![Bytes::from(sig.serialize())];
+            for data in &witness {
+                signed_witness.push(data.clone());
+            }
+            signed_witness
+        })
+        .collect();
+    // calculate message
+    TransactionBuilder::from_transaction(tx)
+        .witnesses_clear()
+        .witnesses(signed_witnesses)
         .build()
 }
 
@@ -216,14 +242,8 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey_and_non_recoverable_signatur
     );
     // Create non-recoverable signature
     let tx = {
-        let mut blake2b = ckb_hash::new_blake2b();
-        let mut message = [0u8; 32];
-        blake2b.update(&tx.hash()[..]);
-        blake2b.update(pubkey.as_slice());
-        blake2b.finalize(&mut message);
-
         let context = &ckb_crypto::secp::SECP256K1;
-        let message = secp256k1::Message::from_slice(&message).unwrap();
+        let message = secp256k1::Message::from_slice(tx.hash().as_bytes()).unwrap();
         let privkey = secp256k1::key::SecretKey::from_slice(privkey.as_bytes()).unwrap();
         let signature = context.sign(&message, &privkey);
         let signature = Bytes::from(&signature.serialize_compact()[..]);
@@ -323,13 +343,7 @@ fn test_super_long_witness() {
     buffer.resize(40000, 1);
     let super_long_message = Bytes::from(&buffer[..]);
 
-    let mut blake2b = ckb_hash::new_blake2b();
-    let mut message = [0u8; 32];
-    blake2b.update(&tx.hash()[..]);
-    blake2b.update(&super_long_message[..]);
-    blake2b.finalize(&mut message);
-    let message = H256::from(message);
-    let sig = privkey.sign_recoverable(&message).expect("sign");
+    let sig = privkey.sign_recoverable(&tx.hash()).expect("sign");
     let tx = TransactionBuilder::from_transaction(tx)
         .witnesses_clear()
         .witness(vec![Bytes::from(sig.serialize()), super_long_message])

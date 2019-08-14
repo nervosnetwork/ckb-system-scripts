@@ -2,6 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifndef SHA256_H
+#define SHA256_H
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -180,3 +183,5 @@ void sha256_finalize(sha256_state* S, unsigned char hash[32]) {
 void sha256_reset(sha256_state* S) {
     sha256_init(S);
 }
+
+#endif

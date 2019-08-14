@@ -2,6 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifndef RIPEMD160_H
+#define RIPEMD160_H
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -281,3 +284,5 @@ void ripemd160_finalize(ripemd160_state* S, unsigned char hash[20]) {
 void ripemd160_reset(ripemd160_state* S) {
     ripemd160_init(S);
 }
+
+#endif

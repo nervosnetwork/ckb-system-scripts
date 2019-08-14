@@ -1,6 +1,10 @@
 /*
-* only used on little endian
-*/
+ * Copyright (c) 2014-2018 The Bitcoin Core developers
+ * Distributed under the MIT software license, see the accompanying
+ * file COPYING or http://www.opensource.org/licenses/mit-license.php.
+ *
+ * only used on little endian
+ */
 
 #ifndef CONVERSION_H
 #define CONVERSION_H
