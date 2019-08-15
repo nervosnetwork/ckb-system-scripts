@@ -248,15 +248,6 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey_and_non_recoverable_signatur
         let signature = context.sign(&message, &privkey);
         let signature = Bytes::from(&signature.serialize_compact()[..]);
 
-        // This is the recoverable signature
-        // let message = H256::from(message);
-        // let signature = Bytes::from(
-        //     privkey
-        //         .sign_recoverable(&message)
-        //         .expect("sign")
-        //         .serialize(),
-        // );
-
         TransactionBuilder::from_transaction(tx)
             .witnesses_clear()
             .witness(vec![signature, pubkey.into()])

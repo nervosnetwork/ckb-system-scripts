@@ -51,8 +51,7 @@ static int extract_bytes(ns(Bytes_table_t) bytes, unsigned char* buffer,
  * shield the real pubkey in lock script.
  *
  * Witness:
- * 1. signature, signature used to present ownership
- * 2. signature size, in little endian 64 bit unsigned integer
+ * 0. signature, signature used to present ownership
  */
 int main(int argc, char* argv[]) {
   int ret;
