@@ -346,3 +346,48 @@ fn test_super_long_witness() {
         .verify(MAX_CYCLES);
     assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-12)));
 }
+
+#[test]
+fn test_wrong_size_witness_args() {
+    let mut data_loader = DummyDataLoader::new();
+    let key_gen = Generator::new();
+    let privkey = key_gen.random_privkey();
+    let pubkey = pubkey_uncompressed(&privkey.pubkey().expect("pubkey"));
+    let pubkey_hash = pubkey_hash(&pubkey);
+    let raw_tx = gen_tx(
+        &mut data_loader,
+        BITCOIN_P2PKH_BIN.clone(),
+        vec![pubkey_hash.into()],
+        vec![pubkey.into()],
+    );
+    // witness more than 2 args
+    let tx = sign_tx(raw_tx.clone(), &privkey);
+    let other_witness = Bytes::from("1243");
+    let tx = TransactionBuilder::from_transaction(tx)
+        .witnesses_clear()
+        .witness(vec![
+            other_witness.clone(),
+            other_witness.clone(),
+            other_witness.clone(),
+        ])
+        .build();
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let script_config = ScriptConfig::default();
+    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
+        .verify(MAX_CYCLES);
+
+    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-2)));
+
+    // witness less than 2 args
+    let tx = sign_tx(raw_tx.clone(), &privkey);
+    let tx = TransactionBuilder::from_transaction(tx)
+        .witnesses_clear()
+        .witness(vec![other_witness.clone()])
+        .build();
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let script_config = ScriptConfig::default();
+    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
+        .verify(MAX_CYCLES);
+
+    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-2)));
+}

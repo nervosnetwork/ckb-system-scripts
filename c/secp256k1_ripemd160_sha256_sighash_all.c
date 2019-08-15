@@ -14,8 +14,8 @@
  * We need verify ripemd160(sha256(pubkey)), so transaction lock script like this:
  *
  * ```
- * dependence_code_hash = "0x + this script binary hash"
- * args = [ "0x + ripemd160(sha256(pubkey))" ]
+ * dependence_code_hash = "this script binary hash"
+ * args = [ "ripemd160(sha256(pubkey))" ]
  * ```
  *
  * We need verify the ownership of the pubkey, so transaction witness is:
@@ -143,7 +143,7 @@ int main(int argc, char* argv[]) {
       return ERROR_ENCODING;
     }
     args = ns(Witness_data(witness_table));
-    if (ns(Bytes_vec_len(args)) < 2) {
+    if (ns(Bytes_vec_len(args)) != 2) {
       return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
     }
 
