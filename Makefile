@@ -9,7 +9,7 @@ FLATCC := deps/flatcc/bin/flatcc
 # docker pull xxuejie/riscv-gnu-toolchain-rv64imac:xenial-20190606
 BUILDER_DOCKER := xxuejie/riscv-gnu-toolchain-rv64imac@sha256:4f71556b7ea8f450243e2b2483bca046da1c0d76c2d34d120aa0fbf1a0688ec0
 
-all: specs/cells/secp256k1_blake160_sighash_all specs/cells/dao
+all: specs/cells/secp256k1_blake160_sighash_all specs/cells/dao specs/cells/secp256k1_ripemd160_sha256_sighash_all
 
 all-via-docker:
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
@@ -18,6 +18,9 @@ specs/cells/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 specs/cells/dao: c/dao.c c/protocol_reader.h
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+
+specs/cells/secp256k1_ripemd160_sha256_sighash_all: c/secp256k1_ripemd160_sha256_sighash_all.c c/protocol_reader.h build/secp256k1_data_info.h $(SECP256K1_SRC)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 build/secp256k1_data_info.h: build/dump_secp256k1_data
@@ -62,6 +65,7 @@ clean:
 	rm -rf specs/cells/secp256k1_blake160_sighash_all specs/cells/dao
 	rm -rf build/secp256k1_data_info.h build/dump_secp256k1_data
 	rm -rf specs/cells/secp256k1_data
+	rm -rf spec/cells/secp256k1_ripemd160_sha256_sighash_all
 	cd deps/flatcc && scripts/cleanall.sh
 	cd deps/secp256k1 && make clean
 

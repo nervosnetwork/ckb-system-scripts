@@ -1,5 +1,6 @@
 mod dao;
 mod secp256k1_blake160_sighash_all;
+mod secp256k1_ripemd160_sha256_sighash_all;
 
 use ckb_core::{
     cell::CellMeta,
@@ -19,6 +20,9 @@ pub const MAX_CYCLES: u64 = std::u64::MAX;
 lazy_static! {
     pub static ref SIGHASH_ALL_BIN: Bytes =
         Bytes::from(&include_bytes!("../../specs/cells/secp256k1_blake160_sighash_all")[..]);
+    pub static ref BITCOIN_P2PKH_BIN: Bytes = Bytes::from(
+        &include_bytes!("../../specs/cells/secp256k1_ripemd160_sha256_sighash_all")[..]
+    );
     pub static ref SECP256K1_DATA_BIN: Bytes =
         Bytes::from(&include_bytes!("../../specs/cells/secp256k1_data")[..]);
     pub static ref DAO_BIN: Bytes = Bytes::from(&include_bytes!("../../specs/cells/dao")[..]);
@@ -63,7 +67,7 @@ pub fn sign_tx(tx: Transaction, key: &Privkey) -> Transaction {
         .iter()
         .enumerate()
         .map(|(i, _)| {
-            let witness = tx.witnesses().get(i).cloned().unwrap_or(vec![]);
+            let witness = tx.witnesses().get(i).cloned().unwrap_or_default();
             let mut blake2b = ckb_hash::new_blake2b();
             let mut message = [0u8; 32];
             blake2b.update(&tx.hash()[..]);
