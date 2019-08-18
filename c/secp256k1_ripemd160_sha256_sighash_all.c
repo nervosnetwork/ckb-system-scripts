@@ -32,9 +32,6 @@
 #include "protocol_reader.h"
 #include "secp256k1_helper.h"
 
-#undef ns
-#define ns(x) FLATBUFFERS_WRAP_NAMESPACE(Ckb_Protocol, x)
-
 #define ERROR_UNKNOWN -1
 #define ERROR_WRONG_NUMBER_OF_ARGUMENTS -2
 #define ERROR_PUBKEY_RIPEMD160_HASH -3
@@ -56,23 +53,6 @@
 /* 32 KB */
 #define WITNESS_SIZE 32768
 
-static int extract_bytes(ns(Bytes_table_t) bytes, unsigned char* buffer,
-                         volatile size_t* s) {
-  flatbuffers_uint8_vec_t seq = ns(Bytes_seq(bytes));
-  size_t len = flatbuffers_uint8_vec_len(seq);
-
-  if (len > *s) {
-    return ERROR_BUFFER_NOT_ENOUGH;
-  }
-
-  for (size_t i = 0; i < len; i++) {
-    buffer[i] = flatbuffers_uint8_vec_at(seq, i);
-  }
-  *s = len;
-
-  return CKB_SUCCESS;
-}
-
 /*
  * Arguments are listed in the following order:
  * 0. program name
@@ -86,14 +66,14 @@ static int extract_bytes(ns(Bytes_table_t) bytes, unsigned char* buffer,
 int main(int argc, char* argv[]) {
   int ret;
   size_t index = 0;
-  uint64_t signature_size = 0;
   volatile uint64_t len = 0;
   unsigned char tx_hash[BLAKE2B_BLOCK_SIZE];
   unsigned char temp[TEMP_SIZE];
   unsigned char witness[WITNESS_SIZE];
-  ns(Witness_table_t) witness_table;
-  ns(Bytes_vec_t) args;
   uint8_t secp_data[CKB_SECP256K1_DATA_SIZE];
+  mol_pos_t witness_pos;
+  mol_read_res_t arg_res;
+  mol_read_res_t bytes_res;
 
   if (argc != 2) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
@@ -139,24 +119,29 @@ int main(int argc, char* argv[]) {
       return ERROR_WITNESS_TOO_LONG;
     }
 
-    if (!(witness_table = ns(Witness_as_root(witness)))) {
-      return ERROR_ENCODING;
-    }
-    args = ns(Witness_data(witness_table));
-    if (ns(Bytes_vec_len(args)) != 2) {
+    witness_pos.ptr = (const uint8_t*)witness;
+    witness_pos.size = len;
+
+    arg_res = mol_cut(&witness_pos, MOL_Witness(1));
+    if (arg_res.code != 0) {
+      if (arg_res.attr != 2) {
+        return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
+      } else {
+        return ERROR_ENCODING;
+      }
+    } else if (arg_res.attr != 2) {
       return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
     }
 
-    /* load pubkey and check pubkey hash */
-    len = TEMP_SIZE;
-    ret = extract_bytes(ns(Bytes_vec_at(args, 1)), temp, &len);
-    if (ret != CKB_SUCCESS) {
+    bytes_res = mol_cut_bytes(&arg_res.pos);
+    if (bytes_res.code != 0) {
       return ERROR_ENCODING;
     }
 
     /* parse pubkey */
     secp256k1_pubkey pubkey;
-    if (secp256k1_ec_pubkey_parse(&context, &pubkey, temp, len) == 0) {
+    if (secp256k1_ec_pubkey_parse(&context, &pubkey, bytes_res.pos.ptr,
+                bytes_res.pos.size) == 0) {
       return ERROR_SECP_PARSE_PUBKEY;
     }
 
@@ -164,7 +149,7 @@ int main(int argc, char* argv[]) {
     ripemd160_state ripe160_ctx;
 
     sha256_init(&sha256_ctx);
-    sha256_update(&sha256_ctx, temp, len);
+    sha256_update(&sha256_ctx, bytes_res.pos.ptr, bytes_res.pos.size);
     sha256_finalize(&sha256_ctx, temp);
 
     ripemd160_init(&ripe160_ctx);
@@ -177,14 +162,18 @@ int main(int argc, char* argv[]) {
     }
 
     /* Load signature */
-    len = TEMP_SIZE;
-    ret = extract_bytes(ns(Bytes_vec_at(args, 0)), temp, &len);
-    if (ret != CKB_SUCCESS) {
+    arg_res = mol_cut(&witness_pos, MOL_Witness(0));
+    if (arg_res.code != 0) {
+      return ERROR_ENCODING;
+    }
+
+    bytes_res = mol_cut_bytes(&arg_res.pos);
+    if (bytes_res.code != 0) {
       return ERROR_ENCODING;
     }
 
     secp256k1_ecdsa_signature signature;
-    if (secp256k1_ecdsa_signature_parse_compact(&context, &signature, temp) == 0) {
+    if (secp256k1_ecdsa_signature_parse_compact(&context, &signature, bytes_res.pos.ptr) == 0) {
         return ERROR_SECP_PARSE_SIGNATURE;
     }
 

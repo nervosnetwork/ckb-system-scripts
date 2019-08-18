@@ -3,9 +3,6 @@
 #include "protocol_reader.h"
 #include "secp256k1_helper.h"
 
-#undef ns
-#define ns(x) FLATBUFFERS_WRAP_NAMESPACE(Ckb_Protocol, x)
-
 #define ERROR_UNKNOWN -1
 #define ERROR_WRONG_NUMBER_OF_ARGUMENTS -2
 #define ERROR_PUBKEY_BLAKE160_HASH -3
@@ -27,23 +24,6 @@
 /* 32 KB */
 #define WITNESS_SIZE 32768
 
-static int extract_bytes(ns(Bytes_table_t) bytes, unsigned char* buffer,
-                         volatile size_t* s) {
-  flatbuffers_uint8_vec_t seq = ns(Bytes_seq(bytes));
-  size_t len = flatbuffers_uint8_vec_len(seq);
-
-  if (len > *s) {
-    return ERROR_BUFFER_NOT_ENOUGH;
-  }
-
-  for (size_t i = 0; i < len; i++) {
-    buffer[i] = flatbuffers_uint8_vec_at(seq, i);
-  }
-  *s = len;
-
-  return CKB_SUCCESS;
-}
-
 /*
  * Arguments are listed in the following order:
  * 0. program name
@@ -57,14 +37,15 @@ int main(int argc, char* argv[]) {
   int ret;
   int recid;
   size_t index = 0;
-  uint64_t signature_size = 0;
   volatile uint64_t len = 0;
   unsigned char tx_hash[BLAKE2B_BLOCK_SIZE];
   unsigned char temp[TEMP_SIZE];
   unsigned char witness[WITNESS_SIZE];
-  ns(Witness_table_t) witness_table;
-  ns(Bytes_vec_t) args;
   uint8_t secp_data[CKB_SECP256K1_DATA_SIZE];
+  mol_pos_t witness_pos;
+  size_t witness_len;
+  mol_read_res_t arg_res;
+  mol_read_res_t bytes_res;
 
   if (argc != 2) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
@@ -110,39 +91,50 @@ int main(int argc, char* argv[]) {
       return ERROR_WITNESS_TOO_LONG;
     }
 
-    if (!(witness_table = ns(Witness_as_root(witness)))) {
-      return ERROR_ENCODING;
-    }
-    args = ns(Witness_data(witness_table));
-    if (ns(Bytes_vec_len(args)) < 1) {
-      return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
-    }
+    witness_pos.ptr = (const uint8_t*)witness;
+    witness_pos.size = len;
 
     /* Load signature */
-    len = TEMP_SIZE;
-    ret = extract_bytes(ns(Bytes_vec_at(args, 0)), temp, &len);
-    if (ret != CKB_SUCCESS) {
+    arg_res = mol_cut(&witness_pos, MOL_Witness(0));
+    if (arg_res.code != 0) {
+      if (arg_res.attr < 1) {
+        return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
+      } else {
+        return ERROR_ENCODING;
+      }
+    }
+    witness_len = arg_res.attr;
+
+    bytes_res = mol_cut_bytes(&arg_res.pos);
+    if (bytes_res.code != 0) {
+      return ERROR_ENCODING;
+    } else if (bytes_res.pos.size < 65) {
       return ERROR_ENCODING;
     }
 
     /* The 65th byte is recid according to contract spec.*/
-    recid = temp[RECID_INDEX];
+    recid = bytes_res.pos.ptr[RECID_INDEX];
     /* Recover pubkey */
     secp256k1_ecdsa_recoverable_signature signature;
     if (secp256k1_ecdsa_recoverable_signature_parse_compact(
-            &context, &signature, temp, recid) == 0) {
+            &context, &signature, bytes_res.pos.ptr, recid) == 0) {
       return ERROR_SECP_PARSE_SIGNATURE;
     }
     blake2b_state blake2b_ctx;
     blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
     blake2b_update(&blake2b_ctx, tx_hash, BLAKE2B_BLOCK_SIZE);
-    for (size_t i = 1; i < ns(Bytes_vec_len(args)); i++) {
-      len = TEMP_SIZE;
-      ret = extract_bytes(ns(Bytes_vec_at(args, i)), temp, &len);
-      if (ret != CKB_SUCCESS) {
+    for (size_t i = 1; i < witness_len; i++) {
+      arg_res = mol_cut(&witness_pos, MOL_Witness(i));
+      if (arg_res.code != 0) {
         return ERROR_ENCODING;
       }
-      blake2b_update(&blake2b_ctx, temp, len);
+
+      bytes_res = mol_cut_bytes(&arg_res.pos);
+      if (bytes_res.code != 0) {
+        return ERROR_ENCODING;
+      }
+
+      blake2b_update(&blake2b_ctx, bytes_res.pos.ptr, bytes_res.pos.size);
     }
     blake2b_final(&blake2b_ctx, temp, BLAKE2B_BLOCK_SIZE);
 

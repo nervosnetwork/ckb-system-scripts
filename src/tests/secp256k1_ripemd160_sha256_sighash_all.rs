@@ -1,15 +1,17 @@
 use super::{DummyDataLoader, BITCOIN_P2PKH_BIN, MAX_CYCLES, SECP256K1_DATA_BIN};
-use ckb_core::{
-    cell::{CellMetaBuilder, ResolvedTransaction},
-    script::{Script, ScriptHashType},
-    transaction::{
-        CellDep, CellInput, CellOutput, OutPoint, Transaction, TransactionBuilder, Witness,
-    },
-    Bytes, Capacity,
-};
 use ckb_crypto::secp::{Generator, Privkey, Pubkey};
 use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
-use numext_fixed_hash::{h160, h256, H160, H256};
+use ckb_types::{
+    bytes::Bytes,
+    core::{
+        cell::{CellMetaBuilder, ResolvedTransaction},
+        Capacity, ScriptHashType, TransactionBuilder, TransactionView,
+    },
+    h160, h256,
+    packed::{CellDep, CellInput, CellOutput, OutPoint, Script, Witness},
+    prelude::*,
+    H160, H256,
+};
 use rand::{thread_rng, Rng};
 
 fn gen_tx(
@@ -17,7 +19,7 @@ fn gen_tx(
     script_data: Bytes,
     lock_args: Vec<Bytes>,
     extra_witness: Vec<Bytes>,
-) -> Transaction {
+) -> TransactionView {
     let previous_tx_hash = {
         let mut rng = thread_rng();
         let mut buf = [0u8; 32];
@@ -36,12 +38,14 @@ fn gen_tx(
     let contract_index = 0;
     let contract_out_point = OutPoint::new(contract_tx_hash.clone(), contract_index);
     // dep contract code
-    let dep_cell = CellOutput::new(
-        Capacity::bytes(script_data.len()).expect("script capacity"),
-        CellOutput::calculate_data_hash(&script_data),
-        Default::default(),
-        None,
-    );
+    let dep_cell = CellOutput::new_builder()
+        .capacity(
+            Capacity::bytes(script_data.len())
+                .expect("script capacity")
+                .pack(),
+        )
+        .data_hash(CellOutput::calc_data_hash(&script_data).pack())
+        .build();
     let dep_cell_data_hash = dep_cell.data_hash().to_owned();
     dummy
         .cells
@@ -56,74 +60,78 @@ fn gen_tx(
         };
         OutPoint::new(tx_hash, 0)
     };
-    let secp256k1_data_cell = CellOutput::new(
-        Capacity::bytes(SECP256K1_DATA_BIN.len()).expect("data capacity"),
-        CellOutput::calculate_data_hash(&SECP256K1_DATA_BIN),
-        Default::default(),
-        None,
-    );
+    let secp256k1_data_cell = CellOutput::new_builder()
+        .capacity(
+            Capacity::bytes(SECP256K1_DATA_BIN.len())
+                .expect("data capacity")
+                .pack(),
+        )
+        .data_hash(CellOutput::calc_data_hash(&SECP256K1_DATA_BIN).pack())
+        .build();
     dummy.cells.insert(
         secp256k1_data_out_point.clone(),
         (secp256k1_data_cell, SECP256K1_DATA_BIN.clone()),
     );
     // input unlock script
-    let previous_output_cell = CellOutput::new(
-        capacity,
-        Default::default(),
-        Script::new(lock_args, dep_cell_data_hash, ScriptHashType::Data),
-        None,
-    );
+    let script = Script::new_builder()
+        .args(lock_args.pack())
+        .code_hash(dep_cell_data_hash)
+        .hash_type(ScriptHashType::Data.pack())
+        .build();
+    let previous_output_cell = CellOutput::new_builder()
+        .capacity(capacity.pack())
+        .lock(script)
+        .build();
     dummy.cells.insert(
         previous_out_point.clone(),
         (previous_output_cell, Bytes::new()),
     );
     TransactionBuilder::default()
         .input(CellInput::new(previous_out_point.clone(), 0))
-        .witness(extra_witness)
+        .witness(extra_witness.into_iter().map(|x| x.pack()).pack())
         .cell_dep(CellDep::new(contract_out_point, false))
         .cell_dep(CellDep::new(secp256k1_data_out_point, false))
-        .output(CellOutput::new(
-            capacity,
-            Default::default(),
-            Default::default(),
-            None,
-        ))
-        .output_data(Bytes::new())
+        .output(CellOutput::new_builder().capacity(capacity.pack()).build())
+        .output_data(Bytes::new().pack())
         .build()
 }
 
 // Special signature method, inconsistent with the default lock behavior,
 // witness signature only sign transaction hash
-pub fn sign_tx(tx: Transaction, key: &Privkey) -> Transaction {
+pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
+    let tx_hash: H256 = tx.hash().unpack();
     let signed_witnesses: Vec<Witness> = tx
         .inputs()
-        .iter()
+        .into_iter()
         .enumerate()
         .map(|(i, _)| {
-            let witness = tx.witnesses().get(i).cloned().unwrap_or_default();
-            let sig = key.sign_recoverable(&tx.hash()).expect("sign");
-            let mut signed_witness = vec![Bytes::from(sig.serialize())];
-            for data in &witness {
-                signed_witness.push(data.clone());
+            let witness = tx.witnesses().get(i).unwrap_or_default();
+            let sig = key.sign_recoverable(&tx_hash).expect("sign");
+            let mut signed_witness = vec![Bytes::from(sig.serialize()).pack()];
+            for data in witness.into_iter() {
+                signed_witness.push(data);
             }
-            signed_witness
+            signed_witness.pack()
         })
         .collect();
     // calculate message
-    TransactionBuilder::from_transaction(tx)
-        .witnesses_clear()
-        .witnesses(signed_witnesses)
+    tx.as_advanced_builder()
+        .set_witnesses(signed_witnesses)
         .build()
 }
 
 fn build_resolved_tx<'a>(
     data_loader: &DummyDataLoader,
-    tx: &'a Transaction,
+    tx: &'a TransactionView,
 ) -> ResolvedTransaction<'a> {
-    let previous_out_point = tx.inputs()[0].previous_output.clone();
+    let previous_out_point = tx
+        .inputs()
+        .get(0)
+        .expect("should have at least one input")
+        .previous_output();
     let resolved_cell_deps = tx
         .cell_deps()
-        .iter()
+        .into_iter()
         .map(|dep| {
             let deps_out_point = dep.clone();
             let (dep_output, dep_data) =
@@ -242,15 +250,17 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey_and_non_recoverable_signatur
     );
     // Create non-recoverable signature
     let tx = {
+        let tx_hash: H256 = tx.hash().unpack();
         let context = &ckb_crypto::secp::SECP256K1;
-        let message = secp256k1::Message::from_slice(tx.hash().as_bytes()).unwrap();
+        let message = secp256k1::Message::from_slice(tx_hash.as_bytes()).unwrap();
         let privkey = secp256k1::key::SecretKey::from_slice(privkey.as_bytes()).unwrap();
         let signature = context.sign(&message, &privkey);
         let signature = Bytes::from(&signature.serialize_compact()[..]);
+        let pubkey_bytes: Bytes = pubkey.into();
 
-        TransactionBuilder::from_transaction(tx)
-            .witnesses_clear()
-            .witness(vec![signature, pubkey.into()])
+        tx.as_advanced_builder()
+            .set_witnesses(vec![])
+            .witness(vec![signature.pack(), pubkey_bytes.pack()].pack())
             .build()
     };
 
@@ -299,14 +309,7 @@ fn test_signing_wrong_tx_hash() {
     );
     let tx = sign_tx(tx, &privkey);
     // Change tx hash
-    let tx = TransactionBuilder::from_transaction(tx)
-        .output(CellOutput::new(
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            None,
-        ))
-        .build();
+    let tx = tx.as_advanced_builder().output(Default::default()).build();
 
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let script_config = ScriptConfig::default();
@@ -329,15 +332,23 @@ fn test_super_long_witness() {
         vec![pubkey_hash.into()],
         vec![pubkey.into()],
     );
+    let tx_hash: H256 = tx.hash().unpack();
 
     let mut buffer: Vec<u8> = vec![];
     buffer.resize(40000, 1);
     let super_long_message = Bytes::from(&buffer[..]);
 
-    let sig = privkey.sign_recoverable(&tx.hash()).expect("sign");
-    let tx = TransactionBuilder::from_transaction(tx)
-        .witnesses_clear()
-        .witness(vec![Bytes::from(sig.serialize()), super_long_message])
+    let sig = privkey.sign_recoverable(&tx_hash).expect("sign");
+    let tx = tx
+        .as_advanced_builder()
+        .set_witnesses(vec![])
+        .witness(
+            vec![
+                Bytes::from(sig.serialize()).pack(),
+                super_long_message.pack(),
+            ]
+            .pack(),
+        )
         .build();
 
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
@@ -362,14 +373,18 @@ fn test_wrong_size_witness_args() {
     );
     // witness more than 2 args
     let tx = sign_tx(raw_tx.clone(), &privkey);
-    let other_witness = Bytes::from("1243");
-    let tx = TransactionBuilder::from_transaction(tx)
-        .witnesses_clear()
-        .witness(vec![
-            other_witness.clone(),
-            other_witness.clone(),
-            other_witness.clone(),
-        ])
+    let other_witness = Bytes::from("1243").pack();
+    let tx = tx
+        .as_advanced_builder()
+        .set_witnesses(vec![])
+        .witness(
+            vec![
+                other_witness.clone(),
+                other_witness.clone(),
+                other_witness.clone(),
+            ]
+            .pack(),
+        )
         .build();
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let script_config = ScriptConfig::default();
@@ -380,9 +395,10 @@ fn test_wrong_size_witness_args() {
 
     // witness less than 2 args
     let tx = sign_tx(raw_tx.clone(), &privkey);
-    let tx = TransactionBuilder::from_transaction(tx)
-        .witnesses_clear()
-        .witness(vec![other_witness.clone()])
+    let tx = tx
+        .as_advanced_builder()
+        .set_witnesses(vec![])
+        .witness(vec![other_witness.clone()].pack())
         .build();
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let script_config = ScriptConfig::default();

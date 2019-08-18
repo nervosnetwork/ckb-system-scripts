@@ -1,16 +1,23 @@
 use super::{sign_tx, DummyDataLoader, MAX_CYCLES, SECP256K1_DATA_BIN, SIGHASH_ALL_BIN};
-use ckb_core::{
-    cell::{CellMetaBuilder, ResolvedTransaction},
-    script::{Script, ScriptHashType},
-    transaction::{CellDep, CellInput, CellOutput, OutPoint, Transaction, TransactionBuilder},
-    Bytes, Capacity,
-};
 use ckb_crypto::secp::{Generator, Privkey};
 use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
-use numext_fixed_hash::H256;
+use ckb_types::{
+    bytes::Bytes,
+    core::{
+        cell::{CellMetaBuilder, ResolvedTransaction},
+        Capacity, ScriptHashType, TransactionBuilder, TransactionView,
+    },
+    packed::{CellDep, CellInput, CellOutput, OutPoint, Script},
+    prelude::*,
+    H256,
+};
 use rand::{thread_rng, Rng};
 
-fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Vec<Bytes>) -> Transaction {
+fn gen_tx(
+    dummy: &mut DummyDataLoader,
+    script_data: Bytes,
+    lock_args: Vec<Bytes>,
+) -> TransactionView {
     let previous_tx_hash = {
         let mut rng = thread_rng();
         let mut buf = [0u8; 32];
@@ -29,12 +36,14 @@ fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Vec<Bytes>
     let contract_index = 0;
     let contract_out_point = OutPoint::new(contract_tx_hash.clone(), contract_index);
     // dep contract code
-    let dep_cell = CellOutput::new(
-        Capacity::bytes(script_data.len()).expect("script capacity"),
-        CellOutput::calculate_data_hash(&script_data),
-        Default::default(),
-        None,
-    );
+    let dep_cell = CellOutput::new_builder()
+        .capacity(
+            Capacity::bytes(script_data.len())
+                .expect("script capacity")
+                .pack(),
+        )
+        .data_hash(CellOutput::calc_data_hash(&script_data).pack())
+        .build();
     let dep_cell_data_hash = dep_cell.data_hash().to_owned();
     dummy
         .cells
@@ -49,23 +58,28 @@ fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Vec<Bytes>
         };
         OutPoint::new(tx_hash, 0)
     };
-    let secp256k1_data_cell = CellOutput::new(
-        Capacity::bytes(SECP256K1_DATA_BIN.len()).expect("data capacity"),
-        CellOutput::calculate_data_hash(&SECP256K1_DATA_BIN),
-        Default::default(),
-        None,
-    );
+    let secp256k1_data_cell = CellOutput::new_builder()
+        .capacity(
+            Capacity::bytes(SECP256K1_DATA_BIN.len())
+                .expect("data capacity")
+                .pack(),
+        )
+        .data_hash(CellOutput::calc_data_hash(&SECP256K1_DATA_BIN).pack())
+        .build();
     dummy.cells.insert(
         secp256k1_data_out_point.clone(),
         (secp256k1_data_cell, SECP256K1_DATA_BIN.clone()),
     );
     // input unlock script
-    let previous_output_cell = CellOutput::new(
-        capacity,
-        Default::default(),
-        Script::new(lock_args, dep_cell_data_hash, ScriptHashType::Data),
-        None,
-    );
+    let script = Script::new_builder()
+        .args(lock_args.pack())
+        .code_hash(dep_cell_data_hash)
+        .hash_type(ScriptHashType::Data.pack())
+        .build();
+    let previous_output_cell = CellOutput::new_builder()
+        .capacity(capacity.pack())
+        .lock(script)
+        .build();
     dummy.cells.insert(
         previous_out_point.clone(),
         (previous_output_cell, Bytes::new()),
@@ -74,17 +88,12 @@ fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Vec<Bytes>
         .input(CellInput::new(previous_out_point.clone(), 0))
         .cell_dep(CellDep::new(contract_out_point, false))
         .cell_dep(CellDep::new(secp256k1_data_out_point, false))
-        .output(CellOutput::new(
-            capacity,
-            Default::default(),
-            Default::default(),
-            None,
-        ))
-        .output_data(Bytes::new())
+        .output(CellOutput::new_builder().capacity(capacity.pack()).build())
+        .output_data(Bytes::new().pack())
         .build()
 }
 
-fn sign_tx_hash(tx: Transaction, key: &Privkey, tx_hash: &[u8]) -> Transaction {
+fn sign_tx_hash(tx: TransactionView, key: &Privkey, tx_hash: &[u8]) -> TransactionView {
     // calculate message
     let mut blake2b = ckb_hash::new_blake2b();
     let mut message = [0u8; 32];
@@ -92,19 +101,23 @@ fn sign_tx_hash(tx: Transaction, key: &Privkey, tx_hash: &[u8]) -> Transaction {
     blake2b.finalize(&mut message);
     let message = H256::from(message);
     let sig = key.sign_recoverable(&message).expect("sign");
-    TransactionBuilder::from_transaction(tx)
-        .witness(vec![Bytes::from(sig.serialize())])
+    tx.as_advanced_builder()
+        .witness(vec![Bytes::from(sig.serialize()).pack()].pack())
         .build()
 }
 
 fn build_resolved_tx<'a>(
     data_loader: &DummyDataLoader,
-    tx: &'a Transaction,
+    tx: &'a TransactionView,
 ) -> ResolvedTransaction<'a> {
-    let previous_out_point = tx.inputs()[0].previous_output.clone();
+    let previous_out_point = tx
+        .inputs()
+        .get(0)
+        .expect("should have at least one input")
+        .previous_output();
     let resolved_cell_deps = tx
         .cell_deps()
-        .iter()
+        .into_iter()
         .map(|dep| {
             let deps_out_point = dep.clone();
             let (dep_output, dep_data) =
@@ -220,6 +233,7 @@ fn test_super_long_witness() {
         SIGHASH_ALL_BIN.clone(),
         vec![pubkey_hash.into()],
     );
+    let tx_hash: H256 = tx.hash().unpack();
 
     let mut buffer: Vec<u8> = vec![];
     buffer.resize(40000, 1);
@@ -227,13 +241,20 @@ fn test_super_long_witness() {
 
     let mut blake2b = ckb_hash::new_blake2b();
     let mut message = [0u8; 32];
-    blake2b.update(&tx.hash()[..]);
+    blake2b.update(&tx_hash[..]);
     blake2b.update(&super_long_message[..]);
     blake2b.finalize(&mut message);
     let message = H256::from(message);
     let sig = privkey.sign_recoverable(&message).expect("sign");
-    let tx = TransactionBuilder::from_transaction(tx)
-        .witness(vec![Bytes::from(sig.serialize()), super_long_message])
+    let tx = tx
+        .as_advanced_builder()
+        .witness(
+            vec![
+                Bytes::from(sig.serialize()).pack(),
+                super_long_message.pack(),
+            ]
+            .pack(),
+        )
         .build();
 
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
