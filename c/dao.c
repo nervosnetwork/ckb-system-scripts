@@ -56,9 +56,6 @@
 #include "ckb_syscalls.h"
 #include "protocol_reader.h"
 
-#undef ns
-#define ns(x) FLATBUFFERS_WRAP_NAMESPACE(Ckb_Protocol, x)
-
 #define ERROR_UNKNOWN -1
 #define ERROR_WRONG_NUMBER_OF_ARGUMENTS -2
 #define ERROR_SYSCALL -4
@@ -80,23 +77,6 @@
 
 #define MAX(a, b) (((a) < (b)) ? (b) : (a))
 
-static int extract_bytes(ns(Bytes_table_t) bytes, unsigned char *buffer,
-                         volatile size_t *s) {
-  flatbuffers_uint8_vec_t seq = ns(Bytes_seq(bytes));
-  size_t len = flatbuffers_uint8_vec_len(seq);
-
-  if (len > *s) {
-    return ERROR_BUFFER_NOT_ENOUGH;
-  }
-
-  for (size_t i = 0; i < len; i++) {
-    buffer[i] = flatbuffers_uint8_vec_at(seq, i);
-  }
-  *s = len;
-
-  return CKB_SUCCESS;
-}
-
 /*
  * Fetch withdraw header hash from the 3rd(offset by 1) argument
  * of witness table. Kept as a separate function so witness buffer
@@ -106,6 +86,9 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
   int ret;
   volatile uint64_t len = 0;
   unsigned char witness[WITNESS_SIZE];
+  mol_pos_t witness_pos;
+  mol_read_res_t arg_res;
+  mol_read_res_t bytes_res;
 
   len = WITNESS_SIZE;
   ret = ckb_load_witness(witness, &len, 0, input_index, CKB_SOURCE_INPUT);
@@ -115,25 +98,70 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
   if (len > WITNESS_SIZE) {
     return ERROR_WITNESS_TOO_LONG;
   }
-  ns(Witness_table_t) witness_table = ns(Witness_as_root(witness));
-  if (witness_table == NULL) {
-    return ERROR_ENCODING;
+
+  witness_pos.ptr = (const uint8_t*)witness;
+  witness_pos.size = len;
+
+  /* Load signature */
+  arg_res = mol_cut(&witness_pos, MOL_Witness(1));
+  if (arg_res.code != 0) {
+    if (arg_res.attr < 2) {
+      return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
+    } else {
+      return ERROR_ENCODING;
+    }
   }
-  ns(Bytes_vec_t) data = ns(Witness_data(witness_table));
-  if (ns(Bytes_vec_len(data)) < 2) {
+  if (arg_res.attr < 2) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
   }
 
-  volatile uint64_t value = 0xFFFFFFFFFFFFFFFF;
-  volatile size_t s = 8;
-  ret = extract_bytes(ns(Bytes_vec_at(data, 1)), ((unsigned char *)&value), &s);
-  if (ret != CKB_SUCCESS) {
-    return ret;
-  }
-  if (s != 8) {
+  bytes_res = mol_cut_bytes(&arg_res.pos);
+  if (bytes_res.code != 0) {
     return ERROR_ENCODING;
   }
-  *index = value;
+  if (bytes_res.pos.size != 8) {
+    return ERROR_ENCODING;
+  }
+
+  *index = *((size_t *)bytes_res.pos.ptr);
+  return CKB_SUCCESS;
+}
+
+static int extract_header_number_and_dao(
+        unsigned char *bytes, uint64_t len,
+        uint64_t *number, mol_pos_t *dao_pos) {
+  mol_pos_t header_pos;
+  header_pos.ptr = (const uint8_t*)bytes;
+  header_pos.size = len;
+  mol_read_res_t raw_res;
+  mol_read_res_t number_res;
+  mol_read_res_t dao_res;
+  mol_read_res_t bytes_res;
+
+  raw_res = mol_cut(&header_pos, MOL_Header_raw());
+  if (raw_res.code != 0) {
+    return ERROR_ENCODING;
+  }
+  number_res = mol_cut(&raw_res.pos, MOL_RawHeader_number());
+  if (number_res.code != 0) {
+    return ERROR_ENCODING;
+  }
+  if (number_res.pos.size != 8) {
+    return ERROR_ENCODING;
+  }
+  // we can do this, because we use little endian in both Serialization and VM
+  *number = *((uint64_t*) number_res.pos.ptr);
+  dao_res = mol_cut(&raw_res.pos, MOL_RawHeader_dao());
+  if (dao_res.code != 0) {
+    return ERROR_ENCODING;
+  }
+  bytes_res = mol_cut_bytes(&dao_res.pos);
+  if (bytes_res.code != 0) {
+    return ERROR_ENCODING;
+  } else if (bytes_res.pos.size < DAO_SIZE) {
+    return ERROR_ENCODING;
+  }
+  *dao_pos = bytes_res.pos;
   return CKB_SUCCESS;
 }
 
@@ -150,33 +178,32 @@ static int calculate_dao_input_capacity(size_t input_index,
   }
 
   unsigned char deposit_header_buffer[HEADER_SIZE];
+  uint64_t deposit_number;
+  mol_pos_t deposit_dao_pos;
   len = HEADER_SIZE;
   ret = ckb_load_header(deposit_header_buffer, &len, 0, input_index,
                         CKB_SOURCE_INPUT);
   if (ret != CKB_SUCCESS) {
     return ret;
   }
+  ret = extract_header_number_and_dao(deposit_header_buffer, len, &deposit_number, &deposit_dao_pos);
+  if (ret != CKB_SUCCESS) {
+    return ret;
+  }
 
   unsigned char withdraw_header_buffer[HEADER_SIZE];
+  uint64_t withdraw_number;
+  mol_pos_t withdraw_dao_pos;
   len = HEADER_SIZE;
   ret = ckb_load_header(withdraw_header_buffer, &len, 0, withdraw_index,
                         CKB_SOURCE_HEADER_DEP);
   if (ret != CKB_SUCCESS) {
     return ret;
   }
-
-  ns(Header_table_t) deposit_header = ns(Header_as_root(deposit_header_buffer));
-  if (deposit_header == NULL) {
-    return ERROR_ENCODING;
+  ret = extract_header_number_and_dao(withdraw_header_buffer, len, &withdraw_number, &withdraw_dao_pos);
+  if (ret != CKB_SUCCESS) {
+    return ret;
   }
-  ns(Header_table_t) withdraw_header =
-      ns(Header_as_root(withdraw_header_buffer));
-  if (withdraw_header == NULL) {
-    return ERROR_ENCODING;
-  }
-
-  uint64_t deposit_number = ns(Header_number(deposit_header));
-  uint64_t withdraw_number = ns(Header_number(withdraw_header));
 
   if (withdraw_number <= deposit_number) {
     return ERROR_INVALID_WITHDRAW_BLOCK;
@@ -203,28 +230,8 @@ static int calculate_dao_input_capacity(size_t input_index,
     return ERROR_INVALID_WITHDRAW_BLOCK;
   }
 
-  unsigned char deposit_dao[DAO_SIZE];
-  unsigned char withdraw_dao[DAO_SIZE];
-
-  len = DAO_SIZE;
-  ret = extract_bytes(ns(Header_dao(deposit_header)), deposit_dao, &len);
-  if (ret != CKB_SUCCESS) {
-    return ret;
-  }
-  if (len < 8) {
-    return ERROR_ENCODING;
-  }
-  len = DAO_SIZE;
-  ret = extract_bytes(ns(Header_dao(withdraw_header)), withdraw_dao, &len);
-  if (ret != CKB_SUCCESS) {
-    return ret;
-  }
-  if (len < 8) {
-    return ERROR_ENCODING;
-  }
-
-  uint64_t deposit_accumulate_rate = *((uint64_t *)(&deposit_dao[8]));
-  uint64_t withdraw_accumulate_rate = *((uint64_t *)(&withdraw_dao[8]));
+  uint64_t deposit_accumulate_rate = *((uint64_t *)(&deposit_dao_pos.ptr[8]));
+  uint64_t withdraw_accumulate_rate = *((uint64_t *)(&withdraw_dao_pos.ptr[8]));
 
   volatile uint64_t occupied_capacity = 0;
   len = 8;

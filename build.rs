@@ -15,7 +15,7 @@ const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 const BINARIES: &[(&str, &str)] = &[
     (
         "secp256k1_blake160_sighash_all",
-        "2d75153097d640b4628ec31ed46863296c63a73edda24451827132bc33f04212",
+        "664b03c55410dd7d694a73779fa86edd7f069ee17fd79b0fef4c4fec0377b9a6",
     ),
     (
         "secp256k1_data",
@@ -23,11 +23,11 @@ const BINARIES: &[(&str, &str)] = &[
     ),
     (
         "dao",
-        "32543ae0401dec556640aee7ca37fd69edb42f1c08dc6175589821dc9b6a883a",
+        "75ff25b427a9bee13106da176f1b5884f931432a9bf0e06fa4044fe6bc327cd5",
     ),
     (
         "secp256k1_ripemd160_sha256_sighash_all",
-        "d7f2c2402f2ce1a0d0ab70d662b61adf67795106c784e6c945a178230df126af",
+        "1acf88382192fbf76fc5a457a11cc393a90d84a46c5e0d7ceebfd1d0dec871e4",
     ),
 ];
 
@@ -36,6 +36,8 @@ fn main() {
 
     let out_path = Path::new(&env::var("OUT_DIR").unwrap()).join("code_hashes.rs");
     let mut out_file = BufWriter::new(File::create(&out_path).expect("create code_hashes.rs"));
+
+    let mut errors = Vec::new();
 
     for (name, expected_hash) in BINARIES {
         let path = format!("{}{}", PATH_PREFIX, name);
@@ -60,7 +62,11 @@ fn main() {
         let mut hash = [0u8; 32];
         blake2b.finalize(&mut hash);
 
-        assert_eq!(expected_hash, &faster_hex::hex_string(&hash).unwrap());
+        let actual_hash = faster_hex::hex_string(&hash).unwrap();
+        if expected_hash != &actual_hash {
+            errors.push((name, expected_hash, actual_hash));
+            continue;
+        }
 
         write!(
             &mut out_file,
@@ -69,6 +75,13 @@ fn main() {
             hash
         )
         .expect("write to code_hashes.rs");
+    }
+
+    if !errors.is_empty() {
+        for (name, expected, actual) in errors.into_iter() {
+            eprintln!("{}: expect {}, actual {}", name, expected, actual);
+        }
+        panic!("not all hashes are right");
     }
 
     bundled.build("bundled.rs").expect("build resource bundle");

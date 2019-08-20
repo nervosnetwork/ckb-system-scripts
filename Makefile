@@ -1,10 +1,11 @@
 TARGET := riscv64-unknown-elf
 CC := $(TARGET)-gcc
 LD := $(TARGET)-gcc
-CFLAGS := -O3 -Ideps/flatcc/include -I deps/secp256k1/src -I deps/secp256k1 -I c -I build -Wall -Werror -Wno-nonnull-compare -Wno-unused-function
+CFLAGS := -O3 -Ideps/molecule -I deps/secp256k1/src -I deps/secp256k1 -I c -I build -Wall -Werror -Wno-nonnull-compare -Wno-unused-function
 LDFLAGS := -Wl,-static -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-s
 SECP256K1_SRC := deps/secp256k1/src/ecmult_static_pre_context.h
-FLATCC := deps/flatcc/bin/flatcc
+MOLC := moleculec
+MOLC_VERSION := 0.2.4
 
 # docker pull xxuejie/riscv-gnu-toolchain-rv64imac:xenial-20190606
 BUILDER_DOCKER := xxuejie/riscv-gnu-toolchain-rv64imac@sha256:4f71556b7ea8f450243e2b2483bca046da1c0d76c2d34d120aa0fbf1a0688ec0
@@ -36,12 +37,18 @@ $(SECP256K1_SRC):
 		CC=$(CC) LD=$(LD) ./configure --with-bignum=no --enable-ecmult-static-precomputation --enable-endomorphism --enable-module-recovery --host=$(TARGET) && \
 		make src/ecmult_static_pre_context.h src/ecmult_static_context.h
 
-c/protocol_reader.h: c/protocol.fbs $(FLATCC)
-	$(FLATCC) -c --reader -o c $<
+c/protocol_reader.h: c/ckb.mol
+	test "$$(${MOLC} --version | awk '{ print $$2 }' | tr -d ' ')" = ${MOLC_VERSION}
+	${MOLC} \
+		--language c \
+		--schema-file c/ckb.mol \
+		> c/protocol_reader.h
 
-
-$(FLATCC):
-	cd deps/flatcc && scripts/initbuild.sh make && scripts/build.sh
+install-tools:
+	if [ ! -x "$$(command -v "${MOLC}"))" ] \
+			|| [ "$$(${MOLC} --version | awk '{ print $$2 }' | tr -d ' ')" != "${MOLC_VERSION}" ]; then \
+		cargo install --force --version "${MOLC_VERSION}" "${MOLC}"; \
+	fi
 
 publish:
 	git diff --exit-code Cargo.toml
@@ -66,7 +73,6 @@ clean:
 	rm -rf build/secp256k1_data_info.h build/dump_secp256k1_data
 	rm -rf specs/cells/secp256k1_data
 	rm -rf spec/cells/secp256k1_ripemd160_sha256_sighash_all
-	cd deps/flatcc && scripts/cleanall.sh
 	cd deps/secp256k1 && make clean
 
 dist: clean all
