@@ -1,4 +1,4 @@
-use super::{sign_tx, DummyDataLoader, MAX_CYCLES, SECP256K1_DATA_BIN, SIGHASH_ALL_BIN};
+use super::{blake160, sign_tx, DummyDataLoader, MAX_CYCLES, SECP256K1_DATA_BIN, SIGHASH_ALL_BIN};
 use ckb_crypto::secp::{Generator, Privkey};
 use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
 use ckb_types::{
@@ -12,6 +12,9 @@ use ckb_types::{
     H256,
 };
 use rand::{thread_rng, Rng};
+
+const ERROR_PUBKEY_BLAKE160_HASH: i8 = -3;
+const ERROR_WITNESS_TOO_LONG: i8 = -12;
 
 fn gen_tx(
     dummy: &mut DummyDataLoader,
@@ -145,16 +148,8 @@ fn test_sighash_all_unlock() {
     let key_gen = Generator::new();
     let privkey = key_gen.random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
-    // compute pubkey hash
-    let pubkey_hash = {
-        let ser_pk = pubkey.serialize();
-        ckb_hash::blake2b_256(ser_pk)[..20].to_vec()
-    };
-    let tx = gen_tx(
-        &mut data_loader,
-        SIGHASH_ALL_BIN.clone(),
-        vec![pubkey_hash.into()],
-    );
+    let pubkey_hash = blake160(&pubkey.serialize());
+    let tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), vec![pubkey_hash]);
     let tx = sign_tx(tx, &privkey);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let script_config = ScriptConfig::default();
@@ -170,22 +165,17 @@ fn test_signing_with_wrong_key() {
     let privkey = key_gen.random_privkey();
     let wrong_privkey = key_gen.random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
-    // compute pubkey hash
-    let pubkey_hash = {
-        let ser_pk = pubkey.serialize();
-        ckb_hash::blake2b_256(ser_pk)[..20].to_vec()
-    };
-    let tx = gen_tx(
-        &mut data_loader,
-        SIGHASH_ALL_BIN.clone(),
-        vec![pubkey_hash.into()],
-    );
+    let pubkey_hash = blake160(&pubkey.serialize());
+    let tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), vec![pubkey_hash]);
     let tx = sign_tx(tx, &wrong_privkey);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let script_config = ScriptConfig::default();
     let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
         .verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-3)));
+    assert_eq!(
+        verify_result,
+        Err(ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH))
+    );
 }
 
 #[test]
@@ -194,16 +184,8 @@ fn test_signing_wrong_tx_hash() {
     let key_gen = Generator::new();
     let privkey = key_gen.random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
-    // compute pubkey hash
-    let pubkey_hash = {
-        let ser_pk = pubkey.serialize();
-        ckb_hash::blake2b_256(ser_pk)[..20].to_vec()
-    };
-    let tx = gen_tx(
-        &mut data_loader,
-        SIGHASH_ALL_BIN.clone(),
-        vec![pubkey_hash.into()],
-    );
+    let pubkey_hash = blake160(&pubkey.serialize());
+    let tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), vec![pubkey_hash]);
     let tx = {
         let mut rand_tx_hash = [0u8; 32];
         let mut rng = thread_rng();
@@ -214,7 +196,10 @@ fn test_signing_wrong_tx_hash() {
     let script_config = ScriptConfig::default();
     let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
         .verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-3)));
+    assert_eq!(
+        verify_result,
+        Err(ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH))
+    );
 }
 
 #[test]
@@ -223,16 +208,8 @@ fn test_super_long_witness() {
     let key_gen = Generator::new();
     let privkey = key_gen.random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
-    // compute pubkey hash
-    let pubkey_hash = {
-        let ser_pk = pubkey.serialize();
-        ckb_hash::blake2b_256(ser_pk)[..20].to_vec()
-    };
-    let tx = gen_tx(
-        &mut data_loader,
-        SIGHASH_ALL_BIN.clone(),
-        vec![pubkey_hash.into()],
-    );
+    let pubkey_hash = blake160(&pubkey.serialize());
+    let tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), vec![pubkey_hash]);
     let tx_hash: H256 = tx.hash().unpack();
 
     let mut buffer: Vec<u8> = vec![];
@@ -261,5 +238,139 @@ fn test_super_long_witness() {
     let script_config = ScriptConfig::default();
     let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
         .verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-12)));
+    assert_eq!(
+        verify_result,
+        Err(ScriptError::ValidationFailure(ERROR_WITNESS_TOO_LONG))
+    );
+}
+
+#[cfg(test)]
+mod multisig_tests {
+    const ERROR_WRONG_NUMBER_OF_ARGUMENTS: i8 = -2;
+    const ERROR_DUPLICATED_SIGNATURES: i8 = -13;
+
+    // script args: [pkh_1, pkh_2, ..., pkh_n, m ]
+    // - pkh_i: public key blake160 hash as bytes
+    // - m: u8 as byte
+    //
+    // witness: [ sig_1, sig_2, ..., sig_m ]
+    // - sig_1: recoverable signature
+    use super::super::multi_sign_tx;
+    use super::*;
+
+    fn generate_keys(n: usize) -> Vec<Privkey> {
+        let mut keys = Vec::with_capacity(n);
+        let key_gen = Generator::new();
+        for _ in 0..n {
+            keys.push(key_gen.random_privkey());
+        }
+
+        keys
+    }
+
+    fn pkh(key: &Privkey) -> Bytes {
+        blake160(&key.pubkey().unwrap().serialize())
+    }
+
+    fn verify(data_loader: &DummyDataLoader, tx: &TransactionView) -> Result<u64, ScriptError> {
+        let resolved_tx = build_resolved_tx(&data_loader, &tx);
+        let script_config = ScriptConfig::default();
+        TransactionScriptsVerifier::new(&resolved_tx, data_loader, &script_config)
+            .verify(MAX_CYCLES)
+    }
+
+    #[test]
+    fn test_sighash_1_2_unlock() {
+        let mut data_loader = DummyDataLoader::new();
+        let keys = generate_keys(3);
+
+        let raw_tx = gen_tx(
+            &mut data_loader,
+            SIGHASH_ALL_BIN.clone(),
+            vec![pkh(&keys[0]), pkh(&keys[1]), vec![1].into()],
+        );
+
+        {
+            let tx = sign_tx(raw_tx.clone(), &keys[0]);
+            verify(&data_loader, &tx).expect("pass verification");
+        }
+        {
+            let tx = sign_tx(raw_tx.clone(), &keys[1]);
+            verify(&data_loader, &tx).expect("pass verification");
+        }
+        {
+            let tx = sign_tx(raw_tx.clone(), &keys[2]);
+            assert_eq!(
+                verify(&data_loader, &tx),
+                Err(ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH))
+            );
+        }
+    }
+
+    #[test]
+    fn test_sighash_2_3_unlock() {
+        let mut data_loader = DummyDataLoader::new();
+        let keys = generate_keys(4);
+
+        let raw_tx = gen_tx(
+            &mut data_loader,
+            SIGHASH_ALL_BIN.clone(),
+            vec![pkh(&keys[0]), pkh(&keys[1]), pkh(&keys[2]), vec![2].into()],
+        );
+
+        {
+            let tx = multi_sign_tx(raw_tx.clone(), &[&keys[0], &keys[1]]);
+            verify(&data_loader, &tx).expect("pass verification");
+        }
+        {
+            let tx = multi_sign_tx(raw_tx.clone(), &[&keys[1], &keys[0]]);
+            verify(&data_loader, &tx).expect("pass verification");
+        }
+        {
+            let tx = multi_sign_tx(raw_tx.clone(), &[&keys[0], &keys[2]]);
+            verify(&data_loader, &tx).expect("pass verification");
+        }
+        {
+            let tx = multi_sign_tx(raw_tx.clone(), &[&keys[1], &keys[2]]);
+            verify(&data_loader, &tx).expect("pass verification");
+        }
+
+        {
+            // add extra arg
+            let raw_tx = raw_tx
+                .as_advanced_builder()
+                .set_witnesses(vec![])
+                .witness(vec![Bytes::from("x").pack()].pack())
+                .build();
+            let tx = multi_sign_tx(raw_tx, &[&keys[0], &keys[1]]);
+            assert_eq!(3, tx.witnesses().get(0).expect("get 0").len());
+            verify(&data_loader, &tx).expect("pass verification");
+        }
+
+        {
+            let tx = sign_tx(raw_tx.clone(), &keys[1]);
+            assert_eq!(
+                verify(&data_loader, &tx),
+                Err(ScriptError::ValidationFailure(
+                    ERROR_WRONG_NUMBER_OF_ARGUMENTS
+                ))
+            );
+        }
+
+        {
+            let tx = multi_sign_tx(raw_tx.clone(), &[&keys[0], &keys[0]]);
+            assert_eq!(
+                verify(&data_loader, &tx),
+                Err(ScriptError::ValidationFailure(ERROR_DUPLICATED_SIGNATURES))
+            );
+        }
+
+        {
+            let tx = multi_sign_tx(raw_tx.clone(), &[&keys[0], &keys[3]]);
+            assert_eq!(
+                verify(&data_loader, &tx),
+                Err(ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH))
+            );
+        }
+    }
 }

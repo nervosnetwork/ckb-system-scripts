@@ -102,7 +102,7 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
   witness_pos.ptr = (const uint8_t*)witness;
   witness_pos.size = len;
 
-  /* Load signature */
+  /* Load header index */
   arg_res = mol_cut(&witness_pos, MOL_Witness(1));
   if (arg_res.code != 0) {
     if (arg_res.attr < 2) {
@@ -111,8 +111,13 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
       return ERROR_ENCODING;
     }
   }
-  if (arg_res.attr < 2) {
-    return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
+
+  /* last position arg is header index */
+  if (arg_res.attr > 2) {
+    arg_res = mol_cut(&witness_pos, MOL_Witness(arg_res.attr - 1));
+    if (arg_res.code != 0) {
+      return ERROR_ENCODING;
+    }
   }
 
   bytes_res = mol_cut_bytes(&arg_res.pos);
