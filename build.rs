@@ -15,7 +15,7 @@ const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 const BINARIES: &[(&str, &str)] = &[
     (
         "secp256k1_blake160_sighash_all",
-        "0fe440d459c7e8ff9ef268833e562a105f00c03c1ec11796d6ad56f9ae7c3663",
+        "1d107ddec56ec77b79c41cd10b35a3b47434c93a604ecb8e8e73e7372fe1a794",
     ),
     (
         "secp256k1_data",

@@ -15,8 +15,7 @@
 #define ERROR_BUFFER_NOT_ENOUGH -10
 #define ERROR_ENCODING -11
 #define ERROR_WITNESS_TOO_LONG -12
-#define ERROR_DUPLICATED_SIGNATURES -13
-#define ERROR_INVALID_THRESHOLD -14
+#define ERROR_INVALID_THRESHOLD -13
 
 #define BLAKE2B_BLOCK_SIZE 32
 #define BLAKE160_SIZE 20
@@ -122,13 +121,14 @@ int main(int argc, char* argv[]) {
       /* Load signature */
       arg_res = mol_cut(&witness_pos, MOL_Witness(i));
       if (arg_res.code != 0) {
-        if (arg_res.attr < threshold) {
-          return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
-        } else {
-          return ERROR_ENCODING;
-        }
+        return ERROR_ENCODING;
       }
+
       witness_len = arg_res.attr;
+
+      if (witness_len < threshold) {
+        return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
+      }
 
       bytes_res = mol_cut_bytes(&arg_res.pos);
       if (bytes_res.code != 0) {
@@ -184,11 +184,11 @@ int main(int argc, char* argv[]) {
       uint8_t valid = 0;
       /* compare with all pubkey hash */
       for (size_t i = 0; i < sigs_cnt; i++) {
-        if (memcmp(argv[i + 1], temp, BLAKE160_SIZE) != 0) {
+        if (used_signatures[i] == 1) {
           continue;
         }
-        if (used_signatures[i] == 1) {
-          return ERROR_DUPLICATED_SIGNATURES;
+        if (memcmp(argv[i + 1], temp, BLAKE160_SIZE) != 0) {
+          continue;
         }
         valid = 1;
         used_signatures[i] = 1;

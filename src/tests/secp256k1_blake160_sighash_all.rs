@@ -247,7 +247,6 @@ fn test_super_long_witness() {
 #[cfg(test)]
 mod multisig_tests {
     const ERROR_WRONG_NUMBER_OF_ARGUMENTS: i8 = -2;
-    const ERROR_DUPLICATED_SIGNATURES: i8 = -13;
 
     // script args: [pkh_1, pkh_2, ..., pkh_n, m ]
     // - pkh_i: public key blake160 hash as bytes
@@ -361,7 +360,7 @@ mod multisig_tests {
             let tx = multi_sign_tx(raw_tx.clone(), &[&keys[0], &keys[0]]);
             assert_eq!(
                 verify(&data_loader, &tx),
-                Err(ScriptError::ValidationFailure(ERROR_DUPLICATED_SIGNATURES))
+                Err(ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH))
             );
         }
 
