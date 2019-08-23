@@ -1,4 +1,4 @@
-// Copy from ckb-types (#7460af8).
+// Copy from ckb-types (#eed8b344).
 
 /* Basic Types */
 
@@ -96,14 +96,9 @@ table RawHeader {
     dao:                    Bytes,
 }
 
-table Seal {
-    nonce:                  Uint64,
-    proof:                  Bytes,
-}
-
 table Header {
     raw:                    RawHeader,
-    seal:                   Seal,
+    nonce:                  Uint64,
 }
 
 table UncleBlock {

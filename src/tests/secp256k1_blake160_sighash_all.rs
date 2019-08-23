@@ -144,8 +144,7 @@ fn build_resolved_tx<'a>(
 #[test]
 fn test_sighash_all_unlock() {
     let mut data_loader = DummyDataLoader::new();
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
+    let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
     let tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), vec![pubkey_hash]);
@@ -160,9 +159,8 @@ fn test_sighash_all_unlock() {
 #[test]
 fn test_signing_with_wrong_key() {
     let mut data_loader = DummyDataLoader::new();
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
-    let wrong_privkey = key_gen.random_privkey();
+    let privkey = Generator::random_privkey();
+    let wrong_privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
     let tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), vec![pubkey_hash]);
@@ -180,8 +178,7 @@ fn test_signing_with_wrong_key() {
 #[test]
 fn test_signing_wrong_tx_hash() {
     let mut data_loader = DummyDataLoader::new();
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
+    let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
     let tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), vec![pubkey_hash]);
@@ -204,8 +201,7 @@ fn test_signing_wrong_tx_hash() {
 #[test]
 fn test_super_long_witness() {
     let mut data_loader = DummyDataLoader::new();
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
+    let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
     let tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), vec![pubkey_hash]);
@@ -258,9 +254,8 @@ mod multisig_tests {
 
     fn generate_keys(n: usize) -> Vec<Privkey> {
         let mut keys = Vec::with_capacity(n);
-        let key_gen = Generator::new();
         for _ in 0..n {
-            keys.push(key_gen.random_privkey());
+            keys.push(Generator::random_privkey());
         }
 
         keys
