@@ -44,9 +44,8 @@ fn gen_tx(
                 .expect("script capacity")
                 .pack(),
         )
-        .data_hash(CellOutput::calc_data_hash(&script_data).pack())
         .build();
-    let dep_cell_data_hash = dep_cell.data_hash().to_owned();
+    let dep_cell_data_hash = CellOutput::calc_data_hash(&script_data).pack();
     dummy
         .cells
         .insert(contract_out_point.clone(), (dep_cell, script_data));
@@ -66,7 +65,6 @@ fn gen_tx(
                 .expect("data capacity")
                 .pack(),
         )
-        .data_hash(CellOutput::calc_data_hash(&SECP256K1_DATA_BIN).pack())
         .build();
     dummy.cells.insert(
         secp256k1_data_out_point.clone(),
@@ -150,6 +148,7 @@ fn build_resolved_tx<'a>(
         transaction: tx,
         resolved_cell_deps,
         resolved_inputs: vec![input_cell],
+        resolved_dep_groups: vec![],
     }
 }
 

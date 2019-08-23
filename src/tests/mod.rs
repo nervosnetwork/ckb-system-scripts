@@ -41,12 +41,11 @@ impl DummyDataLoader {
 
 impl DataLoader for DummyDataLoader {
     // load Cell Data
-    fn load_cell_data(&self, cell: &CellMeta) -> Option<Bytes> {
+    fn load_cell_data(&self, cell: &CellMeta) -> Option<(Bytes, Byte32)> {
         cell.mem_cell_data.clone().or_else(|| {
             self.cells
                 .get(&cell.out_point)
-                .map(|(_, data)| data)
-                .cloned()
+                .map(|(_, data)| (data.clone(), CellOutput::calc_data_hash(&data).pack()))
         })
     }
     // load BlockExt
