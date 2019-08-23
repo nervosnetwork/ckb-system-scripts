@@ -37,7 +37,6 @@ fn script_cell(script_data: &Bytes) -> (CellOutput, OutPoint) {
                 .expect("script capacity")
                 .pack(),
         )
-        .data_hash(CellOutput::calc_data_hash(&script_data).pack())
         .build();
 
     (cell, out_point)
@@ -203,6 +202,7 @@ fn test_dao_single_cell() {
         transaction: &tx,
         resolved_inputs,
         resolved_cell_deps,
+        resolved_dep_groups: vec![],
     };
 
     let script_config = ScriptConfig::default();
@@ -263,6 +263,7 @@ fn test_dao_single_cell_with_fees() {
         transaction: &tx,
         resolved_inputs,
         resolved_cell_deps,
+        resolved_dep_groups: vec![],
     };
 
     let script_config = ScriptConfig::default();
@@ -333,6 +334,7 @@ fn test_dao_single_cell_with_dao_output_cell() {
         transaction: &tx,
         resolved_inputs,
         resolved_cell_deps,
+        resolved_dep_groups: vec![],
     };
 
     let script_config = ScriptConfig::default();
@@ -421,6 +423,7 @@ fn test_dao_multiple_cells() {
         transaction: &tx,
         resolved_inputs,
         resolved_cell_deps,
+        resolved_dep_groups: vec![],
     };
 
     let script_config = ScriptConfig::default();
@@ -483,6 +486,7 @@ fn test_dao_missing_deposit_header() {
         transaction: &tx,
         resolved_inputs,
         resolved_cell_deps,
+        resolved_dep_groups: vec![],
     };
 
     let script_config = ScriptConfig::default();
@@ -538,6 +542,7 @@ fn test_dao_missing_withdraw_header() {
         transaction: &tx,
         resolved_inputs,
         resolved_cell_deps,
+        resolved_dep_groups: vec![],
     };
 
     let script_config = ScriptConfig::default();
@@ -598,6 +603,7 @@ fn test_dao_missing_invalid_withdraw_header() {
         transaction: &tx,
         resolved_inputs,
         resolved_cell_deps,
+        resolved_dep_groups: vec![],
     };
 
     let script_config = ScriptConfig::default();
@@ -658,6 +664,7 @@ fn test_dao_missing_invalid_since() {
         transaction: &tx,
         resolved_inputs,
         resolved_cell_deps,
+        resolved_dep_groups: vec![],
     };
 
     let script_config = ScriptConfig::default();
@@ -718,6 +725,7 @@ fn test_dao_invalid_withdraw_amount() {
         transaction: &tx,
         resolved_inputs,
         resolved_cell_deps,
+        resolved_dep_groups: vec![],
     };
 
     let script_config = ScriptConfig::default();
