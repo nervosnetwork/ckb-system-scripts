@@ -93,8 +93,7 @@ fn gen_header(number: BlockNumber, ar: u64) -> HeaderView {
 }
 
 fn gen_lock() -> (Privkey, Vec<Bytes>) {
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
+    let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     // compute pubkey hash
     let pubkey_hash = {

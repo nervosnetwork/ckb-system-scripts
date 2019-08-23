@@ -193,8 +193,7 @@ fn test_rust_crypto() {
 #[test]
 fn test_sighash_all_unlock() {
     let mut data_loader = DummyDataLoader::new();
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
+    let privkey = Generator::random_privkey();
     let pubkey = pubkey_compressed(&privkey.pubkey().expect("pubkey"));
     // compute pubkey hash
     let pubkey_hash = pubkey_hash(&pubkey);
@@ -215,8 +214,7 @@ fn test_sighash_all_unlock() {
 #[test]
 fn test_sighash_all_unlock_with_uncompressed_pubkey() {
     let mut data_loader = DummyDataLoader::new();
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
+    let privkey = Generator::random_privkey();
     let pubkey = pubkey_uncompressed(&privkey.pubkey().expect("pubkey"));
     let pubkey_hash = pubkey_hash(&pubkey);
     let tx = gen_tx(
@@ -236,8 +234,7 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey() {
 #[test]
 fn test_sighash_all_unlock_with_uncompressed_pubkey_and_non_recoverable_signature() {
     let mut data_loader = DummyDataLoader::new();
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
+    let privkey = Generator::random_privkey();
     let pubkey = pubkey_uncompressed(&privkey.pubkey().expect("pubkey"));
     let pubkey_hash = pubkey_hash(&pubkey);
 
@@ -273,9 +270,8 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey_and_non_recoverable_signatur
 #[test]
 fn test_signing_with_wrong_key() {
     let mut data_loader = DummyDataLoader::new();
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
-    let wrong_privkey = key_gen.random_privkey();
+    let privkey = Generator::random_privkey();
+    let wrong_privkey = Generator::random_privkey();
     let wrong_pubkey = pubkey_compressed(&wrong_privkey.pubkey().expect("pubkey"));
     let pubkey = pubkey_compressed(&privkey.pubkey().expect("pubkey"));
     let pubkey_hash = pubkey_hash(&pubkey);
@@ -296,8 +292,7 @@ fn test_signing_with_wrong_key() {
 #[test]
 fn test_signing_wrong_tx_hash() {
     let mut data_loader = DummyDataLoader::new();
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
+    let privkey = Generator::random_privkey();
     let pubkey = pubkey_compressed(&privkey.pubkey().expect("pubkey"));
     let pubkey_hash = pubkey_hash(&pubkey);
     let tx = gen_tx(
@@ -320,8 +315,7 @@ fn test_signing_wrong_tx_hash() {
 #[test]
 fn test_super_long_witness() {
     let mut data_loader = DummyDataLoader::new();
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
+    let privkey = Generator::random_privkey();
     let pubkey = pubkey_compressed(&privkey.pubkey().expect("pubkey"));
     // compute pubkey hash
     let pubkey_hash = pubkey_hash(&pubkey);
@@ -360,8 +354,7 @@ fn test_super_long_witness() {
 #[test]
 fn test_wrong_size_witness_args() {
     let mut data_loader = DummyDataLoader::new();
-    let key_gen = Generator::new();
-    let privkey = key_gen.random_privkey();
+    let privkey = Generator::random_privkey();
     let pubkey = pubkey_uncompressed(&privkey.pubkey().expect("pubkey"));
     let pubkey_hash = pubkey_hash(&pubkey);
     let raw_tx = gen_tx(
