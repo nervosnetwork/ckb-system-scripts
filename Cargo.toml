@@ -1,6 +1,6 @@
 [package]
 name = "ckb-system-scripts"
-version = "0.3.1-alpha.1"
+version = "0.3.1-alpha.2"
 authors = ["Nervos Core Dev <dev@nervos.org>"]
 edition = "2018"
 build = "build.rs"
@@ -20,11 +20,11 @@ faster-hex = "0.3"
 
 [dev-dependencies]
 byteorder = "1.3.1"
-ckb-types = { git = "https://github.com/nervosnetwork/ckb.git", rev = "0d15c204" }
-ckb-script = { git = "https://github.com/nervosnetwork/ckb.git", rev = "0d15c204" }
-ckb-crypto = { git = "https://github.com/nervosnetwork/ckb.git", rev = "0d15c204" }
-ckb-dao-utils = { git = "https://github.com/nervosnetwork/ckb.git", rev = "0d15c204" }
-ckb-hash = { git = "https://github.com/nervosnetwork/ckb.git", rev = "0d15c204" }
+ckb-types = { git = "https://github.com/nervosnetwork/ckb.git", rev = "5e68b97a" }
+ckb-script = { git = "https://github.com/nervosnetwork/ckb.git", rev = "5e68b97a" }
+ckb-crypto = { git = "https://github.com/nervosnetwork/ckb.git", rev = "5e68b97a" }
+ckb-dao-utils = { git = "https://github.com/nervosnetwork/ckb.git", rev = "5e68b97a" }
+ckb-hash = { git = "https://github.com/nervosnetwork/ckb.git", rev = "5e68b97a" }
 rand = "0.6.5"
 lazy_static = "1.3.0"
 ripemd160 = "0.8.0"
