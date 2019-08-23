@@ -12,7 +12,7 @@ BUILDER_DOCKER := xxuejie/riscv-gnu-toolchain-rv64imac@sha256:4f71556b7ea8f45024
 
 all: specs/cells/secp256k1_blake160_sighash_all specs/cells/dao specs/cells/secp256k1_ripemd160_sha256_sighash_all
 
-all-via-docker:
+all-via-docker: c/protocol_reader.h
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
 
 specs/cells/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c c/protocol_reader.h build/secp256k1_data_info.h $(SECP256K1_SRC)

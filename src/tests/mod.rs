@@ -60,7 +60,11 @@ impl DataLoader for DummyDataLoader {
     }
 }
 
-pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
+pub fn blake160(message: &[u8]) -> Bytes {
+    Bytes::from(&ckb_hash::blake2b_256(message)[..20])
+}
+
+pub fn multi_sign_tx(tx: TransactionView, keys: &[&Privkey]) -> TransactionView {
     let tx_hash: H256 = tx.hash().unpack();
     let signed_witnesses: Vec<Witness> = tx
         .inputs()
@@ -76,8 +80,13 @@ pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
             }
             blake2b.finalize(&mut message);
             let message = H256::from(message);
-            let sig = key.sign_recoverable(&message).expect("sign");
-            let mut signed_witness = vec![Bytes::from(sig.serialize()).pack()];
+            let mut signed_witness: Vec<_> = keys
+                .iter()
+                .map(|key| {
+                    let sig = key.sign_recoverable(&message).expect("sign");
+                    Bytes::from(sig.serialize()).pack()
+                })
+                .collect();
             for data in witness.into_iter() {
                 signed_witness.push(data);
             }
@@ -88,4 +97,8 @@ pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
     tx.as_advanced_builder()
         .set_witnesses(signed_witnesses)
         .build()
+}
+
+pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
+    multi_sign_tx(tx, &[key])
 }
