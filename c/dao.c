@@ -7,9 +7,8 @@
  * to use any other lock script, as long as the lock script satisfies the
  * following conditions:
  *
- * 1. The lock script won't use the witness argument at index 1(offset by 0,
- * so this is actually the 2nd argument in witness).
- * 2. The lock script ensures the witness argument at index 1 won't be tampered,
+ * 1. The lock script won't affected by the last witness argument.
+ * 2. The lock script ensures the last witness argument won't be tampered,
  * one example to ensure this, is that the lock script can include this argument
  * in signature calculation steps.
  *
@@ -24,8 +23,8 @@
  * this withdraw block.
  * The withdraw block should be included in one of the transaction deps using
  * block_hash field. The index of the withdraw block in the deps field, should
- * be serialized into 64-bit unsigned little endian integer, and put as the
- * witness argument at index 1 in the corresponding witness for the locked
+ * be serialized into 64-bit unsigned little endian integer, and append as the
+ * witness argument at the last index in the corresponding witness for the locked
  * NervosDAO input.
  *
  * If the above steps feel confusing to you, you can also refer to one of our
