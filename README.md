@@ -8,10 +8,9 @@ CKB's system scripts, which included in the system cells in the genesis block.
 ## Quick Start
 
 ```
-cargo install moleculec
-
 git submodule init
 git submodule update
-make build
+make install-tools
+make all-via-docker
 cargo test --all
 ```
