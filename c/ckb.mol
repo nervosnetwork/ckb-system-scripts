@@ -1,4 +1,4 @@
-// Copy from ckb-types (#89344f6a).
+// Copy from ckb-types (#0d15c204).
 
 /* Basic Types */
 
@@ -56,7 +56,6 @@ table CellInput {
 
 table CellOutput {
     capacity:       Uint64,
-    data_hash:      Byte32,
     lock:           Script,
     type_:          ScriptOpt,
 }
@@ -74,16 +73,12 @@ table RawTransaction {
     header_deps:    Byte32Vec,
     inputs:         CellInputVec,
     outputs:        CellOutputVec,
-}
-
-table SlimTransaction {
-    raw:            RawTransaction,
-    witnesses:      WitnessVec,
+    outputs_data:   BytesVec,
 }
 
 table Transaction {
-    slim:           SlimTransaction,
-    outputs_data:   BytesVec,
+    raw:            RawTransaction,
+    witnesses:      WitnessVec,
 }
 
 table RawHeader {
