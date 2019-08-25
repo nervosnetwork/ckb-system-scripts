@@ -7,8 +7,8 @@ use ckb_types::{
     bytes::Bytes,
     core::{
         cell::{CellMeta, CellMetaBuilder, ResolvedTransaction},
-        BlockNumber, Capacity, HeaderBuilder, HeaderView, ScriptHashType, TransactionBuilder,
-        TransactionInfo, TransactionView,
+        BlockNumber, Capacity, DepType, HeaderBuilder, HeaderView, ScriptHashType,
+        TransactionBuilder, TransactionInfo, TransactionView,
     },
     packed::{Byte32, CellDep, CellInput, CellOutput, OutPoint, Script},
     prelude::*,
@@ -88,7 +88,11 @@ fn gen_dao_cell(
 fn gen_header(number: BlockNumber, ar: u64) -> HeaderView {
     HeaderBuilder::default()
         .number(number.pack())
-        .dao(pack_dao_data(ar, Capacity::shannons(0), Capacity::shannons(0)).pack())
+        .dao(pack_dao_data(
+            ar,
+            Capacity::shannons(0),
+            Capacity::shannons(0),
+        ))
         .build()
 }
 
@@ -136,9 +140,24 @@ fn complete_tx(
         .insert(dao_out_point.clone(), (dao_cell, DAO_BIN.clone()));
 
     let tx = builder
-        .cell_dep(CellDep::new(secp_out_point, false))
-        .cell_dep(CellDep::new(secp_data_out_point, false))
-        .cell_dep(CellDep::new(dao_out_point, false))
+        .cell_dep(
+            CellDep::new_builder()
+                .out_point(secp_out_point)
+                .dep_type(DepType::Code.pack())
+                .build(),
+        )
+        .cell_dep(
+            CellDep::new_builder()
+                .out_point(secp_data_out_point)
+                .dep_type(DepType::Code.pack())
+                .build(),
+        )
+        .cell_dep(
+            CellDep::new_builder()
+                .out_point(dao_out_point)
+                .dep_type(DepType::Code.pack())
+                .build(),
+        )
         .build();
 
     let mut resolved_cell_deps = vec![];

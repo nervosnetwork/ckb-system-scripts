@@ -5,7 +5,7 @@ use ckb_types::{
     bytes::Bytes,
     core::{
         cell::{CellMetaBuilder, ResolvedTransaction},
-        Capacity, ScriptHashType, TransactionBuilder, TransactionView,
+        Capacity, DepType, ScriptHashType, TransactionBuilder, TransactionView,
     },
     packed::{CellDep, CellInput, CellOutput, OutPoint, Script},
     prelude::*,
@@ -87,8 +87,18 @@ fn gen_tx(
     );
     TransactionBuilder::default()
         .input(CellInput::new(previous_out_point.clone(), 0))
-        .cell_dep(CellDep::new(contract_out_point, false))
-        .cell_dep(CellDep::new(secp256k1_data_out_point, false))
+        .cell_dep(
+            CellDep::new_builder()
+                .out_point(contract_out_point)
+                .dep_type(DepType::Code.pack())
+                .build(),
+        )
+        .cell_dep(
+            CellDep::new_builder()
+                .out_point(secp256k1_data_out_point)
+                .dep_type(DepType::Code.pack())
+                .build(),
+        )
         .output(CellOutput::new_builder().capacity(capacity.pack()).build())
         .output_data(Bytes::new().pack())
         .build()

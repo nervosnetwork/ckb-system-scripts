@@ -1,4 +1,4 @@
-// Copy from ckb-types (#eed8b344).
+// Copy from ckb-types (#477d12c9).
 
 /* Basic Types */
 
@@ -93,7 +93,7 @@ table RawHeader {
     uncles_hash:            Byte32,
     uncles_count:           Uint32,
     epoch:                  Uint64,
-    dao:                    Bytes,
+    dao:                    Byte32,
 }
 
 table Header {
