@@ -66,7 +66,6 @@
 #define ERROR_INCORRECT_CAPACITY -15
 
 #define HASH_SIZE 32
-#define DAO_SIZE 32
 #define HEADER_SIZE 4096
 /* 32 KB */
 #define WITNESS_SIZE 32768
