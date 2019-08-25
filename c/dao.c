@@ -140,7 +140,6 @@ static int extract_header_number_and_dao(
   mol_read_res_t raw_res;
   mol_read_res_t number_res;
   mol_read_res_t dao_res;
-  mol_read_res_t bytes_res;
 
   raw_res = mol_cut(&header_pos, MOL_Header_raw());
   if (raw_res.code != 0) {
@@ -159,13 +158,7 @@ static int extract_header_number_and_dao(
   if (dao_res.code != 0) {
     return ERROR_ENCODING;
   }
-  bytes_res = mol_cut_bytes(&dao_res.pos);
-  if (bytes_res.code != 0) {
-    return ERROR_ENCODING;
-  } else if (bytes_res.pos.size < DAO_SIZE) {
-    return ERROR_ENCODING;
-  }
-  *dao_pos = bytes_res.pos;
+  *dao_pos = dao_res.pos;
   return CKB_SUCCESS;
 }
 
