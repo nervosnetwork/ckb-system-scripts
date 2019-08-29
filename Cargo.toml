@@ -20,11 +20,11 @@ faster-hex = "0.3"
 
 [dev-dependencies]
 byteorder = "1.3.1"
-ckb-types = { git = "https://github.com/nervosnetwork/ckb.git", rev = "797c6416" }
-ckb-script = { git = "https://github.com/nervosnetwork/ckb.git", rev = "797c6416" }
-ckb-crypto = { git = "https://github.com/nervosnetwork/ckb.git", rev = "797c6416" }
-ckb-dao-utils = { git = "https://github.com/nervosnetwork/ckb.git", rev = "797c6416" }
-ckb-hash = { git = "https://github.com/nervosnetwork/ckb.git", rev = "797c6416" }
+ckb-types = { git = "https://github.com/nervosnetwork/ckb.git", rev = "61c65b89" }
+ckb-script = { git = "https://github.com/nervosnetwork/ckb.git", rev = "61c65b89" }
+ckb-crypto = { git = "https://github.com/nervosnetwork/ckb.git", rev = "61c65b89" }
+ckb-dao-utils = { git = "https://github.com/nervosnetwork/ckb.git", rev = "61c65b89" }
+ckb-hash = { git = "https://github.com/nervosnetwork/ckb.git", rev = "61c65b89" }
 rand = "0.6.5"
 lazy_static = "1.3.0"
 ripemd160 = "0.8.0"

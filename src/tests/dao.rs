@@ -12,7 +12,6 @@ use ckb_types::{
     },
     packed::{Byte32, CellDep, CellInput, CellOutput, OutPoint, Script},
     prelude::*,
-    H256,
 };
 use rand::{thread_rng, Rng};
 
@@ -27,7 +26,7 @@ fn script_cell(script_data: &Bytes) -> (CellOutput, OutPoint) {
         let mut rng = thread_rng();
         let mut buf = [0u8; 32];
         rng.fill(&mut buf);
-        H256::from(&buf)
+        buf.pack()
     };
     let out_point = OutPoint::new(tx_hash, 0);
 
@@ -43,11 +42,11 @@ fn script_cell(script_data: &Bytes) -> (CellOutput, OutPoint) {
 }
 
 fn secp_code_hash() -> Byte32 {
-    CellOutput::calc_data_hash(&SIGHASH_ALL_BIN).pack()
+    CellOutput::calc_data_hash(&SIGHASH_ALL_BIN)
 }
 
 fn dao_code_hash() -> Byte32 {
-    CellOutput::calc_data_hash(&DAO_BIN).pack()
+    CellOutput::calc_data_hash(&DAO_BIN)
 }
 
 fn gen_dao_cell(
@@ -59,7 +58,7 @@ fn gen_dao_cell(
         let mut rng = thread_rng();
         let mut buf = [0u8; 32];
         rng.fill(&mut buf);
-        H256::from(&buf)
+        buf.pack()
     };
     let out_point = OutPoint::new(tx_hash, 0);
 
@@ -191,7 +190,7 @@ fn test_dao_single_cell() {
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::new())
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
-            block_hash: deposit_header.hash().unpack(),
+            block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
             block_epoch: 100,
             index: 0,
@@ -252,7 +251,7 @@ fn test_dao_single_cell_with_fees() {
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::new())
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
-            block_hash: deposit_header.hash().unpack(),
+            block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
             block_epoch: 100,
             index: 0,
@@ -313,7 +312,7 @@ fn test_dao_single_cell_with_dao_output_cell() {
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::new())
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
-            block_hash: deposit_header.hash().unpack(),
+            block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
             block_epoch: 100,
             index: 0,
@@ -397,7 +396,7 @@ fn test_dao_multiple_cells() {
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::new())
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
-            block_hash: deposit_header.hash().unpack(),
+            block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
             block_epoch: 100,
             index: 0,
@@ -406,7 +405,7 @@ fn test_dao_multiple_cells() {
     let input_cell_meta2 = CellMetaBuilder::from_cell_output(cell2, Bytes::new())
         .out_point(previous_out_point2.clone())
         .transaction_info(TransactionInfo {
-            block_hash: deposit_header2.hash().unpack(),
+            block_hash: deposit_header2.hash(),
             block_number: deposit_header2.number(),
             block_epoch: 100,
             index: 0,
@@ -475,7 +474,7 @@ fn test_dao_missing_deposit_header() {
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::new())
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
-            block_hash: deposit_header.hash().unpack(),
+            block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
             block_epoch: 100,
             index: 0,
@@ -532,7 +531,7 @@ fn test_dao_missing_withdraw_header() {
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::new())
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
-            block_hash: deposit_header.hash().unpack(),
+            block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
             block_epoch: 100,
             index: 0,
@@ -592,7 +591,7 @@ fn test_dao_missing_invalid_withdraw_header() {
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::new())
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
-            block_hash: deposit_header.hash().unpack(),
+            block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
             block_epoch: 100,
             index: 0,
@@ -653,7 +652,7 @@ fn test_dao_missing_invalid_since() {
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::new())
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
-            block_hash: deposit_header.hash().unpack(),
+            block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
             block_epoch: 100,
             index: 0,
@@ -714,7 +713,7 @@ fn test_dao_invalid_withdraw_amount() {
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::new())
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
-            block_hash: deposit_header.hash().unpack(),
+            block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
             block_epoch: 100,
             index: 0,

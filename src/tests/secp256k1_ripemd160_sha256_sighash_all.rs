@@ -24,7 +24,7 @@ fn gen_tx(
         let mut rng = thread_rng();
         let mut buf = [0u8; 32];
         rng.fill(&mut buf);
-        H256::from(&buf)
+        buf.pack()
     };
     let previous_index = 0;
     let capacity = Capacity::shannons(42);
@@ -33,7 +33,7 @@ fn gen_tx(
         let mut rng = thread_rng();
         let mut buf = [0u8; 32];
         rng.fill(&mut buf);
-        H256::from(&buf)
+        buf.pack()
     };
     let contract_index = 0;
     let contract_out_point = OutPoint::new(contract_tx_hash.clone(), contract_index);
@@ -45,7 +45,7 @@ fn gen_tx(
                 .pack(),
         )
         .build();
-    let dep_cell_data_hash = CellOutput::calc_data_hash(&script_data).pack();
+    let dep_cell_data_hash = CellOutput::calc_data_hash(&script_data);
     dummy
         .cells
         .insert(contract_out_point.clone(), (dep_cell, script_data));
@@ -55,7 +55,7 @@ fn gen_tx(
             let mut rng = thread_rng();
             let mut buf = [0u8; 32];
             rng.fill(&mut buf);
-            H256::from(&buf)
+            buf.pack()
         };
         OutPoint::new(tx_hash, 0)
     };
@@ -165,13 +165,13 @@ fn build_resolved_tx<'a>(
 fn ripemd160(data: &[u8]) -> H160 {
     use ripemd160::{Digest, Ripemd160};
     let digest: [u8; 20] = Ripemd160::digest(data).into();
-    H160::from(&digest)
+    H160::from(digest)
 }
 
 fn sha256(data: &[u8]) -> H256 {
     use sha2::{Digest, Sha256};
     let digest: [u8; 32] = Sha256::digest(data).into();
-    H256::from(&digest)
+    H256::from(digest)
 }
 
 fn pubkey_uncompressed(pubkey: &Pubkey) -> Vec<u8> {
@@ -185,7 +185,9 @@ fn pubkey_compressed(pubkey: &Pubkey) -> Vec<u8> {
 }
 
 fn pubkey_hash(serialized_pubkey: &[u8]) -> Vec<u8> {
-    ripemd160(sha256(serialized_pubkey).as_bytes()).to_vec()
+    ripemd160(sha256(serialized_pubkey).as_bytes())
+        .as_ref()
+        .to_owned()
 }
 
 #[test]

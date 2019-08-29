@@ -5,7 +5,7 @@ CFLAGS := -O3 -Ideps/molecule -I deps/secp256k1/src -I deps/secp256k1 -I c -I bu
 LDFLAGS := -Wl,-static -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-s
 SECP256K1_SRC := deps/secp256k1/src/ecmult_static_pre_context.h
 MOLC := moleculec
-MOLC_VERSION := 0.2.4
+MOLC_VERSION := 0.2.5
 
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
 BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba

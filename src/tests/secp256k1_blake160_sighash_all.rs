@@ -25,7 +25,7 @@ fn gen_tx(
         let mut rng = thread_rng();
         let mut buf = [0u8; 32];
         rng.fill(&mut buf);
-        H256::from(&buf)
+        buf.pack()
     };
     let previous_index = 0;
     let capacity = Capacity::shannons(42);
@@ -34,7 +34,7 @@ fn gen_tx(
         let mut rng = thread_rng();
         let mut buf = [0u8; 32];
         rng.fill(&mut buf);
-        H256::from(&buf)
+        buf.pack()
     };
     let contract_index = 0;
     let contract_out_point = OutPoint::new(contract_tx_hash.clone(), contract_index);
@@ -46,7 +46,7 @@ fn gen_tx(
                 .pack(),
         )
         .build();
-    let dep_cell_data_hash = CellOutput::calc_data_hash(&script_data).pack();
+    let dep_cell_data_hash = CellOutput::calc_data_hash(&script_data);
     dummy
         .cells
         .insert(contract_out_point.clone(), (dep_cell, script_data));
@@ -56,7 +56,7 @@ fn gen_tx(
             let mut rng = thread_rng();
             let mut buf = [0u8; 32];
             rng.fill(&mut buf);
-            H256::from(&buf)
+            buf.pack()
         };
         OutPoint::new(tx_hash, 0)
     };
@@ -215,7 +215,7 @@ fn test_super_long_witness() {
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
     let tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), vec![pubkey_hash]);
-    let tx_hash: H256 = tx.hash().unpack();
+    let tx_hash = tx.hash();
 
     let mut buffer: Vec<u8> = vec![];
     buffer.resize(40000, 1);
@@ -223,7 +223,7 @@ fn test_super_long_witness() {
 
     let mut blake2b = ckb_hash::new_blake2b();
     let mut message = [0u8; 32];
-    blake2b.update(&tx_hash[..]);
+    blake2b.update(&tx_hash.raw_data());
     blake2b.update(&super_long_message[..]);
     blake2b.finalize(&mut message);
     let message = H256::from(message);
