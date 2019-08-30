@@ -5,10 +5,10 @@ CFLAGS := -O3 -Ideps/molecule -I deps/secp256k1/src -I deps/secp256k1 -I c -I bu
 LDFLAGS := -Wl,-static -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-s
 SECP256K1_SRC := deps/secp256k1/src/ecmult_static_pre_context.h
 MOLC := moleculec
-MOLC_VERSION := 0.2.4
+MOLC_VERSION := 0.2.5
 
-# docker pull xxuejie/riscv-gnu-toolchain-rv64imac:xenial-20190606
-BUILDER_DOCKER := xxuejie/riscv-gnu-toolchain-rv64imac@sha256:4f71556b7ea8f450243e2b2483bca046da1c0d76c2d34d120aa0fbf1a0688ec0
+# docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
+BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
 
 all: specs/cells/secp256k1_blake160_sighash_all specs/cells/dao specs/cells/secp256k1_ripemd160_sha256_sighash_all
 

@@ -45,7 +45,7 @@ impl DataLoader for DummyDataLoader {
         cell.mem_cell_data.clone().or_else(|| {
             self.cells
                 .get(&cell.out_point)
-                .map(|(_, data)| (data.clone(), CellOutput::calc_data_hash(&data).pack()))
+                .map(|(_, data)| (data.clone(), CellOutput::calc_data_hash(&data)))
         })
     }
     // load BlockExt
@@ -64,7 +64,7 @@ pub fn blake160(message: &[u8]) -> Bytes {
 }
 
 pub fn multi_sign_tx(tx: TransactionView, keys: &[&Privkey]) -> TransactionView {
-    let tx_hash: H256 = tx.hash().unpack();
+    let tx_hash = tx.hash();
     let signed_witnesses: Vec<Witness> = tx
         .inputs()
         .into_iter()
@@ -73,7 +73,7 @@ pub fn multi_sign_tx(tx: TransactionView, keys: &[&Privkey]) -> TransactionView 
             let witness = tx.witnesses().get(i).unwrap_or_default();
             let mut blake2b = ckb_hash::new_blake2b();
             let mut message = [0u8; 32];
-            blake2b.update(&tx_hash[..]);
+            blake2b.update(&tx_hash.raw_data());
             for data in witness.clone().into_iter() {
                 blake2b.update(&data.raw_data());
             }
