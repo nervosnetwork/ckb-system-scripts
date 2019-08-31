@@ -1,4 +1,4 @@
-// Copy from ckb-types (#3d226c5d).
+// Copy from ckb-types.
 
 /* Basic Types */
 
@@ -42,6 +42,7 @@ vector WitnessVec <Witness>;
 table Script {
     code_hash:      Byte32,
     hash_type:      ScriptHashType,
+    padding_:       byte,
     args:           BytesVec,
 }
 
@@ -64,6 +65,7 @@ table CellOutput {
 struct CellDep {
     out_point:      OutPoint,
     dep_type:       DepType,
+    padding_:       byte,
 }
 
 vector Witness <Bytes>;
