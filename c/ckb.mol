@@ -1,4 +1,4 @@
-// Copy from ckb-types (#3d226c5d).
+// Copy from ckb-types (#e96b13f).
 
 /* Basic Types */
 
@@ -45,14 +45,14 @@ table Script {
     args:           BytesVec,
 }
 
-struct OutPoint {
+table OutPoint {
     tx_hash:        Byte32,
     index:          Uint32,
 }
 
-struct CellInput {
-    since:           Uint64,
+table CellInput {
     previous_output: OutPoint,
+    since:           Uint64,
 }
 
 table CellOutput {
@@ -61,7 +61,7 @@ table CellOutput {
     type_:          ScriptOpt,
 }
 
-struct CellDep {
+table CellDep {
     out_point:      OutPoint,
     dep_type:       DepType,
 }
@@ -82,22 +82,23 @@ table Transaction {
     witnesses:      WitnessVec,
 }
 
-struct RawHeader {
+table RawHeader {
     version:                Uint32,
-    uncles_count:           Uint32,
+    parent_hash:            Byte32,
     timestamp:              Uint64,
     number:                 Uint64,
-    epoch:                  Uint64,
-    parent_hash:            Byte32,
     transactions_root:      Byte32,
     witnesses_root:         Byte32,
     proposals_hash:         Byte32,
     difficulty:             Byte32,
     uncles_hash:            Byte32,
+    uncles_count:           Uint32,
+    epoch:                  Uint64,
     dao:                    Byte32,
+    chain_root:             Byte32,
 }
 
-struct Header {
+table Header {
     raw:                    RawHeader,
     nonce:                  Uint64,
 }
@@ -114,41 +115,48 @@ table Block {
     proposals:              ProposalShortIdVec,
 }
 
+/* Types for Chain root MMR */
+
+struct HeaderDigest {
+    hash:               Byte32,
+    total_difficulty:   Byte32,
+}
+
 /* Types for Storage */
 
 table HeaderView {
-    hash:               Byte32,
     data:               Header,
+    hash:               Byte32,
 }
 
 table UncleBlockVecView {
-    hashes:             Byte32Vec,
     data:               UncleBlockVec,
+    hashes:             Byte32Vec,
 }
 
 table TransactionView {
+    data:               Transaction,
     hash:               Byte32,
     witness_hash:       Byte32,
-    data:               Transaction,
 }
 
 table BlockExt {
+    received_at:        Uint64,
     total_difficulty:   Byte32,
     total_uncles_count: Uint64,
-    received_at:        Uint64,
-    txs_fees:           Uint64Vec,
     verified:           BoolOpt,
+    txs_fees:           Uint64Vec,
 }
 
 table EpochExt {
-    previous_epoch_hash_rate:           Byte32,
-    last_block_hash_in_previous_epoch:  Byte32,
-    difficulty:                         Byte32,
     number:                             Uint64,
     block_reward:                       Uint64,
     remainder_reward:                   Uint64,
+    previous_epoch_hash_rate:           Byte32,
+    last_block_hash_in_previous_epoch:  Byte32,
     start_number:                       Uint64,
     length:                             Uint64,
+    difficulty:                         Byte32,
 }
 
 struct TransactionKey {
@@ -157,38 +165,38 @@ struct TransactionKey {
 }
 
 table TransactionInfo {
+    key:            TransactionKey,
     block_number:   Uint64,
     block_epoch:    Uint64,
-    key:            TransactionKey,
 }
 
 table TransactionMeta {
-    block_hash:     Byte32,
     block_number:   Uint64,
     epoch_number:   Uint64,
+    block_hash:     Byte32,
     len:            Uint32,
     bits:           Bytes,
     cellbase:       Bool,
 }
 
 struct CellMeta {
-    data_hash:      Byte32,
     capacity:       Uint64,
+    data_hash:      Byte32,
 }
 
 /* Types for Indexer */
 
 table TransactionPoint {
-    tx_hash:        Byte32,
     block_number:   Uint64,
+    tx_hash:        Byte32,
     index:          Uint32,
 }
 
 option TransactionPointOpt (TransactionPoint);
 
 table LockHashCellOutput {
-    lock_hash:      Byte32,
     block_number:   Uint64,
+    lock_hash:      Byte32,
     cell_output:    CellOutputOpt,
 }
 
@@ -301,8 +309,8 @@ table SendBlock {
 
 table SetFilter {
     hash_seed:              Uint32,
-    filter:                 Bytes,
     num_hashes:             byte,
+    filter:                 Bytes,
 }
 
 table AddFilter {
@@ -333,13 +341,13 @@ table Time {
 }
 
 table RawAlert {
-    notice_until:   Uint64,
     id:             Uint32,
     cancel:         Uint32,
-    priority:       Uint32,
-    message:        Bytes,
     min_version:    BytesOpt,
     max_version:    BytesOpt,
+    priority:       Uint32,
+    notice_until:   Uint64,
+    message:        Bytes,
 }
 
 table Alert {
@@ -348,7 +356,7 @@ table Alert {
 }
 
 table Identify {
-    flag:                       Uint64,         // Flag
     name:                       Bytes,          // Network Name
+    flag:                       Uint64,         // Flag
     client_version:             Bytes,
 }
