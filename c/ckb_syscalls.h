@@ -68,6 +68,12 @@ int ckb_load_cell_by_field(void* addr, volatile uint64_t* len, size_t offset,
                  field);
 }
 
+int ckb_load_header_by_field(void* addr, volatile uint64_t* len, size_t offset,
+                             size_t index, size_t source, size_t field) {
+  return syscall(SYS_ckb_load_header_by_field, addr, len, offset, index, source,
+                 field);
+}
+
 int ckb_load_input_by_field(void* addr, volatile uint64_t* len, size_t offset,
                             size_t index, size_t source, size_t field) {
   return syscall(SYS_ckb_load_input_by_field, addr, len, offset, index, source,
