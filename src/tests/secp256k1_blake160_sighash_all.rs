@@ -1,6 +1,7 @@
 use super::{blake160, sign_tx, DummyDataLoader, MAX_CYCLES, SECP256K1_DATA_BIN, SIGHASH_ALL_BIN};
 use ckb_crypto::secp::{Generator, Privkey};
-use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
+use ckb_error::{assert_error_eq, Error};
+use ckb_script::{ScriptError, TransactionScriptsVerifier};
 use ckb_types::{
     bytes::Bytes,
     core::{
@@ -160,9 +161,8 @@ fn test_sighash_all_unlock() {
     let tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), vec![pubkey_hash]);
     let tx = sign_tx(tx, &privkey);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -176,12 +176,11 @@ fn test_signing_with_wrong_key() {
     let tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), vec![pubkey_hash]);
     let tx = sign_tx(tx, &wrong_privkey);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
-    assert_eq!(
-        verify_result,
-        Err(ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH))
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    assert_error_eq(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
     );
 }
 
@@ -199,12 +198,11 @@ fn test_signing_wrong_tx_hash() {
         sign_tx_hash(tx, &privkey, &rand_tx_hash[..])
     };
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
-    assert_eq!(
-        verify_result,
-        Err(ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH))
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    assert_error_eq(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
     );
 }
 
@@ -240,12 +238,11 @@ fn test_super_long_witness() {
         .build();
 
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
-    assert_eq!(
-        verify_result,
-        Err(ScriptError::ValidationFailure(ERROR_WITNESS_TOO_LONG))
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    assert_error_eq(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(ERROR_WITNESS_TOO_LONG),
     );
 }
 
@@ -275,11 +272,9 @@ mod multisig_tests {
         blake160(&key.pubkey().unwrap().serialize())
     }
 
-    fn verify(data_loader: &DummyDataLoader, tx: &TransactionView) -> Result<u64, ScriptError> {
+    fn verify(data_loader: &DummyDataLoader, tx: &TransactionView) -> Result<u64, Error> {
         let resolved_tx = build_resolved_tx(&data_loader, &tx);
-        let script_config = ScriptConfig::default();
-        TransactionScriptsVerifier::new(&resolved_tx, data_loader, &script_config)
-            .verify(MAX_CYCLES)
+        TransactionScriptsVerifier::new(&resolved_tx, data_loader).verify(MAX_CYCLES)
     }
 
     #[test]
@@ -303,9 +298,9 @@ mod multisig_tests {
         }
         {
             let tx = sign_tx(raw_tx.clone(), &keys[2]);
-            assert_eq!(
-                verify(&data_loader, &tx),
-                Err(ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH))
+            assert_error_eq(
+                verify(&data_loader, &tx).unwrap_err(),
+                ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
             );
         }
     }
@@ -352,27 +347,25 @@ mod multisig_tests {
 
         {
             let tx = sign_tx(raw_tx.clone(), &keys[1]);
-            assert_eq!(
-                verify(&data_loader, &tx),
-                Err(ScriptError::ValidationFailure(
-                    ERROR_WRONG_NUMBER_OF_ARGUMENTS
-                ))
+            assert_error_eq(
+                verify(&data_loader, &tx).unwrap_err(),
+                ScriptError::ValidationFailure(ERROR_WRONG_NUMBER_OF_ARGUMENTS),
             );
         }
 
         {
             let tx = multi_sign_tx(raw_tx.clone(), &[&keys[0], &keys[0]]);
-            assert_eq!(
-                verify(&data_loader, &tx),
-                Err(ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH))
+            assert_error_eq(
+                verify(&data_loader, &tx).unwrap_err(),
+                ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
             );
         }
 
         {
             let tx = multi_sign_tx(raw_tx.clone(), &[&keys[0], &keys[3]]);
-            assert_eq!(
-                verify(&data_loader, &tx),
-                Err(ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH))
+            assert_error_eq(
+                verify(&data_loader, &tx).unwrap_err(),
+                ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
             );
         }
     }

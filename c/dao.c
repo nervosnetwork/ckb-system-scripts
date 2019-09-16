@@ -75,9 +75,11 @@
 
 #define MAX(a, b) (((a) < (b)) ? (b) : (a))
 
-#define FRACTION ((__int128)100000)
+#define FRACTION ((uint64_t)(1 << 16))
 #define LOCK_PERIOD_EPOCHES 180
 #define LOCK_PERIOD_FRACTIONS (FRACTION * LOCK_PERIOD_EPOCHES)
+
+#define EPOCH_NUMBER_MASK 0x0000FFFFFFFFFFFF
 
 /*
  * Fetch withdraw header hash from the 3rd(offset by 1) argument
@@ -135,10 +137,7 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
 }
 
 typedef struct {
-  uint64_t block_number;
   uint64_t epoch_number;
-  uint64_t epoch_length;
-  uint64_t epoch_start;
   uint8_t dao[32];
 } dao_header_data_t;
 
@@ -161,52 +160,18 @@ static int load_dao_header_data(size_t index, size_t source,
   if (raw_res.code != 0) {
     return ERROR_ENCODING;
   }
-  mol_read_res_t number_res = mol_cut(&raw_res.pos, MOL_RawHeader_number());
-  if (number_res.code != 0 || number_res.pos.size != 8) {
-    return ERROR_ENCODING;
-  }
-  data->block_number = *((uint64_t *)number_res.pos.ptr);
   mol_read_res_t dao_res = mol_cut(&raw_res.pos, MOL_RawHeader_dao());
   if (dao_res.code != 0 || dao_res.pos.size != 32) {
     return ERROR_ENCODING;
   }
   memcpy(data->dao, dao_res.pos.ptr, 32);
-
-  volatile uint64_t epoch_data = 0;
-  len = 8;
-  ret = ckb_load_header_by_field(((uint8_t *)&epoch_data), &len, 0, index,
-                                 source, CKB_HEADER_FIELD_EPOCH_NUMBER);
-  if (ret != 0) {
-    return ret;
-  }
-  if (len != 8) {
+  mol_read_res_t epoch_res = mol_cut(&raw_res.pos, MOL_RawHeader_epoch());
+  if (epoch_res.code != 0 || epoch_res.pos.size != 8) {
     return ERROR_ENCODING;
   }
-  data->epoch_number = epoch_data;
-
-  epoch_data = 0;
-  len = 8;
-  ret = ckb_load_header_by_field((uint8_t *)&epoch_data, &len, 0, index, source,
-                                 CKB_HEADER_FIELD_EPOCH_LENGTH);
-  if (ret != 0) {
-    return ret;
-  }
-  if (len != 8) {
-    return ERROR_ENCODING;
-  }
-  data->epoch_length = epoch_data;
-
-  epoch_data = 0;
-  len = 8;
-  ret = ckb_load_header_by_field((uint8_t *)&epoch_data, &len, 0, index, source,
-                                 CKB_HEADER_FIELD_EPOCH_START_BLOCK_NUMBER);
-  if (ret != 0) {
-    return ret;
-  }
-  if (len != 8) {
-    return ERROR_ENCODING;
-  }
-  data->epoch_start = epoch_data;
+  data->epoch_number = *((uint64_t *)epoch_res.pos.ptr);
+  /* The lower 40 bits contain the actual epoch number with fraction */
+  data->epoch_number &= EPOCH_NUMBER_MASK;
 
   return CKB_SUCCESS;
 }
@@ -239,31 +204,34 @@ static int calculate_dao_input_capacity(size_t input_index,
     return ERROR_INVALID_WITHDRAW_BLOCK;
   }
 
-  /* Calculate lock period first */
-  __int128 locked_epoch_fractions =
-      ((__int128)(deposit_data.epoch_start + deposit_data.epoch_length - 1 -
-                  deposit_data.block_number)) *
-      FRACTION / ((__int128)deposit_data.epoch_length);
-  locked_epoch_fractions +=
-      ((__int128)withdraw_data.epoch_number - deposit_data.epoch_number - 1) *
-      FRACTION;
-  locked_epoch_fractions +=
-      ((__int128)withdraw_data.block_number - withdraw_data.epoch_start) *
-      FRACTION / ((__int128)withdraw_data.epoch_length);
-  __int128 next_block_locked_epoch_fractions =
-      locked_epoch_fractions +
-      FRACTION / ((__int128)withdraw_data.epoch_length);
-  __int128 lock_periods =
-      next_block_locked_epoch_fractions / LOCK_PERIOD_FRACTIONS;
+  uint64_t deposited_epoches =
+      withdraw_data.epoch_number - deposit_data.epoch_number;
+  uint64_t lock_periods =
+      (deposited_epoches + (LOCK_PERIOD_FRACTIONS - 1)) / LOCK_PERIOD_FRACTIONS;
   /* Cell must at least be locked for one full lock period(180 epoches) */
   if (lock_periods < 1) {
     return ERROR_INVALID_WITHDRAW_BLOCK;
   }
-  __int128 lock_period_expected_fractions =
-      lock_periods * LOCK_PERIOD_FRACTIONS;
-  /* Withdraw block must be the last block in the specified lock periods */
-  if (!((locked_epoch_fractions <= lock_period_expected_fractions) &&
-        (next_block_locked_epoch_fractions > lock_period_expected_fractions))) {
+  uint64_t lock_epoches = lock_periods * LOCK_PERIOD_FRACTIONS;
+  uint64_t since_epoches = lock_epoches + deposit_data.epoch_number;
+
+  volatile uint64_t input_since = 0;
+  len = 8;
+  ret = ckb_load_input_by_field(((unsigned char *)&input_since), &len, 0,
+                                input_index, CKB_SOURCE_INPUT,
+                                CKB_INPUT_FIELD_SINCE);
+  if (ret != CKB_SUCCESS) {
+    return ret;
+  }
+
+  /*
+   * NervosDAO requires DAO input field to have a since value represented
+   * via absolute epoch number.
+   */
+  if (input_since >> 56 != 0x20) {
+    return ERROR_INVALID_WITHDRAW_BLOCK;
+  }
+  if ((input_since & EPOCH_NUMBER_MASK) < since_epoches) {
     return ERROR_INVALID_WITHDRAW_BLOCK;
   }
 
