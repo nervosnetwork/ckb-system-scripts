@@ -20,12 +20,12 @@ faster-hex = "0.3"
 
 [dev-dependencies]
 byteorder = "1.3.1"
-ckb-types = { git = "https://github.com/xxuejie/ckb.git", rev = "a9ac149" }
-ckb-script = { git = "https://github.com/xxuejie/ckb.git", rev = "a9ac149" }
-ckb-crypto = { git = "https://github.com/xxuejie/ckb.git", rev = "a9ac149" }
-ckb-dao-utils = { git = "https://github.com/xxuejie/ckb.git", rev = "a9ac149" }
-ckb-hash = { git = "https://github.com/xxuejie/ckb.git", rev = "a9ac149" }
-ckb-error = { git = "https://github.com/xxuejie/ckb.git", rev = "a9ac149" }
+ckb-types = { git = "https://github.com/xxuejie/ckb.git", rev = "0df28b5" }
+ckb-script = { git = "https://github.com/xxuejie/ckb.git", rev = "0df28b5" }
+ckb-crypto = { git = "https://github.com/xxuejie/ckb.git", rev = "0df28b5" }
+ckb-dao-utils = { git = "https://github.com/xxuejie/ckb.git", rev = "0df28b5" }
+ckb-hash = { git = "https://github.com/xxuejie/ckb.git", rev = "0df28b5" }
+ckb-error = { git = "https://github.com/xxuejie/ckb.git", rev = "0df28b5" }
 rand = "0.6.5"
 lazy_static = "1.3.0"
 ripemd160 = "0.8.0"

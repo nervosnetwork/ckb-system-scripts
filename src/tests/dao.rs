@@ -8,8 +8,9 @@ use ckb_types::{
     bytes::Bytes,
     core::{
         cell::{CellMeta, CellMetaBuilder, ResolvedTransaction},
-        BlockNumber, Capacity, DepType, EpochExt, EpochNumber, HeaderBuilder, HeaderView,
-        ScriptHashType, TransactionBuilder, TransactionInfo, TransactionView,
+        BlockNumber, Capacity, DepType, EpochExt, EpochNumber, EpochNumberWithFraction,
+        HeaderBuilder, HeaderView, ScriptHashType, TransactionBuilder, TransactionInfo,
+        TransactionView,
     },
     packed::{Byte32, CellDep, CellInput, CellOutput, OutPoint, Script},
     prelude::*,
@@ -212,7 +213,7 @@ fn test_dao_single_cell() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 554, 1000),
             index: 0,
         })
         .build();
@@ -224,7 +225,7 @@ fn test_dao_single_cell() {
     LittleEndian::write_u64(&mut b, 0);
     let witness = vec![Bytes::from(&b[..]).pack()];
     let builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point, 0x2000000002f38dd2))
+        .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
@@ -277,7 +278,7 @@ fn test_dao_single_cell_epoch_edge() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 554, 1000),
             index: 0,
         })
         .build();
@@ -289,7 +290,7 @@ fn test_dao_single_cell_epoch_edge() {
     LittleEndian::write_u64(&mut b, 0);
     let witness = vec![Bytes::from(&b[..]).pack()];
     let builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point, 0x2000000002f38dd2))
+        .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
@@ -342,7 +343,7 @@ fn test_dao_single_cell_start_of_epoch() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 0, 1000),
             index: 0,
         })
         .build();
@@ -354,7 +355,7 @@ fn test_dao_single_cell_start_of_epoch() {
     LittleEndian::write_u64(&mut b, 0);
     let witness = vec![Bytes::from(&b[..]).pack()];
     let builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point, 0x2000000002f30000))
+        .input(CellInput::new(previous_out_point, 0x2003e800000002f3))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
@@ -407,7 +408,7 @@ fn test_dao_single_cell_end_of_epoch() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 999, 1000),
             index: 0,
         })
         .build();
@@ -419,7 +420,7 @@ fn test_dao_single_cell_end_of_epoch() {
     LittleEndian::write_u64(&mut b, 0);
     let witness = vec![Bytes::from(&b[..]).pack()];
     let builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point, 0x2000000002f3ffbe))
+        .input(CellInput::new(previous_out_point, 0x2003e803e70002f3))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
@@ -472,7 +473,7 @@ fn test_dao_single_cell_with_fees() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 554, 1000),
             index: 0,
         })
         .build();
@@ -484,7 +485,7 @@ fn test_dao_single_cell_with_fees() {
     LittleEndian::write_u64(&mut b, 0);
     let witness = vec![Bytes::from(&b[..]).pack()];
     let builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point, 0x2000000002f38dd2))
+        .input(CellInput::new(previous_out_point, 0x2003e800000002f4))
         .output(cell_output_with_only_capacity(123458045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
@@ -537,7 +538,7 @@ fn test_dao_single_cell_with_dao_output_cell() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 554, 1000),
             index: 0,
         })
         .build();
@@ -554,7 +555,7 @@ fn test_dao_single_cell_with_dao_output_cell() {
         .hash_type(ScriptHashType::Data.pack())
         .build();
     let builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point, 0x2000000002f38dd2))
+        .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
         .output(
             cell_output_with_only_capacity(123468045678)
                 .as_builder()
@@ -631,7 +632,7 @@ fn test_dao_multiple_cells() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 554, 1000),
             index: 0,
         })
         .build();
@@ -640,7 +641,7 @@ fn test_dao_multiple_cells() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header2.hash(),
             block_number: deposit_header2.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 564, 1000),
             index: 0,
         })
         .build();
@@ -653,8 +654,8 @@ fn test_dao_multiple_cells() {
     let mut b2 = [0; 8];
     LittleEndian::write_u64(&mut b2, 1);
     let builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point, 0x2000000002f38dd2))
-        .input(CellInput::new(previous_out_point2, 0x2000000002f39062))
+        .input(CellInput::new(previous_out_point, 0x2003e800000002f4))
+        .input(CellInput::new(previous_out_point2, 0x2003e802340002f3))
         .output(cell_output_with_only_capacity(123468185678))
         .output(cell_output_with_only_capacity(123468186678))
         .outputs_data(vec![Bytes::new(); 2].pack())
@@ -710,7 +711,7 @@ fn test_dao_missing_deposit_header() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 554, 1000),
             index: 0,
         })
         .build();
@@ -722,7 +723,7 @@ fn test_dao_missing_deposit_header() {
     LittleEndian::write_u64(&mut b, 0);
     let witness = vec![Bytes::from(&b[..]).pack()];
     let builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point, 0x2000000002f38dd2))
+        .input(CellInput::new(previous_out_point, 0x2003e80000000320))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
@@ -770,7 +771,7 @@ fn test_dao_missing_withdraw_header() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 554, 1000),
             index: 0,
         })
         .build();
@@ -782,7 +783,7 @@ fn test_dao_missing_withdraw_header() {
     LittleEndian::write_u64(&mut b, 1);
     let witness = vec![Bytes::from(&b[..]).pack()];
     let builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point, 0x2000000000f78dae))
+        .input(CellInput::new(previous_out_point, 0x2003e80000000320))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(deposit_header.hash())
@@ -837,7 +838,7 @@ fn test_dao_invalid_withdraw_header() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 554, 1000),
             index: 0,
         })
         .build();
@@ -849,10 +850,10 @@ fn test_dao_invalid_withdraw_header() {
     LittleEndian::write_u64(&mut b, 0);
     let witness = vec![Bytes::from(&b[..]).pack()];
     let builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point, 2011))
+        .input(CellInput::new(previous_out_point, 0x2003e80000000320))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
-        .header_dep(withdraw_header.hash())
+        .header_dep(deposit_header.hash())
         .header_dep(deposit_header.hash())
         .witness(witness.pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
@@ -905,7 +906,7 @@ fn test_dao_invalid_withdraw_amount() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 554, 1000),
             index: 0,
         })
         .build();
@@ -917,7 +918,7 @@ fn test_dao_invalid_withdraw_amount() {
     LittleEndian::write_u64(&mut b, 0);
     let witness = vec![Bytes::from(&b[..]).pack()];
     let builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point, 0x2000000002f38dd2))
+        .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
         .output(cell_output_with_only_capacity(123488045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
@@ -973,7 +974,7 @@ fn test_dao_invalid_since() {
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
             block_number: deposit_header.number(),
-            block_epoch: 100,
+            block_epoch: EpochNumberWithFraction::new(35, 554, 1000),
             index: 0,
         })
         .build();
@@ -985,7 +986,7 @@ fn test_dao_invalid_since() {
     LittleEndian::write_u64(&mut b, 0);
     let witness = vec![Bytes::from(&b[..]).pack()];
     let builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point, 0x2000000002f38dd0))
+        .input(CellInput::new(previous_out_point, 0x2003e802290002f3))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
@@ -1006,6 +1007,6 @@ fn test_dao_invalid_since() {
     let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
     assert_error_eq(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(-14),
+        ScriptError::ValidationFailure(-17),
     );
 }
