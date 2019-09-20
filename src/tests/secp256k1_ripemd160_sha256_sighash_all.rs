@@ -129,10 +129,7 @@ pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
         .build()
 }
 
-fn build_resolved_tx<'a>(
-    data_loader: &DummyDataLoader,
-    tx: &'a TransactionView,
-) -> ResolvedTransaction<'a> {
+fn build_resolved_tx(data_loader: &DummyDataLoader, tx: &TransactionView) -> ResolvedTransaction {
     let previous_out_point = tx
         .inputs()
         .get(0)
@@ -156,7 +153,7 @@ fn build_resolved_tx<'a>(
             .out_point(previous_out_point)
             .build();
     ResolvedTransaction {
-        transaction: tx,
+        transaction: tx.clone(),
         resolved_cell_deps,
         resolved_inputs: vec![input_cell],
         resolved_dep_groups: vec![],

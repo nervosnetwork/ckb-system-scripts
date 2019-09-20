@@ -237,7 +237,7 @@ fn test_dao_single_cell() {
         resolved_cell_deps.push(dep);
     }
     let rtx = ResolvedTransaction {
-        transaction: &tx,
+        transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
@@ -302,7 +302,7 @@ fn test_dao_single_cell_epoch_edge() {
         resolved_cell_deps.push(dep);
     }
     let rtx = ResolvedTransaction {
-        transaction: &tx,
+        transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
@@ -367,7 +367,7 @@ fn test_dao_single_cell_start_of_epoch() {
         resolved_cell_deps.push(dep);
     }
     let rtx = ResolvedTransaction {
-        transaction: &tx,
+        transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
@@ -432,7 +432,7 @@ fn test_dao_single_cell_end_of_epoch() {
         resolved_cell_deps.push(dep);
     }
     let rtx = ResolvedTransaction {
-        transaction: &tx,
+        transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
@@ -497,7 +497,7 @@ fn test_dao_single_cell_with_fees() {
         resolved_cell_deps.push(dep);
     }
     let rtx = ResolvedTransaction {
-        transaction: &tx,
+        transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
@@ -572,7 +572,7 @@ fn test_dao_single_cell_with_dao_output_cell() {
         resolved_cell_deps.push(dep);
     }
     let rtx = ResolvedTransaction {
-        transaction: &tx,
+        transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
@@ -671,7 +671,7 @@ fn test_dao_multiple_cells() {
         resolved_cell_deps.push(dep);
     }
     let rtx = ResolvedTransaction {
-        transaction: &tx,
+        transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
@@ -734,7 +734,7 @@ fn test_dao_missing_deposit_header() {
         resolved_cell_deps.push(dep);
     }
     let rtx = ResolvedTransaction {
-        transaction: &tx,
+        transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
@@ -794,7 +794,7 @@ fn test_dao_missing_withdraw_header() {
         resolved_cell_deps.push(dep);
     }
     let rtx = ResolvedTransaction {
-        transaction: &tx,
+        transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
@@ -862,7 +862,7 @@ fn test_dao_invalid_withdraw_header() {
         resolved_cell_deps.push(dep);
     }
     let rtx = ResolvedTransaction {
-        transaction: &tx,
+        transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
@@ -930,7 +930,7 @@ fn test_dao_invalid_withdraw_amount() {
         resolved_cell_deps.push(dep);
     }
     let rtx = ResolvedTransaction {
-        transaction: &tx,
+        transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
@@ -998,7 +998,7 @@ fn test_dao_invalid_since() {
         resolved_cell_deps.push(dep);
     }
     let rtx = ResolvedTransaction {
-        transaction: &tx,
+        transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
