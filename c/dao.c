@@ -64,7 +64,7 @@
 #define ERROR_OVERFLOW -13
 #define ERROR_INVALID_WITHDRAW_BLOCK -14
 #define ERROR_INCORRECT_CAPACITY -15
-#define ERROR_INCORRECT_EPOCH_LENGTH -16
+#define ERROR_INCORRECT_EPOCH -16
 #define ERROR_INCORRECT_SINCE -17
 
 #define HASH_SIZE 32
@@ -77,7 +77,6 @@
 
 #define MAX(a, b) (((a) < (b)) ? (b) : (a))
 
-#define FRACTION ((uint64_t)(1 << 16))
 #define LOCK_PERIOD_EPOCHES 180
 
 #define EPOCH_NUMBER_OFFSET 0
@@ -155,8 +154,11 @@ static int extract_epoch_info(uint64_t epoch, int allow_zero_epoch_length,
       index = 0;
       length = 1;
     } else {
-      return ERROR_INCORRECT_EPOCH_LENGTH;
+      return ERROR_INCORRECT_EPOCH;
     }
+  }
+  if (index >= length) {
+    return ERROR_INCORRECT_EPOCH;
   }
   *epoch_number = (epoch >> EPOCH_NUMBER_OFFSET) & EPOCH_NUMBER_MASK;
   *epoch_index = index;
