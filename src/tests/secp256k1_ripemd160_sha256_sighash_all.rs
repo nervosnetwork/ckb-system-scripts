@@ -1,6 +1,7 @@
 use super::{DummyDataLoader, BITCOIN_P2PKH_BIN, MAX_CYCLES, SECP256K1_DATA_BIN};
 use ckb_crypto::secp::{Generator, Privkey, Pubkey};
-use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
+use ckb_error::assert_error_eq;
+use ckb_script::{ScriptError, TransactionScriptsVerifier};
 use ckb_types::{
     bytes::Bytes,
     core::{
@@ -8,7 +9,7 @@ use ckb_types::{
         Capacity, DepType, ScriptHashType, TransactionBuilder, TransactionView,
     },
     h160, h256,
-    packed::{CellDep, CellInput, CellOutput, OutPoint, Script, Witness},
+    packed::{self, CellDep, CellInput, CellOutput, OutPoint, Script},
     prelude::*,
     H160, H256,
 };
@@ -17,8 +18,8 @@ use rand::{thread_rng, Rng};
 fn gen_tx(
     dummy: &mut DummyDataLoader,
     script_data: Bytes,
-    lock_args: Vec<Bytes>,
-    extra_witness: Vec<Bytes>,
+    lock_args: Bytes,
+    extra_witness: Bytes,
 ) -> TransactionView {
     let previous_tx_hash = {
         let mut rng = thread_rng();
@@ -86,7 +87,7 @@ fn gen_tx(
     );
     TransactionBuilder::default()
         .input(CellInput::new(previous_out_point.clone(), 0))
-        .witness(extra_witness.into_iter().map(|x| x.pack()).pack())
+        .witness(extra_witness.pack())
         .cell_dep(
             CellDep::new_builder()
                 .out_point(contract_out_point)
@@ -108,16 +109,15 @@ fn gen_tx(
 // witness signature only sign transaction hash
 pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
     let tx_hash: H256 = tx.hash().unpack();
-    let signed_witnesses: Vec<Witness> = tx
+    let signed_witnesses: Vec<packed::Bytes> = tx
         .inputs()
         .into_iter()
         .enumerate()
         .map(|(i, _)| {
-            let witness = tx.witnesses().get(i).unwrap_or_default();
             let sig = key.sign_recoverable(&tx_hash).expect("sign");
-            let mut signed_witness = vec![Bytes::from(sig.serialize()).pack()];
-            for data in witness.into_iter() {
-                signed_witness.push(data);
+            let mut signed_witness = Bytes::from(sig.serialize());
+            if let Some(witness) = tx.witnesses().get(i) {
+                signed_witness.extend_from_slice(&witness.raw_data());
             }
             signed_witness.pack()
         })
@@ -128,10 +128,7 @@ pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
         .build()
 }
 
-fn build_resolved_tx<'a>(
-    data_loader: &DummyDataLoader,
-    tx: &'a TransactionView,
-) -> ResolvedTransaction<'a> {
+fn build_resolved_tx(data_loader: &DummyDataLoader, tx: &TransactionView) -> ResolvedTransaction {
     let previous_out_point = tx
         .inputs()
         .get(0)
@@ -155,7 +152,7 @@ fn build_resolved_tx<'a>(
             .out_point(previous_out_point)
             .build();
     ResolvedTransaction {
-        transaction: tx,
+        transaction: tx.clone(),
         resolved_cell_deps,
         resolved_inputs: vec![input_cell],
         resolved_dep_groups: vec![],
@@ -207,19 +204,19 @@ fn test_sighash_all_unlock() {
     let mut data_loader = DummyDataLoader::new();
     let privkey = Generator::random_privkey();
     let pubkey = pubkey_compressed(&privkey.pubkey().expect("pubkey"));
+    println!("{}", pubkey.len());
     // compute pubkey hash
     let pubkey_hash = pubkey_hash(&pubkey);
     let tx = gen_tx(
         &mut data_loader,
         BITCOIN_P2PKH_BIN.clone(),
-        vec![pubkey_hash.into()],
-        vec![pubkey.into()],
+        pubkey_hash.into(),
+        pubkey.into(),
     );
     let tx = sign_tx(tx, &privkey);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -232,14 +229,13 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey() {
     let tx = gen_tx(
         &mut data_loader,
         BITCOIN_P2PKH_BIN.clone(),
-        vec![pubkey_hash.into()],
-        vec![pubkey.into()],
+        pubkey_hash.into(),
+        pubkey.into(),
     );
     let tx = sign_tx(tx, &privkey);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -253,8 +249,8 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey_and_non_recoverable_signatur
     let tx = gen_tx(
         &mut data_loader,
         BITCOIN_P2PKH_BIN.clone(),
-        vec![pubkey_hash.into()],
-        vec![],
+        pubkey_hash.into(),
+        Bytes::new(),
     );
     // Create non-recoverable signature
     let tx = {
@@ -263,19 +259,18 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey_and_non_recoverable_signatur
         let message = secp256k1::Message::from_slice(tx_hash.as_bytes()).unwrap();
         let privkey = secp256k1::key::SecretKey::from_slice(privkey.as_bytes()).unwrap();
         let signature = context.sign(&message, &privkey);
-        let signature = Bytes::from(&signature.serialize_compact()[..]);
-        let pubkey_bytes: Bytes = pubkey.into();
+        let mut witness = Bytes::from(&signature.serialize_compact()[..]);
+        witness.extend_from_slice(&pubkey);
 
         tx.as_advanced_builder()
             .set_witnesses(vec![])
-            .witness(vec![signature.pack(), pubkey_bytes.pack()].pack())
+            .witness(witness.pack())
             .build()
     };
 
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -290,15 +285,17 @@ fn test_signing_with_wrong_key() {
     let tx = gen_tx(
         &mut data_loader,
         BITCOIN_P2PKH_BIN.clone(),
-        vec![pubkey_hash.into()],
-        vec![wrong_pubkey.into()],
+        pubkey_hash.into(),
+        wrong_pubkey.into(),
     );
     let tx = sign_tx(tx, &wrong_privkey);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-3)));
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    assert_error_eq(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(-3),
+    );
 }
 
 #[test]
@@ -310,18 +307,20 @@ fn test_signing_wrong_tx_hash() {
     let tx = gen_tx(
         &mut data_loader,
         BITCOIN_P2PKH_BIN.clone(),
-        vec![pubkey_hash.into()],
-        vec![pubkey.into()],
+        pubkey_hash.into(),
+        pubkey.into(),
     );
     let tx = sign_tx(tx, &privkey);
     // Change tx hash
     let tx = tx.as_advanced_builder().output(Default::default()).build();
 
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-9)));
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    assert_error_eq(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(-9),
+    );
 }
 
 #[test]
@@ -334,80 +333,28 @@ fn test_super_long_witness() {
     let tx = gen_tx(
         &mut data_loader,
         BITCOIN_P2PKH_BIN.clone(),
-        vec![pubkey_hash.into()],
-        vec![pubkey.into()],
+        pubkey_hash.into(),
+        pubkey.into(),
     );
     let tx_hash: H256 = tx.hash().unpack();
 
-    let mut buffer: Vec<u8> = vec![];
-    buffer.resize(40000, 1);
-    let super_long_message = Bytes::from(&buffer[..]);
+    let mut super_long_message: Vec<u8> = vec![];
+    super_long_message.resize(40000, 1);
 
     let sig = privkey.sign_recoverable(&tx_hash).expect("sign");
+    let mut witness = Bytes::from(sig.serialize());
+    witness.extend_from_slice(&super_long_message);
     let tx = tx
         .as_advanced_builder()
         .set_witnesses(vec![])
-        .witness(
-            vec![
-                Bytes::from(sig.serialize()).pack(),
-                super_long_message.pack(),
-            ]
-            .pack(),
-        )
+        .witness(witness.pack())
         .build();
 
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-12)));
-}
-
-#[test]
-fn test_wrong_size_witness_args() {
-    let mut data_loader = DummyDataLoader::new();
-    let privkey = Generator::random_privkey();
-    let pubkey = pubkey_uncompressed(&privkey.pubkey().expect("pubkey"));
-    let pubkey_hash = pubkey_hash(&pubkey);
-    let raw_tx = gen_tx(
-        &mut data_loader,
-        BITCOIN_P2PKH_BIN.clone(),
-        vec![pubkey_hash.into()],
-        vec![pubkey.into()],
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    assert_error_eq(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(-12),
     );
-    // witness more than 2 args
-    let tx = sign_tx(raw_tx.clone(), &privkey);
-    let other_witness = Bytes::from("1243").pack();
-    let tx = tx
-        .as_advanced_builder()
-        .set_witnesses(vec![])
-        .witness(
-            vec![
-                other_witness.clone(),
-                other_witness.clone(),
-                other_witness.clone(),
-            ]
-            .pack(),
-        )
-        .build();
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
-
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-2)));
-
-    // witness less than 2 args
-    let tx = sign_tx(raw_tx.clone(), &privkey);
-    let tx = tx
-        .as_advanced_builder()
-        .set_witnesses(vec![])
-        .witness(vec![other_witness.clone()].pack())
-        .build();
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
-
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-2)));
 }

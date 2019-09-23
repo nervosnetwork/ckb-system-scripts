@@ -27,9 +27,7 @@
 
 #include "sha256.h"
 #include "ripemd160.h"
-
 #include "ckb_syscalls.h"
-#include "protocol_reader.h"
 #include "secp256k1_helper.h"
 
 #define ERROR_UNKNOWN -1
@@ -43,7 +41,7 @@
 #define ERROR_SECP_VERIFICATION -9
 #define ERROR_BUFFER_NOT_ENOUGH -10
 #define ERROR_ENCODING -11
-#define ERROR_WITNESS_TOO_LONG -12
+#define ERROR_WITNESS_SIZE -12
 
 #define BLAKE2B_BLOCK_SIZE 32
 #define RIPEMD160_SIZE 20
@@ -52,6 +50,11 @@
 #define RECID_INDEX 64
 /* 32 KB */
 #define WITNESS_SIZE 32768
+#define ARGS_SIZE 32768
+#define RECOVERABLE_SIGNATURE_SIZE 65
+#define NONE_RECOVERABLE_SIGNATURE_SIZE 64
+#define COMPRESSED_PUBKEY_SIZE 33
+#define NONE_COMPRESSED_PUBKEY_SIZE 65
 
 /*
  * Arguments are listed in the following order:
@@ -70,12 +73,16 @@ int main(int argc, char* argv[]) {
   unsigned char tx_hash[BLAKE2B_BLOCK_SIZE];
   unsigned char temp[TEMP_SIZE];
   unsigned char witness[WITNESS_SIZE];
+  unsigned char args[ARGS_SIZE];
   uint8_t secp_data[CKB_SECP256K1_DATA_SIZE];
-  mol_pos_t witness_pos;
-  mol_read_res_t arg_res;
-  mol_read_res_t bytes_res;
 
-  if (argc != 2) {
+  len = ARGS_SIZE;
+  ret = ckb_load_args(args, &len, 0);
+  if (ret != CKB_SUCCESS) {
+    return ERROR_SYSCALL;
+  }
+
+  if (len != RIPEMD160_SIZE) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
   }
 
@@ -115,65 +122,48 @@ int main(int argc, char* argv[]) {
     if (ret != CKB_SUCCESS) {
       return ERROR_SYSCALL;
     }
-    if (len > WITNESS_SIZE) {
-      return ERROR_WITNESS_TOO_LONG;
-    }
-
-    witness_pos.ptr = (const uint8_t*)witness;
-    witness_pos.size = len;
-
-    arg_res = mol_cut(&witness_pos, MOL_Witness(1));
-    if (arg_res.code != 0) {
-      if (arg_res.attr != 2) {
-        return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
-      } else {
-        return ERROR_ENCODING;
-      }
-    } else if (arg_res.attr != 2) {
-      return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
-    }
-
-    bytes_res = mol_cut_bytes(&arg_res.pos);
-    if (bytes_res.code != 0) {
-      return ERROR_ENCODING;
+    if (len != RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE
+        && len != RECOVERABLE_SIGNATURE_SIZE + COMPRESSED_PUBKEY_SIZE
+        && len != NONE_RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE
+        && len != NONE_RECOVERABLE_SIGNATURE_SIZE + COMPRESSED_PUBKEY_SIZE) {
+      return ERROR_WITNESS_SIZE;
     }
 
     /* parse pubkey */
     secp256k1_pubkey pubkey;
-    if (secp256k1_ec_pubkey_parse(&context, &pubkey, bytes_res.pos.ptr,
-                bytes_res.pos.size) == 0) {
-      return ERROR_SECP_PARSE_PUBKEY;
-    }
-
     sha256_state sha256_ctx;
-    ripemd160_state ripe160_ctx;
-
     sha256_init(&sha256_ctx);
-    sha256_update(&sha256_ctx, bytes_res.pos.ptr, bytes_res.pos.size);
+    if (len == RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE
+      || len == NONE_RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE) {
+      if (secp256k1_ec_pubkey_parse(&context, &pubkey, &witness[len - NONE_COMPRESSED_PUBKEY_SIZE],
+                  NONE_COMPRESSED_PUBKEY_SIZE) == 0) {
+        return ERROR_SECP_PARSE_PUBKEY;
+      } else {
+        sha256_update(&sha256_ctx, &witness[len - NONE_COMPRESSED_PUBKEY_SIZE], NONE_COMPRESSED_PUBKEY_SIZE);
+      }
+    } else {
+      if (secp256k1_ec_pubkey_parse(&context, &pubkey, &witness[len - COMPRESSED_PUBKEY_SIZE],
+                  COMPRESSED_PUBKEY_SIZE) == 0) {
+        return ERROR_SECP_PARSE_PUBKEY;
+      } else {
+        sha256_update(&sha256_ctx, &witness[len - COMPRESSED_PUBKEY_SIZE], COMPRESSED_PUBKEY_SIZE);
+      }
+    }
     sha256_finalize(&sha256_ctx, temp);
 
+    ripemd160_state ripe160_ctx;
     ripemd160_init(&ripe160_ctx);
     ripemd160_update(&ripe160_ctx, temp, SHA256_SIZE);
     ripemd160_finalize(&ripe160_ctx, temp);
 
     /* check pubkey hash */
-    if (memcmp(argv[1], temp, RIPEMD160_SIZE) != 0) {
+    if (memcmp(args, temp, RIPEMD160_SIZE) != 0) {
       return ERROR_PUBKEY_RIPEMD160_HASH;
     }
 
     /* Load signature */
-    arg_res = mol_cut(&witness_pos, MOL_Witness(0));
-    if (arg_res.code != 0) {
-      return ERROR_ENCODING;
-    }
-
-    bytes_res = mol_cut_bytes(&arg_res.pos);
-    if (bytes_res.code != 0) {
-      return ERROR_ENCODING;
-    }
-
     secp256k1_ecdsa_signature signature;
-    if (secp256k1_ecdsa_signature_parse_compact(&context, &signature, bytes_res.pos.ptr) == 0) {
+    if (secp256k1_ecdsa_signature_parse_compact(&context, &signature, witness) == 0) {
         return ERROR_SECP_PARSE_SIGNATURE;
     }
 

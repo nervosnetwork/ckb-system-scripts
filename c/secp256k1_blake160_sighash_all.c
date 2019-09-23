@@ -1,6 +1,5 @@
 #include "blake2b.h"
 #include "ckb_syscalls.h"
-#include "protocol_reader.h"
 #include "secp256k1_helper.h"
 
 #define ERROR_UNKNOWN -1
@@ -24,6 +23,8 @@
 #define RECID_INDEX 64
 /* 32 KB */
 #define WITNESS_SIZE 32768
+#define ARGS_SIZE 32768
+#define SIGNATURE_SIZE 65
 
 /*
  * Arguments are listed in the following order:
@@ -36,12 +37,11 @@
  *
  * Witness:
  * 0 ~ m signature, signatures used to present ownership, the number of signatures
- * must be equals to the threshold if the lock is a multisig lock, otherwise must 
+ * must be equals to the threshold if the lock is a multisig lock, otherwise must
  * use only 1 signature.
  */
 int main(int argc, char* argv[]) {
   int ret;
-  int recid;
   size_t index = 0;
   uint64_t sigs_cnt = 0;
   uint64_t threshold = 0;
@@ -49,23 +49,27 @@ int main(int argc, char* argv[]) {
   unsigned char tx_hash[BLAKE2B_BLOCK_SIZE];
   unsigned char temp[TEMP_SIZE];
   unsigned char witness[WITNESS_SIZE];
+  unsigned char args[ARGS_SIZE];
   uint8_t secp_data[CKB_SECP256K1_DATA_SIZE];
-  mol_pos_t witness_pos;
-  size_t witness_len;
-  mol_read_res_t arg_res;
-  mol_read_res_t bytes_res;
 
-  if (argc < 2 || argc == 3) {
-    return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
-  } else if (argc == 2) {
-    sigs_cnt = 1;
-    threshold = 1;
-  } else {
-    sigs_cnt = argc - 2;
-    threshold = argv[argc - 1][0];
+  len = ARGS_SIZE;
+  ret = ckb_load_args(args, &len, 0);
+  if (ret != CKB_SUCCESS) {
+    return ERROR_SYSCALL;
   }
 
-  if (threshold < 1) {
+  if (len == 0) {
+    return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
+  } else {
+    sigs_cnt = len / BLAKE160_SIZE;
+    if (len % BLAKE160_SIZE == 0) {
+      threshold = sigs_cnt;
+    } else {
+      threshold = args[sigs_cnt * BLAKE160_SIZE];
+    }
+  }
+
+  if (threshold > sigs_cnt) {
     return ERROR_INVALID_THRESHOLD;
   }
 
@@ -110,56 +114,25 @@ int main(int argc, char* argv[]) {
     if (len > WITNESS_SIZE) {
       return ERROR_WITNESS_TOO_LONG;
     }
-
-    witness_pos.ptr = (const uint8_t*)witness;
-    witness_pos.size = len;
+    if (len / SIGNATURE_SIZE < threshold) {
+      return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
+    }
 
     /* verify threshold signatures */
     memset(used_signatures, 0, sigs_cnt);
 
     for (size_t i = 0; i < threshold; i++) {
-      /* Load signature */
-      arg_res = mol_cut(&witness_pos, MOL_Witness(i));
-      if (arg_res.code != 0) {
-        return ERROR_ENCODING;
-      }
-
-      witness_len = arg_res.attr;
-
-      if (witness_len < threshold) {
-        return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
-      }
-
-      bytes_res = mol_cut_bytes(&arg_res.pos);
-      if (bytes_res.code != 0) {
-        return ERROR_ENCODING;
-      } else if (bytes_res.pos.size < 65) {
-        return ERROR_ENCODING;
-      }
-
-      /* The 65th byte is recid according to contract spec.*/
-      recid = bytes_res.pos.ptr[RECID_INDEX];
       /* Recover pubkey */
       secp256k1_ecdsa_recoverable_signature signature;
       if (secp256k1_ecdsa_recoverable_signature_parse_compact(
-              &context, &signature, bytes_res.pos.ptr, recid) == 0) {
+              &context, &signature, &witness[i * SIGNATURE_SIZE], witness[i * SIGNATURE_SIZE + RECID_INDEX]) == 0) {
         return ERROR_SECP_PARSE_SIGNATURE;
       }
       blake2b_state blake2b_ctx;
       blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
       blake2b_update(&blake2b_ctx, tx_hash, BLAKE2B_BLOCK_SIZE);
-      for (size_t i = threshold; i < witness_len; i++) {
-        arg_res = mol_cut(&witness_pos, MOL_Witness(i));
-        if (arg_res.code != 0) {
-          return ERROR_ENCODING;
-        }
-
-        bytes_res = mol_cut_bytes(&arg_res.pos);
-        if (bytes_res.code != 0) {
-          return ERROR_ENCODING;
-        }
-
-        blake2b_update(&blake2b_ctx, bytes_res.pos.ptr, bytes_res.pos.size);
+      if (len > threshold * SIGNATURE_SIZE) {
+        blake2b_update(&blake2b_ctx, &witness[threshold * SIGNATURE_SIZE], len - threshold * SIGNATURE_SIZE);
       }
       blake2b_final(&blake2b_ctx, temp, BLAKE2B_BLOCK_SIZE);
 
@@ -176,9 +149,8 @@ int main(int argc, char* argv[]) {
         return ERROR_SECP_SERIALIZE_PUBKEY;
       }
 
-      len = PUBKEY_SIZE;
       blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
-      blake2b_update(&blake2b_ctx, temp, len);
+      blake2b_update(&blake2b_ctx, temp, pubkey_size);
       blake2b_final(&blake2b_ctx, temp, BLAKE2B_BLOCK_SIZE);
 
       uint8_t valid = 0;
@@ -187,7 +159,7 @@ int main(int argc, char* argv[]) {
         if (used_signatures[i] == 1) {
           continue;
         }
-        if (memcmp(argv[i + 1], temp, BLAKE160_SIZE) != 0) {
+        if (memcmp(&args[i * BLAKE160_SIZE], temp, BLAKE160_SIZE) != 0) {
           continue;
         }
         valid = 1;

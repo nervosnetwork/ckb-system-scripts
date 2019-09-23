@@ -84,9 +84,6 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
   int ret;
   volatile uint64_t len = 0;
   unsigned char witness[WITNESS_SIZE];
-  mol_pos_t witness_pos;
-  mol_read_res_t arg_res;
-  mol_read_res_t bytes_res;
 
   len = WITNESS_SIZE;
   ret = ckb_load_witness(witness, &len, 0, input_index, CKB_SOURCE_INPUT);
@@ -97,36 +94,7 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
     return ERROR_WITNESS_TOO_LONG;
   }
 
-  witness_pos.ptr = (const uint8_t*)witness;
-  witness_pos.size = len;
-
-  /* Load header index */
-  arg_res = mol_cut(&witness_pos, MOL_Witness(1));
-  if (arg_res.code != 0) {
-    if (arg_res.attr < 2) {
-      return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
-    } else {
-      return ERROR_ENCODING;
-    }
-  }
-
-  /* last position arg is header index */
-  if (arg_res.attr > 2) {
-    arg_res = mol_cut(&witness_pos, MOL_Witness(arg_res.attr - 1));
-    if (arg_res.code != 0) {
-      return ERROR_ENCODING;
-    }
-  }
-
-  bytes_res = mol_cut_bytes(&arg_res.pos);
-  if (bytes_res.code != 0) {
-    return ERROR_ENCODING;
-  }
-  if (bytes_res.pos.size != 8) {
-    return ERROR_ENCODING;
-  }
-
-  *index = *((size_t *)bytes_res.pos.ptr);
+  *index = *((size_t *)&witness[len - 8]);
   return CKB_SUCCESS;
 }
 
@@ -268,9 +236,10 @@ int main(int argc, char *argv[]) {
    * DAO has no arguments, this way we can ensure all DAO related scripts
    * in a transaction is mapped to the same group.
    */
-  if (argc != 1) {
-    return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
-  }
+  // TODO FIXME Q
+  // if (argc != 1) {
+  //   return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
+  // }
 
   len = HASH_SIZE;
   ret = ckb_load_script_hash(script_hash, &len, 0);

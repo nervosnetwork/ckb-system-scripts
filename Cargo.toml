@@ -1,6 +1,6 @@
 [package]
 name = "ckb-system-scripts"
-version = "0.3.2-alpha.2+refactor-schema"
+version = "0.4.0-alpha.0+single-bytes"
 authors = ["Nervos Core Dev <dev@nervos.org>"]
 edition = "2018"
 build = "build.rs"
@@ -15,16 +15,17 @@ phf = "0.7.21"
 
 [build-dependencies]
 includedir_codegen = "0.5.0"
-blake2b-rs = "0.1.4"
+blake2b-rs = "0.1.5"
 faster-hex = "0.3"
 
 [dev-dependencies]
 byteorder = "1.3.1"
-ckb-types = { git = "https://github.com/nervosnetwork/ckb.git", rev = "3d226c5d" }
-ckb-script = { git = "https://github.com/nervosnetwork/ckb.git", rev = "3d226c5d" }
-ckb-crypto = { git = "https://github.com/nervosnetwork/ckb.git", rev = "3d226c5d" }
-ckb-dao-utils = { git = "https://github.com/nervosnetwork/ckb.git", rev = "3d226c5d" }
-ckb-hash = { git = "https://github.com/nervosnetwork/ckb.git", rev = "3d226c5d" }
+ckb-types = { git = "https://github.com/nervosnetwork/ckb.git", rev = "669c4f0e" }
+ckb-script = { git = "https://github.com/nervosnetwork/ckb.git", rev = "669c4f0e" }
+ckb-crypto = { git = "https://github.com/nervosnetwork/ckb.git", rev = "669c4f0e" }
+ckb-dao-utils = { git = "https://github.com/nervosnetwork/ckb.git", rev = "669c4f0e" }
+ckb-hash = { git = "https://github.com/nervosnetwork/ckb.git", rev = "669c4f0e" }
+ckb-error = { git = "https://github.com/nervosnetwork/ckb.git", rev = "669c4f0e" }
 rand = "0.6.5"
 lazy_static = "1.3.0"
 ripemd160 = "0.8.0"

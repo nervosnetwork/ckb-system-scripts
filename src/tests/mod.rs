@@ -6,8 +6,8 @@ use ckb_crypto::secp::Privkey;
 use ckb_script::DataLoader;
 use ckb_types::{
     bytes::Bytes,
-    core::{cell::CellMeta, BlockExt, HeaderView, TransactionView},
-    packed::{Byte32, CellOutput, OutPoint, Witness},
+    core::{cell::CellMeta, BlockExt, EpochExt, HeaderView, TransactionView},
+    packed::{self, Byte32, CellOutput, OutPoint},
     prelude::*,
     H256,
 };
@@ -57,6 +57,10 @@ impl DataLoader for DummyDataLoader {
     fn get_header(&self, block_hash: &Byte32) -> Option<HeaderView> {
         self.headers.get(block_hash).cloned()
     }
+
+    fn get_block_epoch(&self, _block_hash: &Byte32) -> Option<EpochExt> {
+        unreachable!()
+    }
 }
 
 pub fn blake160(message: &[u8]) -> Bytes {
@@ -65,29 +69,26 @@ pub fn blake160(message: &[u8]) -> Bytes {
 
 pub fn multi_sign_tx(tx: TransactionView, keys: &[&Privkey]) -> TransactionView {
     let tx_hash = tx.hash();
-    let signed_witnesses: Vec<Witness> = tx
+    let signed_witnesses: Vec<packed::Bytes> = tx
         .inputs()
         .into_iter()
         .enumerate()
         .map(|(i, _)| {
-            let witness = tx.witnesses().get(i).unwrap_or_default();
             let mut blake2b = ckb_hash::new_blake2b();
             let mut message = [0u8; 32];
             blake2b.update(&tx_hash.raw_data());
-            for data in witness.clone().into_iter() {
-                blake2b.update(&data.raw_data());
+            if let Some(witness) = tx.witnesses().get(i) {
+                blake2b.update(&witness.raw_data());
             }
             blake2b.finalize(&mut message);
             let message = H256::from(message);
-            let mut signed_witness: Vec<_> = keys
-                .iter()
-                .map(|key| {
-                    let sig = key.sign_recoverable(&message).expect("sign");
-                    Bytes::from(sig.serialize()).pack()
-                })
-                .collect();
-            for data in witness.into_iter() {
-                signed_witness.push(data);
+            let mut signed_witness = Bytes::new();
+            keys.iter().for_each(|key| {
+                let sig = key.sign_recoverable(&message).expect("sign");
+                signed_witness.extend_from_slice(&sig.serialize());
+            });
+            if let Some(witness) = tx.witnesses().get(i) {
+                signed_witness.extend_from_slice(&witness.raw_data());
             }
             signed_witness.pack()
         })
