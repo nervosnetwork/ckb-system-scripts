@@ -27,7 +27,7 @@ const BINARIES: &[(&str, &str)] = &[
     ),
     (
         "secp256k1_ripemd160_sha256_sighash_all",
-        "88fce31aa68db1bb2d5bde7a731b7e6b2429e7aa6fdf60203f397eb8e2147794",
+        "cdd672d2c288fc451c078eefd93ce4be366337e7e308471e3b3095c3c8de4a68",
     ),
 ];
 
