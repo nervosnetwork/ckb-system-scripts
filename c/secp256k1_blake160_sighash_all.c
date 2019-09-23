@@ -40,7 +40,7 @@
  * must be equals to the threshold if the lock is a multisig lock, otherwise must
  * use only 1 signature.
  */
-int main(int argc, char* argv[]) {
+int main() {
   int ret;
   size_t index = 0;
   uint64_t sigs_cnt = 0;
