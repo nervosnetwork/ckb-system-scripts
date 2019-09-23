@@ -71,6 +71,7 @@
 #define HEADER_SIZE 4096
 /* 32 KB */
 #define WITNESS_SIZE 32768
+#define ARGS_SIZE 32768
 
 #define LOCK_PERIOD_BLOCKS 10
 #define MATURITY_BLOCKS 5
@@ -106,6 +107,9 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
   }
   if (len > WITNESS_SIZE) {
     return ERROR_WITNESS_TOO_LONG;
+  }
+  if (len < 8) {
+    return ERROR_ENCODING;
   }
 
   *index = *((size_t *)&witness[len - 8]);
@@ -310,19 +314,23 @@ static int calculate_dao_input_capacity(size_t input_index,
   return CKB_SUCCESS;
 }
 
-int main(int argc, char *argv[]) {
+int main() {
   int ret;
   unsigned char script_hash[HASH_SIZE];
+  unsigned char args[ARGS_SIZE];
   volatile uint64_t len = 0;
 
   /*
    * DAO has no arguments, this way we can ensure all DAO related scripts
    * in a transaction is mapped to the same group.
    */
-  // TODO FIXME Q
-  // if (argc != 1) {
-  //   return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
-  // }
+  len = ARGS_SIZE;
+  ret = ckb_load_args(args, &len, 0);
+  if (ret != CKB_SUCCESS) {
+    return ERROR_SYSCALL;
+  } else if (len != 0) {
+    return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
+  }
 
   len = HASH_SIZE;
   ret = ckb_load_script_hash(script_hash, &len, 0);

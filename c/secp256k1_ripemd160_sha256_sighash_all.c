@@ -66,7 +66,7 @@
  * 0. signature, signature used to present ownership
  * 1. pubkey, real pubkey used to identify token owner
  */
-int main(int argc, char* argv[]) {
+int main() {
   int ret;
   size_t index = 0;
   volatile uint64_t len = 0;
