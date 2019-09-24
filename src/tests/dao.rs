@@ -105,6 +105,7 @@ fn gen_header(
             ar,
             Capacity::shannons(0),
             Capacity::shannons(0),
+            Capacity::shannons(0),
         ))
         .build();
     (header, epoch_ext)
