@@ -6,7 +6,7 @@ use ckb_crypto::secp::Privkey;
 use ckb_script::DataLoader;
 use ckb_types::{
     bytes::Bytes,
-    core::{cell::CellMeta, BlockExt, HeaderView, TransactionView},
+    core::{cell::CellMeta, BlockExt, EpochExt, HeaderView, TransactionView},
     packed::{Byte32, CellOutput, OutPoint, Witness},
     prelude::*,
     H256,
@@ -31,6 +31,7 @@ lazy_static! {
 pub struct DummyDataLoader {
     pub cells: HashMap<OutPoint, (CellOutput, Bytes)>,
     pub headers: HashMap<Byte32, HeaderView>,
+    pub epoches: HashMap<Byte32, EpochExt>,
 }
 
 impl DummyDataLoader {
@@ -56,6 +57,11 @@ impl DataLoader for DummyDataLoader {
     // load header
     fn get_header(&self, block_hash: &Byte32) -> Option<HeaderView> {
         self.headers.get(block_hash).cloned()
+    }
+
+    // load EpochExt
+    fn get_block_epoch(&self, block_hash: &Byte32) -> Option<EpochExt> {
+        self.epoches.get(block_hash).cloned()
     }
 }
 

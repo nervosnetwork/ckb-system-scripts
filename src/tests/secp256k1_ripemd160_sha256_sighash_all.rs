@@ -1,6 +1,7 @@
 use super::{DummyDataLoader, BITCOIN_P2PKH_BIN, MAX_CYCLES, SECP256K1_DATA_BIN};
 use ckb_crypto::secp::{Generator, Privkey, Pubkey};
-use ckb_script::{ScriptConfig, ScriptError, TransactionScriptsVerifier};
+use ckb_error::assert_error_eq;
+use ckb_script::{ScriptError, TransactionScriptsVerifier};
 use ckb_types::{
     bytes::Bytes,
     core::{
@@ -128,10 +129,7 @@ pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
         .build()
 }
 
-fn build_resolved_tx<'a>(
-    data_loader: &DummyDataLoader,
-    tx: &'a TransactionView,
-) -> ResolvedTransaction<'a> {
+fn build_resolved_tx(data_loader: &DummyDataLoader, tx: &TransactionView) -> ResolvedTransaction {
     let previous_out_point = tx
         .inputs()
         .get(0)
@@ -155,7 +153,7 @@ fn build_resolved_tx<'a>(
             .out_point(previous_out_point)
             .build();
     ResolvedTransaction {
-        transaction: tx,
+        transaction: tx.clone(),
         resolved_cell_deps,
         resolved_inputs: vec![input_cell],
         resolved_dep_groups: vec![],
@@ -217,9 +215,8 @@ fn test_sighash_all_unlock() {
     );
     let tx = sign_tx(tx, &privkey);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -237,9 +234,8 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey() {
     );
     let tx = sign_tx(tx, &privkey);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -273,9 +269,8 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey_and_non_recoverable_signatur
     };
 
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -295,10 +290,12 @@ fn test_signing_with_wrong_key() {
     );
     let tx = sign_tx(tx, &wrong_privkey);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-3)));
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    assert_error_eq(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(-3),
+    );
 }
 
 #[test]
@@ -318,10 +315,12 @@ fn test_signing_wrong_tx_hash() {
     let tx = tx.as_advanced_builder().output(Default::default()).build();
 
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-9)));
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    assert_error_eq(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(-9),
+    );
 }
 
 #[test]
@@ -357,10 +356,12 @@ fn test_super_long_witness() {
         .build();
 
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-12)));
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    assert_error_eq(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(-12),
+    );
 }
 
 #[test]
@@ -391,11 +392,13 @@ fn test_wrong_size_witness_args() {
         )
         .build();
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
 
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-2)));
+    assert_error_eq(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(-2),
+    );
 
     // witness less than 2 args
     let tx = sign_tx(raw_tx.clone(), &privkey);
@@ -405,9 +408,11 @@ fn test_wrong_size_witness_args() {
         .witness(vec![other_witness.clone()].pack())
         .build();
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let script_config = ScriptConfig::default();
-    let verify_result = TransactionScriptsVerifier::new(&resolved_tx, &data_loader, &script_config)
-        .verify(MAX_CYCLES);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
 
-    assert_eq!(verify_result, Err(ScriptError::ValidationFailure(-2)));
+    assert_error_eq(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(-2),
+    );
 }

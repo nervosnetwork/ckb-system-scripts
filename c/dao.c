@@ -24,15 +24,15 @@
  * The withdraw block should be included in one of the transaction deps using
  * block_hash field. The index of the withdraw block in the deps field, should
  * be serialized into 64-bit unsigned little endian integer, and append as the
- * witness argument at the last index in the corresponding witness for the locked
- * NervosDAO input.
+ * witness argument at the last index in the corresponding witness for the
+ * locked NervosDAO input.
  *
  * If the above steps feel confusing to you, you can also refer to one of our
  * official CKB SDK to learn how to deposit to and withdraw from NervosDAO.
  *
  * NervosDAO relies on a special field in the block header named dao to provide
- * needed statistic data to calculate NervosDAO interests. Specifically, 3 fields
- * will be kept in DAO field in the block header:
+ * needed statistic data to calculate NervosDAO interests. Specifically, 3
+ * fields will be kept in DAO field in the block header:
  *
  * * AR: accumulated rate of NervosDAO
  * * C: All issued capacities in CKB (not including current block)
@@ -64,6 +64,8 @@
 #define ERROR_OVERFLOW -13
 #define ERROR_INVALID_WITHDRAW_BLOCK -14
 #define ERROR_INCORRECT_CAPACITY -15
+#define ERROR_INCORRECT_EPOCH -16
+#define ERROR_INCORRECT_SINCE -17
 
 #define HASH_SIZE 32
 #define HEADER_SIZE 4096
@@ -74,6 +76,18 @@
 #define MATURITY_BLOCKS 5
 
 #define MAX(a, b) (((a) < (b)) ? (b) : (a))
+
+#define LOCK_PERIOD_EPOCHES 180
+
+#define EPOCH_NUMBER_OFFSET 0
+#define EPOCH_NUMBER_BITS 24
+#define EPOCH_NUMBER_MASK ((1 << EPOCH_NUMBER_BITS) - 1)
+#define EPOCH_INDEX_OFFSET EPOCH_NUMBER_BITS
+#define EPOCH_INDEX_BITS 16
+#define EPOCH_INDEX_MASK ((1 << EPOCH_INDEX_BITS) - 1)
+#define EPOCH_LENGTH_OFFSET (EPOCH_NUMBER_BITS + EPOCH_INDEX_BITS)
+#define EPOCH_LENGTH_BITS 16
+#define EPOCH_LENGTH_MASK ((1 << EPOCH_LENGTH_BITS) - 1)
 
 /*
  * Fetch withdraw header hash from the 3rd(offset by 1) argument
@@ -97,7 +111,7 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
     return ERROR_WITNESS_TOO_LONG;
   }
 
-  witness_pos.ptr = (const uint8_t*)witness;
+  witness_pos.ptr = (const uint8_t *)witness;
   witness_pos.size = len;
 
   /* Load header index */
@@ -130,104 +144,173 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
   return CKB_SUCCESS;
 }
 
-static int extract_header_number_and_dao(
-        unsigned char *bytes, uint64_t len,
-        uint64_t *number, mol_pos_t *dao_pos) {
-  mol_pos_t header_pos;
-  header_pos.ptr = (const uint8_t*)bytes;
-  header_pos.size = len;
-  mol_read_res_t raw_res;
-  mol_read_res_t number_res;
-  mol_read_res_t dao_res;
+static int extract_epoch_info(uint64_t epoch, int allow_zero_epoch_length,
+                              uint64_t *epoch_number, uint64_t *epoch_index,
+                              uint64_t *epoch_length) {
+  uint64_t index = (epoch >> EPOCH_INDEX_OFFSET) & EPOCH_INDEX_MASK;
+  uint64_t length = (epoch >> EPOCH_LENGTH_OFFSET) & EPOCH_LENGTH_MASK;
+  if (length == 0) {
+    if (allow_zero_epoch_length) {
+      index = 0;
+      length = 1;
+    } else {
+      return ERROR_INCORRECT_EPOCH;
+    }
+  }
+  if (index >= length) {
+    return ERROR_INCORRECT_EPOCH;
+  }
+  *epoch_number = (epoch >> EPOCH_NUMBER_OFFSET) & EPOCH_NUMBER_MASK;
+  *epoch_index = index;
+  *epoch_length = length;
+  return CKB_SUCCESS;
+}
 
-  raw_res = mol_cut(&header_pos, MOL_Header_raw());
+typedef struct {
+  uint64_t epoch_number;
+  uint64_t epoch_index;
+  uint64_t epoch_length;
+  uint8_t dao[32];
+} dao_header_data_t;
+
+static int load_dao_header_data(size_t index, size_t source,
+                                dao_header_data_t *data) {
+  uint8_t buffer[HEADER_SIZE];
+  volatile uint64_t len = HEADER_SIZE;
+  int ret = ckb_load_header(buffer, &len, 0, index, source);
+  if (ret != CKB_SUCCESS) {
+    return ret;
+  }
+  if (len > HEADER_SIZE) {
+    return ERROR_BUFFER_NOT_ENOUGH;
+  }
+
+  mol_pos_t header_pos;
+  header_pos.ptr = (const uint8_t *)buffer;
+  header_pos.size = len;
+  mol_read_res_t raw_res = mol_cut(&header_pos, MOL_Header_raw());
   if (raw_res.code != 0) {
     return ERROR_ENCODING;
   }
-  number_res = mol_cut(&raw_res.pos, MOL_RawHeader_number());
-  if (number_res.code != 0) {
+  mol_read_res_t dao_res = mol_cut(&raw_res.pos, MOL_RawHeader_dao());
+  if (dao_res.code != 0 || dao_res.pos.size != 32) {
     return ERROR_ENCODING;
   }
-  if (number_res.pos.size != 8) {
+  memcpy(data->dao, dao_res.pos.ptr, 32);
+  mol_read_res_t epoch_res = mol_cut(&raw_res.pos, MOL_RawHeader_epoch());
+  if (epoch_res.code != 0 || epoch_res.pos.size != 8) {
     return ERROR_ENCODING;
   }
-  // we can do this, because we use little endian in both Serialization and VM
-  *number = *((uint64_t*) number_res.pos.ptr);
-  dao_res = mol_cut(&raw_res.pos, MOL_RawHeader_dao());
-  if (dao_res.code != 0) {
-    return ERROR_ENCODING;
-  }
-  *dao_pos = dao_res.pos;
-  return CKB_SUCCESS;
+  return extract_epoch_info(*((uint64_t *)epoch_res.pos.ptr), 0,
+                            &(data->epoch_number), &(data->epoch_index),
+                            &(data->epoch_length));
 }
 
 static int calculate_dao_input_capacity(size_t input_index,
                                         uint64_t original_capacity,
                                         uint64_t *calculated_capacity) {
-  int ret;
   volatile uint64_t len = 0;
   size_t withdraw_index = 0;
 
-  ret = extract_withdraw_header_index(input_index, &withdraw_index);
+  int ret = extract_withdraw_header_index(input_index, &withdraw_index);
   if (ret != CKB_SUCCESS) {
     return ret;
   }
 
-  unsigned char deposit_header_buffer[HEADER_SIZE];
-  uint64_t deposit_number;
-  mol_pos_t deposit_dao_pos;
-  len = HEADER_SIZE;
-  ret = ckb_load_header(deposit_header_buffer, &len, 0, input_index,
-                        CKB_SOURCE_INPUT);
-  if (ret != CKB_SUCCESS) {
-    return ret;
-  }
-  ret = extract_header_number_and_dao(deposit_header_buffer, len, &deposit_number, &deposit_dao_pos);
+  dao_header_data_t withdraw_data;
+  ret = load_dao_header_data(withdraw_index, CKB_SOURCE_HEADER_DEP,
+                             &withdraw_data);
   if (ret != CKB_SUCCESS) {
     return ret;
   }
 
-  unsigned char withdraw_header_buffer[HEADER_SIZE];
-  uint64_t withdraw_number;
-  mol_pos_t withdraw_dao_pos;
-  len = HEADER_SIZE;
-  ret = ckb_load_header(withdraw_header_buffer, &len, 0, withdraw_index,
-                        CKB_SOURCE_HEADER_DEP);
-  if (ret != CKB_SUCCESS) {
-    return ret;
-  }
-  ret = extract_header_number_and_dao(withdraw_header_buffer, len, &withdraw_number, &withdraw_dao_pos);
+  dao_header_data_t deposit_data;
+  ret = load_dao_header_data(input_index, CKB_SOURCE_INPUT, &deposit_data);
   if (ret != CKB_SUCCESS) {
     return ret;
   }
 
-  if (withdraw_number <= deposit_number) {
+  uint64_t withdraw_fraction =
+      withdraw_data.epoch_index * deposit_data.epoch_length;
+  uint64_t deposit_fraction =
+      deposit_data.epoch_index * withdraw_data.epoch_length;
+  if ((withdraw_data.epoch_number < deposit_data.epoch_number) ||
+      ((withdraw_data.epoch_number == deposit_data.epoch_number) &&
+       (withdraw_fraction <= deposit_fraction))) {
     return ERROR_INVALID_WITHDRAW_BLOCK;
   }
 
-  uint64_t windowleft = LOCK_PERIOD_BLOCKS -
-                        (withdraw_number - deposit_number) % LOCK_PERIOD_BLOCKS;
-  uint64_t minimal_since =
-      withdraw_number + MAX(MATURITY_BLOCKS, windowleft) + 1;
+  uint64_t deposited_epoches =
+      withdraw_data.epoch_number - deposit_data.epoch_number;
+  /*
+   * This is essentially a round-up operation. Suppose withdraw epoch is
+   * a + b / c, deposit epoch is d + e / f, the deposited epoches will be:
+   *
+   * (a - d) + (b / c - e / f) == (a - d) + (b * f - e * c) / (c * f)
+   *
+   * If (b * f - e * c) is larger than 0, we will have a fraction part in
+   * the deposited epoches, we just add one full epoch to deposited_epoches
+   * to round it up.
+   * If (b * f - e * c) is no larger than 0, let's look back at (b / c - e / f),
+   * by the definition of a fraction, we will know 0 <= b / c < 1, and
+   * 0 <= e / f < 1, so we will have -1 < (b / c - e / f) <= 0, hence
+   * (a - d) - 1 < (a - d) + (b / c - e / f) <= (a - d), we won't need to do
+   * anything for a round-up operation.
+   */
+  if (withdraw_fraction > deposit_fraction) {
+    deposited_epoches++;
+  }
+  uint64_t lock_epoches = (deposited_epoches + (LOCK_PERIOD_EPOCHES - 1)) /
+                          LOCK_PERIOD_EPOCHES * LOCK_PERIOD_EPOCHES;
+  /* Cell must at least be locked for one full lock period(180 epoches) */
+  if (lock_epoches < LOCK_PERIOD_EPOCHES) {
+    return ERROR_INVALID_WITHDRAW_BLOCK;
+  }
+  /*
+   * Since actually just stores an epoch integer with a fraction part, it is
+   * not necessary a valid epoch number with fraction.
+   */
+  uint64_t minimal_since_epoch_number =
+      deposit_data.epoch_number + lock_epoches;
+  uint64_t minimal_since_epoch_index = deposit_data.epoch_index;
+  uint64_t minimal_since_epoch_length = deposit_data.epoch_length;
 
   volatile uint64_t input_since = 0;
   len = 8;
-  ret = ckb_load_input_by_field(((unsigned char *)&input_since), &len, 0, input_index,
-                                CKB_SOURCE_INPUT, CKB_INPUT_FIELD_SINCE);
+  ret = ckb_load_input_by_field(((unsigned char *)&input_since), &len, 0,
+                                input_index, CKB_SOURCE_INPUT,
+                                CKB_INPUT_FIELD_SINCE);
+  if (ret != CKB_SUCCESS) {
+    return ret;
+  }
+  /*
+   * NervosDAO requires DAO input field to have a since value represented
+   * via absolute epoch number.
+   */
+  if (input_since >> 56 != 0x20) {
+    return ERROR_INCORRECT_SINCE;
+  }
+  uint64_t input_since_epoch_number = 0;
+  uint64_t input_since_epoch_index = 0;
+  uint64_t input_since_epoch_length = 1;
+  ret = extract_epoch_info(input_since, 1, &input_since_epoch_number,
+                           &input_since_epoch_index, &input_since_epoch_length);
   if (ret != CKB_SUCCESS) {
     return ret;
   }
 
-  /* Right now NervosDAO only supports absolute block number since */
-  if (input_since >> 56 != 0) {
-    return ERROR_INVALID_WITHDRAW_BLOCK;
-  }
-  if (input_since < minimal_since) {
-    return ERROR_INVALID_WITHDRAW_BLOCK;
+  uint64_t minimal_since_epoch_fraction =
+      minimal_since_epoch_index * input_since_epoch_length;
+  uint64_t input_since_epoch_fraction =
+      input_since_epoch_index * minimal_since_epoch_length;
+  if ((input_since_epoch_number < minimal_since_epoch_number) ||
+      ((input_since_epoch_number == minimal_since_epoch_number) &&
+       (input_since_epoch_fraction < minimal_since_epoch_fraction))) {
+    return ERROR_INCORRECT_SINCE;
   }
 
-  uint64_t deposit_accumulate_rate = *((uint64_t *)(&deposit_dao_pos.ptr[8]));
-  uint64_t withdraw_accumulate_rate = *((uint64_t *)(&withdraw_dao_pos.ptr[8]));
+  uint64_t deposit_accumulate_rate = *((uint64_t *)(&deposit_data.dao[8]));
+  uint64_t withdraw_accumulate_rate = *((uint64_t *)(&withdraw_data.dao[8]));
 
   volatile uint64_t occupied_capacity = 0;
   len = 8;
@@ -240,7 +323,7 @@ static int calculate_dao_input_capacity(size_t input_index,
 
   uint64_t counted_capacity = 0;
   if (__builtin_usubl_overflow(original_capacity, occupied_capacity,
-                                &counted_capacity)) {
+                               &counted_capacity)) {
     return ERROR_OVERFLOW;
   }
 
@@ -250,8 +333,8 @@ static int calculate_dao_input_capacity(size_t input_index,
 
   uint64_t withdraw_capacity = 0;
   if (__builtin_uaddl_overflow(occupied_capacity,
-                                (uint64_t)withdraw_counted_capacity,
-                                &withdraw_capacity)) {
+                               (uint64_t)withdraw_counted_capacity,
+                               &withdraw_capacity)) {
     return ERROR_OVERFLOW;
   }
 
@@ -306,7 +389,7 @@ int main(int argc, char *argv[]) {
     if (!dao_input) {
       /* Normal input, use its own capacity */
       if (__builtin_uaddl_overflow(input_capacities, capacity,
-                                    &input_capacities)) {
+                                   &input_capacities)) {
         return ERROR_OVERFLOW;
       }
     } else {
@@ -318,7 +401,7 @@ int main(int argc, char *argv[]) {
       }
 
       if (__builtin_uaddl_overflow(input_capacities, dao_capacity,
-                                    &input_capacities)) {
+                                   &input_capacities)) {
         return ERROR_OVERFLOW;
       }
     }
@@ -341,7 +424,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (__builtin_uaddl_overflow(output_capacities, capacity,
-                                  &output_capacities)) {
+                                 &output_capacities)) {
       return ERROR_OVERFLOW;
     }
 
