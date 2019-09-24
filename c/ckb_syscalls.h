@@ -62,8 +62,8 @@ int ckb_load_witness(void* addr, volatile uint64_t* len, size_t offset,
   return syscall(SYS_ckb_load_witness, addr, len, offset, index, source, 0);
 }
 
-int ckb_load_args(void* addr, volatile uint64_t* len, size_t offset) {
-  return syscall(SYS_ckb_load_args, addr, len, offset, 0, 0, 0);
+int ckb_load_script(void* addr, volatile uint64_t* len, size_t offset) {
+  return syscall(SYS_ckb_load_script, addr, len, offset, 0, 0, 0);
 }
 
 int ckb_load_cell_by_field(void* addr, volatile uint64_t* len, size_t offset,

@@ -7,7 +7,7 @@ use ckb_script::DataLoader;
 use ckb_types::{
     bytes::Bytes,
     core::{cell::CellMeta, BlockExt, EpochExt, HeaderView, TransactionView},
-    packed::{Byte32, CellOutput, OutPoint, Witness},
+    packed::{self, Byte32, CellOutput, OutPoint},
     prelude::*,
     H256,
 };

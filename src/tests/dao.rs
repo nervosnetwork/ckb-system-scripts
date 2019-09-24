@@ -183,15 +183,6 @@ fn complete_tx(
     (tx, resolved_cell_deps)
 }
 
-fn dummy_transaction_info(block_header: &HeaderView) -> TransactionInfo {
-    TransactionInfo {
-        block_hash: block_header.hash(),
-        block_number: block_header.number(),
-        block_epoch: EpochNumberWithFraction::new(100, 0, 1000),
-        index: 0,
-    }
-}
-
 #[test]
 fn test_dao_single_cell() {
     let mut data_loader = DummyDataLoader::new();
@@ -233,7 +224,7 @@ fn test_dao_single_cell() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = vec![Bytes::from(&b[..]).pack()];
+    let witness = Bytes::from(&b[..]);
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
         .output(cell_output_with_only_capacity(123468045678))
@@ -298,7 +289,7 @@ fn test_dao_single_cell_epoch_edge() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = vec![Bytes::from(&b[..]).pack()];
+    let witness = Bytes::from(&b[..]);
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
         .output(cell_output_with_only_capacity(123468045678))
@@ -428,7 +419,7 @@ fn test_dao_single_cell_end_of_epoch() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = vec![Bytes::from(&b[..]).pack()];
+    let witness = Bytes::from(&b[..]);
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e803e70002f3))
         .output(cell_output_with_only_capacity(123468045678))

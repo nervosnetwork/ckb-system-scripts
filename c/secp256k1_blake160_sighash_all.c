@@ -1,5 +1,6 @@
 #include "blake2b.h"
 #include "ckb_syscalls.h"
+#include "protocol_reader.h"
 #include "secp256k1_helper.h"
 
 #define ERROR_UNKNOWN -1
@@ -23,13 +24,12 @@
 #define RECID_INDEX 64
 /* 32 KB */
 #define WITNESS_SIZE 32768
-#define ARGS_SIZE 32768
+#define SCRIPT_SIZE 32768
 #define SIGNATURE_SIZE 65
 
 /*
  * Arguments are listed in the following order:
- * 0. program name
- * 1 ~ n. pubkey blake160 hash, blake2b hash of pubkey first 20 bytes, used to
+ * 0 ~ n. pubkey blake160 hash, blake2b hash of pubkey first 20 bytes, used to
  * shield the real pubkey in lock script, the lock is considered as a multisig
  * lock when the number of pubkeys is more than 1.
  * n + 1. multisig threshold (optional), used to indicate the threshold of a
@@ -49,24 +49,37 @@ int main() {
   unsigned char tx_hash[BLAKE2B_BLOCK_SIZE];
   unsigned char temp[TEMP_SIZE];
   unsigned char witness[WITNESS_SIZE];
-  unsigned char args[ARGS_SIZE];
+  unsigned char script[SCRIPT_SIZE];
   uint8_t secp_data[CKB_SECP256K1_DATA_SIZE];
+  mol_pos_t script_pos;
+  mol_read_res_t args_res;
+  mol_read_res_t bytes_res;
 
-  len = ARGS_SIZE;
-  ret = ckb_load_args(args, &len, 0);
+  /* Load args */
+  len = SCRIPT_SIZE;
+  ret = ckb_load_script(script, &len, 0);
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
-
-  if (len == 0) {
+  script_pos.ptr = (const uint8_t*)script;
+  script_pos.size = len;
+  args_res = mol_cut(&script_pos, MOL_Script_args());
+  if (args_res.code != 0) {
+    return ERROR_ENCODING;
+  }
+  bytes_res = mol_cut_bytes(&args_res.pos);
+  if (bytes_res.code != 0) {
+    return ERROR_ENCODING;
+  } else if (bytes_res.pos.size == 0) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
+  }
+
+  /* Calculate sigs count and threshold */
+  sigs_cnt = bytes_res.pos.size / BLAKE160_SIZE;
+  if (bytes_res.pos.size % BLAKE160_SIZE == 0) {
+    threshold = sigs_cnt;
   } else {
-    sigs_cnt = len / BLAKE160_SIZE;
-    if (len % BLAKE160_SIZE == 0) {
-      threshold = sigs_cnt;
-    } else {
-      threshold = args[sigs_cnt * BLAKE160_SIZE];
-    }
+    threshold = bytes_res.pos.ptr[sigs_cnt * BLAKE160_SIZE];
   }
 
   if (threshold > sigs_cnt) {
@@ -159,7 +172,7 @@ int main() {
         if (used_signatures[i] == 1) {
           continue;
         }
-        if (memcmp(&args[i * BLAKE160_SIZE], temp, BLAKE160_SIZE) != 0) {
+        if (memcmp(&bytes_res.pos.ptr[i * BLAKE160_SIZE], temp, BLAKE160_SIZE) != 0) {
           continue;
         }
         valid = 1;

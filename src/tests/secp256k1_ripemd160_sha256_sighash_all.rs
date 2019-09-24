@@ -368,39 +368,16 @@ fn test_wrong_size_witness_args() {
     let raw_tx = gen_tx(
         &mut data_loader,
         BITCOIN_P2PKH_BIN.clone(),
-        vec![pubkey_hash.into()],
-        vec![pubkey.into()],
+        pubkey_hash.into(),
+        pubkey.into(),
     );
-    // witness more than 2 args
-    let tx = sign_tx(raw_tx.clone(), &privkey);
-    let other_witness = Bytes::from("1243").pack();
-    let tx = tx
-        .as_advanced_builder()
-        .set_witnesses(vec![])
-        .witness(
-            vec![
-                other_witness.clone(),
-                other_witness.clone(),
-                other_witness.clone(),
-            ]
-            .pack(),
-        )
-        .build();
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let verify_result =
-        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
-
-    assert_error_eq(
-        verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(-2),
-    );
-
+    let other_witness = Bytes::from("1243");
     // witness less than 2 args
     let tx = sign_tx(raw_tx.clone(), &privkey);
     let tx = tx
         .as_advanced_builder()
         .set_witnesses(vec![])
-        .witness(vec![other_witness.clone()].pack())
+        .witness(other_witness.pack())
         .build();
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =
@@ -408,6 +385,6 @@ fn test_wrong_size_witness_args() {
 
     assert_error_eq(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(-2),
+        ScriptError::ValidationFailure(-12),
     );
 }

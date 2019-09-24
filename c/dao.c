@@ -71,7 +71,7 @@
 #define HEADER_SIZE 4096
 /* 32 KB */
 #define WITNESS_SIZE 32768
-#define ARGS_SIZE 32768
+#define SCRIPT_SIZE 32768
 
 #define LOCK_PERIOD_BLOCKS 10
 #define MATURITY_BLOCKS 5
@@ -91,8 +91,8 @@
 #define EPOCH_LENGTH_MASK ((1 << EPOCH_LENGTH_BITS) - 1)
 
 /*
- * Fetch withdraw header hash from the 3rd(offset by 1) argument
- * of witness table. Kept as a separate function so witness buffer
+ * Fetch withdraw header hash from the last 8 bytes
+ * of witness. Kept as a separate function so witness buffer
  * can be cleaned as soon as it is not needed.
  */
 static int extract_withdraw_header_index(size_t input_index, size_t *index) {
@@ -317,18 +317,32 @@ static int calculate_dao_input_capacity(size_t input_index,
 int main() {
   int ret;
   unsigned char script_hash[HASH_SIZE];
-  unsigned char args[ARGS_SIZE];
+  unsigned char script[SCRIPT_SIZE];
   volatile uint64_t len = 0;
+  mol_pos_t script_pos;
+  mol_read_res_t args_res;
+  mol_read_res_t bytes_res;
 
   /*
    * DAO has no arguments, this way we can ensure all DAO related scripts
    * in a transaction is mapped to the same group.
    */
-  len = ARGS_SIZE;
-  ret = ckb_load_args(args, &len, 0);
+  len = SCRIPT_SIZE;
+  ret = ckb_load_script(script, &len, 0);
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
-  } else if (len != 0) {
+  }
+  script_pos.ptr = (const uint8_t*)script;
+  script_pos.size = len;
+  args_res = mol_cut(&script_pos, MOL_Script_args());
+  if (args_res.code != 0) {
+    return ERROR_ENCODING;
+  }
+  bytes_res = mol_cut_bytes(&args_res.pos);
+  if (bytes_res.code != 0) {
+    return ERROR_ENCODING;
+  }
+  if (bytes_res.pos.size != 0) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
   }
 
