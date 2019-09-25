@@ -4,11 +4,11 @@
 #define SYS_exit 93
 #define SYS_ckb_load_tx_hash 2061
 #define SYS_ckb_load_script_hash 2062
+#define SYS_ckb_load_script 2063
 #define SYS_ckb_load_cell 2071
 #define SYS_ckb_load_header 2072
 #define SYS_ckb_load_input 2073
 #define SYS_ckb_load_witness 2074
-#define SYS_ckb_load_script 2075
 #define SYS_ckb_load_cell_by_field 2081
 #define SYS_ckb_load_header_by_field 2082
 #define SYS_ckb_load_input_by_field 2083
