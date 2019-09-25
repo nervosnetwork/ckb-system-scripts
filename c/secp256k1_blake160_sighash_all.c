@@ -82,7 +82,7 @@ int main() {
     threshold = bytes_res.pos.ptr[sigs_cnt * BLAKE160_SIZE];
   }
 
-  if (threshold > sigs_cnt) {
+  if (threshold > sigs_cnt || threshold == 0) {
     return ERROR_INVALID_THRESHOLD;
   }
 

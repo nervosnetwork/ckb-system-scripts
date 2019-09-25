@@ -16,6 +16,7 @@ use rand::{thread_rng, Rng};
 
 const ERROR_PUBKEY_BLAKE160_HASH: i8 = -3;
 const ERROR_WITNESS_TOO_LONG: i8 = -12;
+const ERROR_INVALID_THRESHOLD: i8 = -13;
 
 fn gen_tx(dummy: &mut DummyDataLoader, script_data: Bytes, lock_args: Bytes) -> TransactionView {
     let previous_tx_hash = {
@@ -348,6 +349,41 @@ mod multisig_tests {
             assert_error_eq(
                 verify(&data_loader, &tx).unwrap_err(),
                 ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
+            );
+        }
+    }
+
+    #[test]
+    fn test_invalid_threshold() {
+        let mut data_loader = DummyDataLoader::new();
+        let keys = generate_keys(4);
+        {
+            let mut args = pkh(&keys[0]);
+            args.extend_from_slice(&pkh(&keys[1]));
+            args.extend_from_slice(&pkh(&keys[2]));
+            // threshold 5 is bigger than total pubkeys 4
+            args.extend_from_slice(&[5]);
+            let raw_tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), args);
+
+            let tx = multi_sign_tx(raw_tx.clone(), &[&keys[1], &keys[2]]);
+            assert_error_eq(
+                verify(&data_loader, &tx).unwrap_err(),
+                ScriptError::ValidationFailure(ERROR_INVALID_THRESHOLD),
+            );
+        }
+
+        {
+            let mut args = pkh(&keys[0]);
+            args.extend_from_slice(&pkh(&keys[1]));
+            args.extend_from_slice(&pkh(&keys[2]));
+            // threshold 0 is invalid
+            args.extend_from_slice(&[0]);
+            let raw_tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), args);
+
+            let tx = multi_sign_tx(raw_tx.clone(), &[&keys[1], &keys[2]]);
+            assert_error_eq(
+                verify(&data_loader, &tx).unwrap_err(),
+                ScriptError::ValidationFailure(ERROR_INVALID_THRESHOLD),
             );
         }
     }
