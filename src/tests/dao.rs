@@ -17,6 +17,10 @@ use ckb_types::{
 };
 use rand::{thread_rng, Rng};
 
+const ERROR_INVALID_WITHDRAW_BLOCK: i8 = -14;
+const ERROR_INCORRECT_CAPACITY: i8 = -15;
+const ERROR_INCORRECT_SINCE: i8 = -17;
+
 fn cell_output_with_only_capacity(shannons: u64) -> CellOutput {
     CellOutput::new_builder()
         .capacity(Capacity::shannons(shannons).pack())
@@ -871,7 +875,7 @@ fn test_dao_invalid_withdraw_header() {
     let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
     assert_error_eq(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(-14),
+        ScriptError::ValidationFailure(ERROR_INVALID_WITHDRAW_BLOCK),
     );
 }
 
@@ -939,7 +943,7 @@ fn test_dao_invalid_withdraw_amount() {
     let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
     assert_error_eq(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(-15),
+        ScriptError::ValidationFailure(ERROR_INCORRECT_CAPACITY),
     );
 }
 
@@ -1008,6 +1012,6 @@ fn test_dao_invalid_since() {
     let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
     assert_error_eq(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(-17),
+        ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE),
     );
 }

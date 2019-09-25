@@ -15,6 +15,10 @@ use ckb_types::{
 };
 use rand::{thread_rng, Rng};
 
+const ERROR_PUBKEY_RIPEMD160_HASH: i8 = -3;
+const ERROR_SECP_VERIFICATION: i8 = -9;
+const ERROR_WITNESS_SIZE: i8 = -12;
+
 fn gen_tx(
     dummy: &mut DummyDataLoader,
     script_data: Bytes,
@@ -204,7 +208,6 @@ fn test_sighash_all_unlock() {
     let mut data_loader = DummyDataLoader::new();
     let privkey = Generator::random_privkey();
     let pubkey = pubkey_compressed(&privkey.pubkey().expect("pubkey"));
-    println!("{}", pubkey.len());
     // compute pubkey hash
     let pubkey_hash = pubkey_hash(&pubkey);
     let tx = gen_tx(
@@ -294,7 +297,7 @@ fn test_signing_with_wrong_key() {
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
     assert_error_eq(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(-3),
+        ScriptError::ValidationFailure(ERROR_PUBKEY_RIPEMD160_HASH),
     );
 }
 
@@ -319,7 +322,7 @@ fn test_signing_wrong_tx_hash() {
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
     assert_error_eq(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(-9),
+        ScriptError::ValidationFailure(ERROR_SECP_VERIFICATION),
     );
 }
 
@@ -355,7 +358,7 @@ fn test_super_long_witness() {
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
     assert_error_eq(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(-12),
+        ScriptError::ValidationFailure(ERROR_WITNESS_SIZE),
     );
 }
 
@@ -385,6 +388,6 @@ fn test_wrong_size_witness_args() {
 
     assert_error_eq(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(-12),
+        ScriptError::ValidationFailure(ERROR_WITNESS_SIZE),
     );
 }
