@@ -1,6 +1,6 @@
 [package]
 name = "ckb-system-scripts"
-version = "0.4.0-alpha.3+single-bytes"
+version = "0.4.0-alpha.4+single-bytes"
 authors = ["Nervos Core Dev <dev@nervos.org>"]
 edition = "2018"
 build = "build.rs"
