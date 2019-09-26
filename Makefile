@@ -10,7 +10,7 @@ MOLC_VERSION := 0.3.1
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
 BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
 
-all: specs/cells/secp256k1_blake160_sighash_all specs/cells/dao specs/cells/secp256k1_ripemd160_sha256_sighash_all
+all: specs/cells/secp256k1_blake160_sighash_all specs/cells/dao specs/cells/secp256k1_ripemd160_sha256_sighash_all specs/cells/secp256k1_blake160_multisig_all
 
 all-via-docker: c/protocol_reader.h
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
@@ -22,6 +22,9 @@ specs/cells/dao: c/dao.c c/protocol_reader.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 specs/cells/secp256k1_ripemd160_sha256_sighash_all: c/secp256k1_ripemd160_sha256_sighash_all.c c/protocol_reader.h build/secp256k1_data_info.h $(SECP256K1_SRC)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+
+specs/cells/secp256k1_blake160_multisig_all: c/secp256k1_blake160_multisig_all.c c/protocol_reader.h build/secp256k1_data_info.h $(SECP256K1_SRC)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 build/secp256k1_data_info.h: build/dump_secp256k1_data
@@ -69,7 +72,7 @@ package-clean:
 	rm -rf Cargo.toml.bak target/package/
 
 clean:
-	rm -rf specs/cells/secp256k1_blake160_sighash_all specs/cells/dao
+	rm -rf specs/cells/secp256k1_blake160_sighash_all specs/cells/dao specs/cells/secp256k1_blake160_multisig_all
 	rm -rf build/secp256k1_data_info.h build/dump_secp256k1_data
 	rm -rf specs/cells/secp256k1_data
 	rm -rf spec/cells/secp256k1_ripemd160_sha256_sighash_all
