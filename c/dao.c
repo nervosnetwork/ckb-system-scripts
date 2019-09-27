@@ -71,6 +71,7 @@
 #define HEADER_SIZE 4096
 /* 32 KB */
 #define WITNESS_SIZE 32768
+#define SCRIPT_SIZE 32768
 
 #define LOCK_PERIOD_BLOCKS 10
 #define MATURITY_BLOCKS 5
@@ -90,17 +91,14 @@
 #define EPOCH_LENGTH_MASK ((1 << EPOCH_LENGTH_BITS) - 1)
 
 /*
- * Fetch withdraw header hash from the 3rd(offset by 1) argument
- * of witness table. Kept as a separate function so witness buffer
+ * Fetch withdraw header hash from the last 8 bytes
+ * of witness. Kept as a separate function so witness buffer
  * can be cleaned as soon as it is not needed.
  */
 static int extract_withdraw_header_index(size_t input_index, size_t *index) {
   int ret;
   volatile uint64_t len = 0;
   unsigned char witness[WITNESS_SIZE];
-  mol_pos_t witness_pos;
-  mol_read_res_t arg_res;
-  mol_read_res_t bytes_res;
 
   len = WITNESS_SIZE;
   ret = ckb_load_witness(witness, &len, 0, input_index, CKB_SOURCE_INPUT);
@@ -110,37 +108,11 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
   if (len > WITNESS_SIZE) {
     return ERROR_WITNESS_TOO_LONG;
   }
-
-  witness_pos.ptr = (const uint8_t *)witness;
-  witness_pos.size = len;
-
-  /* Load header index */
-  arg_res = mol_cut(&witness_pos, MOL_Witness(1));
-  if (arg_res.code != 0) {
-    if (arg_res.attr < 2) {
-      return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
-    } else {
-      return ERROR_ENCODING;
-    }
-  }
-
-  /* last position arg is header index */
-  if (arg_res.attr > 2) {
-    arg_res = mol_cut(&witness_pos, MOL_Witness(arg_res.attr - 1));
-    if (arg_res.code != 0) {
-      return ERROR_ENCODING;
-    }
-  }
-
-  bytes_res = mol_cut_bytes(&arg_res.pos);
-  if (bytes_res.code != 0) {
-    return ERROR_ENCODING;
-  }
-  if (bytes_res.pos.size != 8) {
+  if (len < 8) {
     return ERROR_ENCODING;
   }
 
-  *index = *((size_t *)bytes_res.pos.ptr);
+  *index = *((size_t *)&witness[len - 8]);
   return CKB_SUCCESS;
 }
 
@@ -342,16 +314,35 @@ static int calculate_dao_input_capacity(size_t input_index,
   return CKB_SUCCESS;
 }
 
-int main(int argc, char *argv[]) {
+int main() {
   int ret;
   unsigned char script_hash[HASH_SIZE];
+  unsigned char script[SCRIPT_SIZE];
   volatile uint64_t len = 0;
+  mol_pos_t script_pos;
+  mol_read_res_t args_res;
+  mol_read_res_t bytes_res;
 
   /*
    * DAO has no arguments, this way we can ensure all DAO related scripts
    * in a transaction is mapped to the same group.
    */
-  if (argc != 1) {
+  len = SCRIPT_SIZE;
+  ret = ckb_load_script(script, &len, 0);
+  if (ret != CKB_SUCCESS) {
+    return ERROR_SYSCALL;
+  }
+  script_pos.ptr = (const uint8_t*)script;
+  script_pos.size = len;
+  args_res = mol_cut(&script_pos, MOL_Script_args());
+  if (args_res.code != 0) {
+    return ERROR_ENCODING;
+  }
+  bytes_res = mol_cut_bytes(&args_res.pos);
+  if (bytes_res.code != 0) {
+    return ERROR_ENCODING;
+  }
+  if (bytes_res.pos.size != 0) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
   }
 
