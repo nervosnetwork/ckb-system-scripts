@@ -172,7 +172,7 @@ fn test_signing_with_wrong_key() {
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
-    assert_error_eq(
+    assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
     );
@@ -194,7 +194,7 @@ fn test_signing_wrong_tx_hash() {
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
-    assert_error_eq(
+    assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
     );
@@ -227,7 +227,7 @@ fn test_super_long_witness() {
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
-    assert_error_eq(
+    assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(ERROR_WITNESS_TOO_LONG),
     );
@@ -283,7 +283,7 @@ mod multisig_tests {
         }
         {
             let tx = sign_tx(raw_tx.clone(), &keys[2]);
-            assert_error_eq(
+            assert_error_eq!(
                 verify(&data_loader, &tx).unwrap_err(),
                 ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
             );
@@ -330,7 +330,7 @@ mod multisig_tests {
 
         {
             let tx = sign_tx(raw_tx.clone(), &keys[1]);
-            assert_error_eq(
+            assert_error_eq!(
                 verify(&data_loader, &tx).unwrap_err(),
                 ScriptError::ValidationFailure(ERROR_WRONG_NUMBER_OF_ARGUMENTS),
             );
@@ -338,7 +338,7 @@ mod multisig_tests {
 
         {
             let tx = multi_sign_tx(raw_tx.clone(), &[&keys[0], &keys[0]]);
-            assert_error_eq(
+            assert_error_eq!(
                 verify(&data_loader, &tx).unwrap_err(),
                 ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
             );
@@ -346,7 +346,7 @@ mod multisig_tests {
 
         {
             let tx = multi_sign_tx(raw_tx.clone(), &[&keys[0], &keys[3]]);
-            assert_error_eq(
+            assert_error_eq!(
                 verify(&data_loader, &tx).unwrap_err(),
                 ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
             );
@@ -366,7 +366,7 @@ mod multisig_tests {
             let raw_tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), args);
 
             let tx = multi_sign_tx(raw_tx.clone(), &[&keys[1], &keys[2]]);
-            assert_error_eq(
+            assert_error_eq!(
                 verify(&data_loader, &tx).unwrap_err(),
                 ScriptError::ValidationFailure(ERROR_INVALID_THRESHOLD),
             );
@@ -381,7 +381,7 @@ mod multisig_tests {
             let raw_tx = gen_tx(&mut data_loader, SIGHASH_ALL_BIN.clone(), args);
 
             let tx = multi_sign_tx(raw_tx.clone(), &[&keys[1], &keys[2]]);
-            assert_error_eq(
+            assert_error_eq!(
                 verify(&data_loader, &tx).unwrap_err(),
                 ScriptError::ValidationFailure(ERROR_INVALID_THRESHOLD),
             );

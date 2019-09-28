@@ -745,7 +745,7 @@ fn test_dao_missing_deposit_header() {
     };
 
     let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
-    assert_error_eq(
+    assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(2),
     );
@@ -805,7 +805,7 @@ fn test_dao_missing_withdraw_header() {
     };
 
     let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
-    assert_error_eq(
+    assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(1),
     );
@@ -873,7 +873,7 @@ fn test_dao_invalid_withdraw_header() {
     };
 
     let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
-    assert_error_eq(
+    assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(ERROR_INVALID_WITHDRAW_BLOCK),
     );
@@ -941,7 +941,7 @@ fn test_dao_invalid_withdraw_amount() {
     };
 
     let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
-    assert_error_eq(
+    assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(ERROR_INCORRECT_CAPACITY),
     );
@@ -1010,7 +1010,7 @@ fn test_dao_invalid_since() {
     };
 
     let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
-    assert_error_eq(
+    assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE),
     );

@@ -295,7 +295,7 @@ fn test_signing_with_wrong_key() {
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
-    assert_error_eq(
+    assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(ERROR_PUBKEY_RIPEMD160_HASH),
     );
@@ -320,7 +320,7 @@ fn test_signing_wrong_tx_hash() {
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
-    assert_error_eq(
+    assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(ERROR_SECP_VERIFICATION),
     );
@@ -356,7 +356,7 @@ fn test_super_long_witness() {
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
-    assert_error_eq(
+    assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(ERROR_WITNESS_SIZE),
     );
@@ -386,7 +386,7 @@ fn test_wrong_size_witness_args() {
     let verify_result =
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
 
-    assert_error_eq(
+    assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(ERROR_WITNESS_SIZE),
     );
