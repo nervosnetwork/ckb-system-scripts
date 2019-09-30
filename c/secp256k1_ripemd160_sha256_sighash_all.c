@@ -109,81 +109,61 @@ int main() {
     return ERROR_SYSCALL;
   }
 
-  while (1) {
-    len = 0;
-    /*
-     * Actually we don't need this syscall, we are just making it to grab all
-     * input indices for current group, from which we can load the actual
-     * witness data we need. `since` field is chosen here since it has a fixed
-     * size of 8 bytes, which is both predictable, and also provides minimal
-     * cycle consumption.
-     */
-    ret = ckb_load_input_by_field(NULL, &len, 0, index, CKB_SOURCE_GROUP_INPUT,
-                                  CKB_INPUT_FIELD_SINCE);
-    if (ret == CKB_INDEX_OUT_OF_BOUND) {
-      return 0;
-    }
-    if (ret != CKB_SUCCESS) {
-      return ERROR_SYSCALL;
-    }
-
-    /* Now we load actual witness data using the same input index above. */
-    len = WITNESS_SIZE;
-    ret = ckb_load_witness(witness, &len, 0, index, CKB_SOURCE_GROUP_INPUT);
-    if (ret != CKB_SUCCESS) {
-      return ERROR_SYSCALL;
-    }
-    if (len != RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE
-        && len != RECOVERABLE_SIGNATURE_SIZE + COMPRESSED_PUBKEY_SIZE
-        && len != NONE_RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE
-        && len != NONE_RECOVERABLE_SIGNATURE_SIZE + COMPRESSED_PUBKEY_SIZE) {
-      return ERROR_WITNESS_SIZE;
-    }
-
-    /* parse pubkey */
-    secp256k1_pubkey pubkey;
-    sha256_state sha256_ctx;
-    sha256_init(&sha256_ctx);
-    if (len == RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE
-      || len == NONE_RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE) {
-      if (secp256k1_ec_pubkey_parse(&context, &pubkey, &witness[len - NONE_COMPRESSED_PUBKEY_SIZE],
-                  NONE_COMPRESSED_PUBKEY_SIZE) == 0) {
-        return ERROR_SECP_PARSE_PUBKEY;
-      } else {
-        sha256_update(&sha256_ctx, &witness[len - NONE_COMPRESSED_PUBKEY_SIZE], NONE_COMPRESSED_PUBKEY_SIZE);
-      }
-    } else {
-      if (secp256k1_ec_pubkey_parse(&context, &pubkey, &witness[len - COMPRESSED_PUBKEY_SIZE],
-                  COMPRESSED_PUBKEY_SIZE) == 0) {
-        return ERROR_SECP_PARSE_PUBKEY;
-      } else {
-        sha256_update(&sha256_ctx, &witness[len - COMPRESSED_PUBKEY_SIZE], COMPRESSED_PUBKEY_SIZE);
-      }
-    }
-    sha256_finalize(&sha256_ctx, temp);
-
-    ripemd160_state ripe160_ctx;
-    ripemd160_init(&ripe160_ctx);
-    ripemd160_update(&ripe160_ctx, temp, SHA256_SIZE);
-    ripemd160_finalize(&ripe160_ctx, temp);
-
-    /* check pubkey hash */
-    if (memcmp(bytes_res.pos.ptr, temp, RIPEMD160_SIZE) != 0) {
-      return ERROR_PUBKEY_RIPEMD160_HASH;
-    }
-
-    /* Load signature */
-    secp256k1_ecdsa_signature signature;
-    if (secp256k1_ecdsa_signature_parse_compact(&context, &signature, witness) == 0) {
-        return ERROR_SECP_PARSE_SIGNATURE;
-    }
-
-    /* verify signature */
-    if (secp256k1_ecdsa_verify(&context, &signature, tx_hash, &pubkey) != 1) {
-      return ERROR_SECP_VERIFICATION;
-    }
-
-    index += 1;
+  /* Now we load actual witness data using the same input index above. */
+  len = WITNESS_SIZE;
+  ret = ckb_load_witness(witness, &len, 0, index, CKB_SOURCE_GROUP_INPUT);
+  if (ret != CKB_SUCCESS) {
+    return ERROR_SYSCALL;
   }
-  return ERROR_UNKNOWN;
+  if (len != RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE
+      && len != RECOVERABLE_SIGNATURE_SIZE + COMPRESSED_PUBKEY_SIZE
+      && len != NONE_RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE
+      && len != NONE_RECOVERABLE_SIGNATURE_SIZE + COMPRESSED_PUBKEY_SIZE) {
+    return ERROR_WITNESS_SIZE;
+  }
+  
+  /* parse pubkey */
+  secp256k1_pubkey pubkey;
+  sha256_state sha256_ctx;
+  sha256_init(&sha256_ctx);
+  if (len == RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE
+    || len == NONE_RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE) {
+    if (secp256k1_ec_pubkey_parse(&context, &pubkey, &witness[len - NONE_COMPRESSED_PUBKEY_SIZE],
+                NONE_COMPRESSED_PUBKEY_SIZE) == 0) {
+      return ERROR_SECP_PARSE_PUBKEY;
+    } else {
+      sha256_update(&sha256_ctx, &witness[len - NONE_COMPRESSED_PUBKEY_SIZE], NONE_COMPRESSED_PUBKEY_SIZE);
+    }
+  } else {
+    if (secp256k1_ec_pubkey_parse(&context, &pubkey, &witness[len - COMPRESSED_PUBKEY_SIZE],
+                COMPRESSED_PUBKEY_SIZE) == 0) {
+      return ERROR_SECP_PARSE_PUBKEY;
+    } else {
+      sha256_update(&sha256_ctx, &witness[len - COMPRESSED_PUBKEY_SIZE], COMPRESSED_PUBKEY_SIZE);
+    }
+  }
+  sha256_finalize(&sha256_ctx, temp);
+  
+  ripemd160_state ripe160_ctx;
+  ripemd160_init(&ripe160_ctx);
+  ripemd160_update(&ripe160_ctx, temp, SHA256_SIZE);
+  ripemd160_finalize(&ripe160_ctx, temp);
+  
+  /* check pubkey hash */
+  if (memcmp(bytes_res.pos.ptr, temp, RIPEMD160_SIZE) != 0) {
+    return ERROR_PUBKEY_RIPEMD160_HASH;
+  }
+  
+  /* Load signature */
+  secp256k1_ecdsa_signature signature;
+  if (secp256k1_ecdsa_signature_parse_compact(&context, &signature, witness) == 0) {
+      return ERROR_SECP_PARSE_SIGNATURE;
+  }
+  
+  /* verify signature */
+  if (secp256k1_ecdsa_verify(&context, &signature, tx_hash, &pubkey) != 1) {
+    return ERROR_SECP_VERIFICATION;
+  }
+
+  return 0;
 }
