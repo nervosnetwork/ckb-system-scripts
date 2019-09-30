@@ -98,7 +98,7 @@ int main() {
   size_t i = 1;
   while (1) {
     len = WITNESS_SIZE;
-    ret = ckb_load_witness(temp, &len, 0, i, CKB_SOURCE_INPUT);
+    ret = ckb_load_witness(temp, &len, 0, i, CKB_SOURCE_GROUP_INPUT);
     if (ret == CKB_INDEX_OUT_OF_BOUND) {
       break;
     }
