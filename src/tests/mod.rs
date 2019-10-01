@@ -70,21 +70,31 @@ pub fn blake160(message: &[u8]) -> Bytes {
 }
 
 pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
+    let witnesses_len = tx.witnesses().len();
+    sign_tx_by_input_group(tx, key, 0, witnesses_len)
+}
+
+pub fn sign_tx_by_input_group(
+    tx: TransactionView,
+    key: &Privkey,
+    begin_index: usize,
+    len: usize,
+) -> TransactionView {
     let tx_hash = tx.hash();
     let signed_witnesses: Vec<packed::Bytes> = tx
         .inputs()
         .into_iter()
         .enumerate()
         .map(|(i, _)| {
-            if i == 0 {
+            if i == begin_index {
                 let mut blake2b = ckb_hash::new_blake2b();
                 let mut message = [0u8; 32];
                 blake2b.update(&tx_hash.raw_data());
-                let witness = tx.witnesses().get(0).unwrap();
+                let witness = tx.witnesses().get(i).unwrap();
                 if !witness.raw_data().is_empty() {
                     blake2b.update(&witness.raw_data());
                 }
-                (1..tx.witnesses().len()).for_each(|n| {
+                ((i + 1)..(i + len)).for_each(|n| {
                     let witness = tx.witnesses().get(n).unwrap();
                     if !witness.raw_data().is_empty() {
                         blake2b.update(&witness.raw_data());
