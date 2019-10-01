@@ -1,4 +1,7 @@
-use super::{blake160, sign_tx, DummyDataLoader, MAX_CYCLES, SECP256K1_DATA_BIN, SIGHASH_ALL_BIN};
+use super::{
+    blake160, sign_tx, sign_tx_by_input_group, DummyDataLoader, MAX_CYCLES, SECP256K1_DATA_BIN,
+    SIGHASH_ALL_BIN,
+};
 use ckb_crypto::secp::{Generator, Privkey};
 use ckb_error::assert_error_eq;
 use ckb_script::{ScriptError, TransactionScriptsVerifier};
@@ -248,6 +251,29 @@ fn test_sighash_all_with_grouped_inputs_unlock() {
             ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
         );
     }
+}
+
+#[test]
+fn test_sighash_all_with_2_different_inputs_unlock() {
+    let mut data_loader = DummyDataLoader::new();
+    // key1
+    let privkey = Generator::random_privkey();
+    let pubkey = privkey.pubkey().expect("pubkey");
+    let pubkey_hash = blake160(&pubkey.serialize());
+    // key2
+    let privkey2 = Generator::random_privkey();
+    let pubkey2 = privkey2.pubkey().expect("pubkey");
+    let pubkey_hash2 = blake160(&pubkey2.serialize());
+
+    // sign with 2 keys
+    let tx = get_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2), (pubkey_hash2, 2)]);
+    let tx = sign_tx_by_input_group(tx, &privkey, 0, 2);
+    let tx = sign_tx_by_input_group(tx, &privkey2, 2, 2);
+
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    verify_result.expect("pass verification");
 }
 
 #[test]
