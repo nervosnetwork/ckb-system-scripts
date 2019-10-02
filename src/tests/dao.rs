@@ -12,7 +12,7 @@ use ckb_types::{
         HeaderBuilder, HeaderView, ScriptHashType, TransactionBuilder, TransactionInfo,
         TransactionView,
     },
-    packed::{Byte32, CellDep, CellInput, CellOutput, OutPoint, Script},
+    packed::{Byte32, CellDep, CellInput, CellOutput, OutPoint, Script, WitnessArgs},
     prelude::*,
 };
 use rand::{thread_rng, Rng};
@@ -228,14 +228,16 @@ fn test_dao_single_cell() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = Bytes::from(&b[..]);
+    let witness = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b[..]).pack())
+        .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
         .header_dep(deposit_header.hash())
-        .witness(witness.pack());
+        .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
     let tx = sign_tx(tx, &privkey);
     for dep in resolved_cell_deps2.drain(..) {
@@ -293,14 +295,16 @@ fn test_dao_single_cell_epoch_edge() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = Bytes::from(&b[..]);
+    let witness = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b[..]).pack())
+        .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
         .header_dep(deposit_header.hash())
-        .witness(witness.pack());
+        .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
     let tx = sign_tx(tx, &privkey);
     for dep in resolved_cell_deps2.drain(..) {
@@ -358,14 +362,16 @@ fn test_dao_single_cell_start_of_epoch() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = Bytes::from(&b[..]);
+    let witness = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b[..]).pack())
+        .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e800000002f3))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
         .header_dep(deposit_header.hash())
-        .witness(witness.pack());
+        .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
     let tx = sign_tx(tx, &privkey);
     for dep in resolved_cell_deps2.drain(..) {
@@ -423,14 +429,16 @@ fn test_dao_single_cell_end_of_epoch() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = Bytes::from(&b[..]);
+    let witness = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b[..]).pack())
+        .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e803e70002f3))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
         .header_dep(deposit_header.hash())
-        .witness(witness.pack());
+        .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
     let tx = sign_tx(tx, &privkey);
     for dep in resolved_cell_deps2.drain(..) {
@@ -488,14 +496,16 @@ fn test_dao_single_cell_with_fees() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = Bytes::from(&b[..]);
+    let witness = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b[..]).pack())
+        .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e800000002f4))
         .output(cell_output_with_only_capacity(123458045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
         .header_dep(deposit_header.hash())
-        .witness(witness.pack());
+        .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
     let tx = sign_tx(tx, &privkey);
     for dep in resolved_cell_deps2.drain(..) {
@@ -553,7 +563,9 @@ fn test_dao_single_cell_with_dao_output_cell() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = Bytes::from(&b[..]);
+    let witness = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b[..]).pack())
+        .build();
     let type_ = Script::new_builder()
         .code_hash(dao_code_hash())
         .hash_type(ScriptHashType::Data.pack())
@@ -569,7 +581,7 @@ fn test_dao_single_cell_with_dao_output_cell() {
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
         .header_dep(deposit_header.hash())
-        .witness(witness.pack());
+        .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
     let tx = sign_tx(tx, &privkey);
     for dep in resolved_cell_deps2.drain(..) {
@@ -655,8 +667,14 @@ fn test_dao_multiple_cells() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
+    let witness = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b[..]).pack())
+        .build();
     let mut b2 = [0; 8];
     LittleEndian::write_u64(&mut b2, 1);
+    let witness2 = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b2[..]).pack())
+        .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e800000002f4))
         .input(CellInput::new(previous_out_point2, 0x2003e802340002f3))
@@ -667,8 +685,8 @@ fn test_dao_multiple_cells() {
         .header_dep(withdraw_header2.hash())
         .header_dep(deposit_header.hash())
         .header_dep(deposit_header2.hash())
-        .witness(Bytes::from(&b[..]).pack())
-        .witness(Bytes::from(&b2[..]).pack());
+        .witness(witness.as_bytes().pack())
+        .witness(witness2.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
     let tx = sign_tx(tx, &privkey);
     for dep in resolved_cell_deps2.drain(..) {
@@ -725,13 +743,15 @@ fn test_dao_missing_deposit_header() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = Bytes::from(&b[..]);
+    let witness = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b[..]).pack())
+        .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e80000000320))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
-        .witness(witness.pack());
+        .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
     let tx = sign_tx(tx, &privkey);
     for dep in resolved_cell_deps2.drain(..) {
@@ -785,13 +805,15 @@ fn test_dao_missing_withdraw_header() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1);
-    let witness = Bytes::from(&b[..]);
+    let witness = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b[..]).pack())
+        .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e80000000320))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(deposit_header.hash())
-        .witness(witness.pack());
+        .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
     let tx = sign_tx(tx, &privkey);
     for dep in resolved_cell_deps2.drain(..) {
@@ -852,14 +874,16 @@ fn test_dao_invalid_withdraw_header() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = Bytes::from(&b[..]);
+    let witness = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b[..]).pack())
+        .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e80000000320))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(deposit_header.hash())
         .header_dep(deposit_header.hash())
-        .witness(witness.pack());
+        .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
     let tx = sign_tx(tx, &privkey);
     for dep in resolved_cell_deps2.drain(..) {
@@ -920,14 +944,16 @@ fn test_dao_invalid_withdraw_amount() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = Bytes::from(&b[..]);
+    let witness = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b[..]).pack())
+        .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
         .output(cell_output_with_only_capacity(123488045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
         .header_dep(deposit_header.hash())
-        .witness(witness.pack());
+        .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
     let tx = sign_tx(tx, &privkey);
     for dep in resolved_cell_deps2.drain(..) {
@@ -988,14 +1014,16 @@ fn test_dao_invalid_since() {
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 0);
-    let witness = Bytes::from(&b[..]);
+    let witness = WitnessArgs::new_builder()
+        .type_(Bytes::from(&b[..]).pack())
+        .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e802290002f3))
         .output(cell_output_with_only_capacity(123468045678))
         .output_data(Bytes::new().pack())
         .header_dep(withdraw_header.hash())
         .header_dep(deposit_header.hash())
-        .witness(witness.pack());
+        .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
     let tx = sign_tx(tx, &privkey);
     for dep in resolved_cell_deps2.drain(..) {

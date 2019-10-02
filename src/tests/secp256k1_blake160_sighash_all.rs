@@ -11,7 +11,7 @@ use ckb_types::{
         cell::{CellMetaBuilder, ResolvedTransaction},
         Capacity, DepType, ScriptHashType, TransactionBuilder, TransactionView,
     },
-    packed::{CellDep, CellInput, CellOutput, OutPoint, Script},
+    packed::{CellDep, CellInput, CellOutput, OutPoint, Script, WitnessArgs, WitnessArgsBuilder},
     prelude::*,
     H256,
 };
@@ -118,9 +118,12 @@ fn get_tx_with_grouped_args<R: Rng>(
             );
             let mut random_extra_witness = [0u8; 32];
             rng.fill(&mut random_extra_witness);
+            let witness_args = WitnessArgsBuilder::default()
+                .extra(Bytes::from(random_extra_witness.to_vec()).pack())
+                .build();
             tx_builder = tx_builder
                 .input(CellInput::new(previous_out_point, 0))
-                .witness(Bytes::from(random_extra_witness.to_vec()).pack());
+                .witness(witness_args.as_bytes().pack());
         }
     }
 
@@ -135,8 +138,11 @@ fn sign_tx_hash(tx: TransactionView, key: &Privkey, tx_hash: &[u8]) -> Transacti
     blake2b.finalize(&mut message);
     let message = H256::from(message);
     let sig = key.sign_recoverable(&message).expect("sign");
+    let witness_args = WitnessArgsBuilder::default()
+        .lock(Bytes::from(sig.serialize()).pack())
+        .build();
     tx.as_advanced_builder()
-        .set_witnesses(vec![Bytes::from(sig.serialize()).pack()])
+        .set_witnesses(vec![witness_args.as_bytes().pack()])
         .build()
 }
 
@@ -197,7 +203,11 @@ fn test_sighash_all_with_extra_witness_unlock() {
     let extract_witness = vec![1, 2, 3, 4];
     let tx = tx
         .as_advanced_builder()
-        .set_witnesses(vec![Bytes::from(extract_witness).pack()])
+        .set_witnesses(vec![WitnessArgs::new_builder()
+            .extra(Bytes::from(extract_witness).pack())
+            .build()
+            .as_bytes()
+            .pack()])
         .build();
     {
         let tx = sign_tx(tx.clone(), &privkey);
@@ -208,10 +218,19 @@ fn test_sighash_all_with_extra_witness_unlock() {
     }
     {
         let tx = sign_tx(tx, &privkey);
-        let wrong_witness = tx.witnesses().get(0).unwrap().as_builder().push(0).build();
+        let wrong_witness = tx
+            .witnesses()
+            .get(0)
+            .map(|w| {
+                WitnessArgs::new_unchecked(w.unpack())
+                    .as_builder()
+                    .extra(Bytes::from(vec![0]).pack())
+                    .build()
+            })
+            .unwrap();
         let tx = tx
             .as_advanced_builder()
-            .set_witnesses(vec![wrong_witness])
+            .set_witnesses(vec![wrong_witness.as_bytes().pack()])
             .build();
         let resolved_tx = build_resolved_tx(&data_loader, &tx);
         let verify_result =
@@ -240,10 +259,22 @@ fn test_sighash_all_with_grouped_inputs_unlock() {
     }
     {
         let tx = sign_tx(tx.clone(), &privkey);
-        let wrong_witness = tx.witnesses().get(1).unwrap().as_builder().push(0).build();
+        let wrong_witness = tx
+            .witnesses()
+            .get(1)
+            .map(|w| {
+                WitnessArgs::new_unchecked(w.unpack())
+                    .as_builder()
+                    .extra(Bytes::from(vec![0]).pack())
+                    .build()
+            })
+            .unwrap();
         let tx = tx
             .as_advanced_builder()
-            .set_witnesses(vec![tx.witnesses().get(0).unwrap(), wrong_witness])
+            .set_witnesses(vec![
+                tx.witnesses().get(0).unwrap(),
+                wrong_witness.as_bytes().pack(),
+            ])
             .build();
         let resolved_tx = build_resolved_tx(&data_loader, &tx);
         let verify_result =
@@ -343,11 +374,13 @@ fn test_super_long_witness() {
     blake2b.finalize(&mut message);
     let message = H256::from(message);
     let sig = privkey.sign_recoverable(&message).expect("sign");
-    let mut witness = Bytes::from(sig.serialize());
-    witness.extend_from_slice(&super_long_message);
+    let witness = WitnessArgs::new_builder()
+        .lock(Bytes::from(sig.serialize()).pack())
+        .extra(super_long_message.pack())
+        .build();
     let tx = tx
         .as_advanced_builder()
-        .set_witnesses(vec![witness.pack()])
+        .set_witnesses(vec![witness.as_bytes().pack()])
         .build();
 
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
@@ -361,7 +394,7 @@ fn test_super_long_witness() {
 
 #[test]
 fn test_sighash_all_2_in_2_out_cycles() {
-    const CONSUME_CYCLES: u64 = 3390910;
+    const CONSUME_CYCLES: u64 = 3392324;
 
     let mut data_loader = DummyDataLoader::new();
     let mut generator = Generator::non_crypto_safe_prng(42);

@@ -11,7 +11,6 @@
 #define ERROR_SECP_SERIALIZE_PUBKEY -13
 #define ERROR_SCRIPT_TOO_LONG -21
 #define ERROR_WITNESS_TOO_LONG -22
-#define ERROR_WITNESS_TOO_SHORT -23
 #define ERROR_PUBKEY_BLAKE160_HASH -31
 
 #define BLAKE2B_BLOCK_SIZE 32
@@ -20,9 +19,50 @@
 #define TEMP_SIZE 1024
 #define RECID_INDEX 64
 /* 32 KB */
-#define WITNESS_SIZE 32768
+#define MAX_WITNESS_SIZE 32768
 #define SCRIPT_SIZE 32768
 #define SIGNATURE_SIZE 65
+
+/* Extract lock, type, extra from WitnessArgs */
+int extract_witness(
+  const uint8_t * witness,
+  uint64_t len,
+  mol_read_res_t * lock_bytes_res, 
+  mol_read_res_t * type_bytes_res,
+  mol_read_res_t * extra_bytes_res) {
+  mol_pos_t witness_pos;
+  witness_pos.ptr = witness;
+  witness_pos.size = len;
+
+  mol_read_res_t lock_res = mol_cut(&witness_pos, MOL_WitnessArgs_lock());
+  if (lock_res.code != 0) {
+    return ERROR_ENCODING;
+  }
+  *lock_bytes_res = mol_cut_bytes(&lock_res.pos);
+  if (lock_bytes_res->code != 0) {
+    return ERROR_ENCODING;
+  } 
+
+  /* Load other fields of WitnessArgs */
+  mol_read_res_t type_res = mol_cut(&witness_pos, MOL_WitnessArgs_type_());
+  if (type_res.code != 0) {
+    return ERROR_ENCODING;
+  }
+  *type_bytes_res = mol_cut_bytes(&type_res.pos);
+  if (type_bytes_res->code != 0) {
+    return ERROR_ENCODING;
+  }
+  mol_read_res_t extra_res = mol_cut(&witness_pos, MOL_WitnessArgs_extra());
+  if (extra_res.code != 0) {
+    return ERROR_ENCODING;
+  }
+  *extra_bytes_res = mol_cut_bytes(&extra_res.pos);
+  if (extra_bytes_res->code != 0) {
+    return ERROR_ENCODING;
+  }
+
+  return 0;
+}
 
 /*
  * Arguments:
@@ -63,19 +103,28 @@ int main() {
   }
 
   /* Load witness of first input */
-  unsigned char witness[WITNESS_SIZE];
-  len = WITNESS_SIZE;
+  unsigned char witness[MAX_WITNESS_SIZE];
+  len = MAX_WITNESS_SIZE;
   ret = ckb_load_witness(witness, &len, 0, 0, CKB_SOURCE_GROUP_INPUT);
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
-  if (len > WITNESS_SIZE) {
+
+  if (len > MAX_WITNESS_SIZE) {
     return ERROR_WITNESS_TOO_LONG;
   }
-  if (len < SIGNATURE_SIZE) {
-    return ERROR_WITNESS_TOO_SHORT;
+
+  mol_read_res_t lock_bytes_res;
+  mol_read_res_t type_bytes_res;
+  mol_read_res_t extra_bytes_res;
+  ret = extract_witness(witness, len, &lock_bytes_res, &type_bytes_res, &extra_bytes_res);
+  if (ret != 0) {
+     return ERROR_ENCODING;
   }
-  size_t extra_witness_len = len - SIGNATURE_SIZE;
+
+  if (lock_bytes_res.pos.size != SIGNATURE_SIZE) {
+    return ERROR_ARGUMENTS_LEN;
+  }
 
   /* Load tx hash */
   unsigned char tx_hash[BLAKE2B_BLOCK_SIZE];
@@ -91,13 +140,16 @@ int main() {
   blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
   blake2b_update(&blake2b_ctx, tx_hash, BLAKE2B_BLOCK_SIZE);
 
-  /* Load extra witness of first input and all witnesses of other inputs */
-  if (extra_witness_len > 0) {
-    blake2b_update(&blake2b_ctx, &witness[SIGNATURE_SIZE], extra_witness_len);
+  /* Digest extra fields of first witness and all other witnesses */
+  if (type_bytes_res.pos.size > 0) {
+    blake2b_update(&blake2b_ctx, type_bytes_res.pos.ptr, type_bytes_res.pos.size);
+  }
+  if (extra_bytes_res.pos.size > 0) {
+    blake2b_update(&blake2b_ctx, extra_bytes_res.pos.ptr, extra_bytes_res.pos.size);
   }
   size_t i = 1;
   while (1) {
-    len = WITNESS_SIZE;
+    len = MAX_WITNESS_SIZE;
     ret = ckb_load_witness(temp, &len, 0, i, CKB_SOURCE_GROUP_INPUT);
     if (ret == CKB_INDEX_OUT_OF_BOUND) {
       break;
@@ -105,7 +157,7 @@ int main() {
     if (ret != CKB_SUCCESS) {
       return ERROR_SYSCALL;
     }
-    if (len > WITNESS_SIZE) {
+    if (len > MAX_WITNESS_SIZE) {
       return ERROR_WITNESS_TOO_LONG;
     }
     blake2b_update(&blake2b_ctx, temp, len);
@@ -123,7 +175,7 @@ int main() {
 
   secp256k1_ecdsa_recoverable_signature signature;
   if (secp256k1_ecdsa_recoverable_signature_parse_compact(
-          &context, &signature, witness, witness[RECID_INDEX]) == 0) {
+          &context, &signature, lock_bytes_res.pos.ptr, lock_bytes_res.pos.ptr[RECID_INDEX]) == 0) {
     return ERROR_SECP_PARSE_SIGNATURE;
   }
 

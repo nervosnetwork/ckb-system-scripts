@@ -7,7 +7,7 @@ use ckb_script::DataLoader;
 use ckb_types::{
     bytes::Bytes,
     core::{cell::CellMeta, BlockExt, EpochExt, HeaderView, TransactionView},
-    packed::{self, Byte32, CellOutput, OutPoint},
+    packed::{self, Byte32, CellOutput, OutPoint, WitnessArgs},
     prelude::*,
     H256,
 };
@@ -90,9 +90,12 @@ pub fn sign_tx_by_input_group(
                 let mut blake2b = ckb_hash::new_blake2b();
                 let mut message = [0u8; 32];
                 blake2b.update(&tx_hash.raw_data());
-                let witness = tx.witnesses().get(i).unwrap();
-                if !witness.raw_data().is_empty() {
-                    blake2b.update(&witness.raw_data());
+                let witness = WitnessArgs::new_unchecked(tx.witnesses().get(i).unwrap().unpack());
+                if !witness.type_().is_empty() {
+                    blake2b.update(&Unpack::<Bytes>::unpack(&witness.type_()));
+                }
+                if !witness.extra().is_empty() {
+                    blake2b.update(&Unpack::<Bytes>::unpack(&witness.extra()));
                 }
                 ((i + 1)..(i + len)).for_each(|n| {
                     let witness = tx.witnesses().get(n).unwrap();
@@ -102,13 +105,13 @@ pub fn sign_tx_by_input_group(
                 });
                 blake2b.finalize(&mut message);
                 let message = H256::from(message);
-                let mut signed_witness = Bytes::new();
                 let sig = key.sign_recoverable(&message).expect("sign");
-                signed_witness.extend_from_slice(&sig.serialize());
-                if !witness.raw_data().is_empty() {
-                    signed_witness.extend_from_slice(&witness.raw_data());
-                }
-                signed_witness.pack()
+                witness
+                    .as_builder()
+                    .lock(sig.serialize().pack())
+                    .build()
+                    .as_bytes()
+                    .pack()
             } else {
                 tx.witnesses().get(i).unwrap_or_default()
             }

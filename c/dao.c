@@ -70,7 +70,7 @@
 #define HASH_SIZE 32
 #define HEADER_SIZE 4096
 /* 32 KB */
-#define WITNESS_SIZE 32768
+#define MAX_WITNESS_SIZE 32768
 #define SCRIPT_SIZE 32768
 
 #define LOCK_PERIOD_BLOCKS 10
@@ -98,21 +98,34 @@
 static int extract_withdraw_header_index(size_t input_index, size_t *index) {
   int ret;
   volatile uint64_t len = 0;
-  unsigned char witness[WITNESS_SIZE];
+  unsigned char witness[MAX_WITNESS_SIZE];
 
-  len = WITNESS_SIZE;
+  len = MAX_WITNESS_SIZE;
   ret = ckb_load_witness(witness, &len, 0, input_index, CKB_SOURCE_INPUT);
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
-  if (len > WITNESS_SIZE) {
+  if (len > MAX_WITNESS_SIZE) {
     return ERROR_WITNESS_TOO_LONG;
   }
-  if (len < 8) {
+
+  mol_pos_t witness_pos;
+  witness_pos.ptr = (const uint8_t*)witness;
+  witness_pos.size = len;
+
+  /* Load type args */
+  mol_read_res_t type_res = mol_cut(&witness_pos, MOL_WitnessArgs_type_());
+  if (type_res.code != 0) {
+    return ERROR_ENCODING;
+  }
+  mol_read_res_t type_bytes_res = mol_cut_bytes(&type_res.pos);
+  if (type_bytes_res.code != 0) {
+    return ERROR_ENCODING;
+  } else if (type_bytes_res.pos.size != 8) {
     return ERROR_ENCODING;
   }
 
-  *index = *((size_t *)&witness[len - 8]);
+  *index = *type_bytes_res.pos.ptr;
   return CKB_SUCCESS;
 }
 
