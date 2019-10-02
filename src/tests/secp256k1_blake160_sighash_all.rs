@@ -15,20 +15,21 @@ use ckb_types::{
     prelude::*,
     H256,
 };
-use rand::{thread_rng, Rng};
+use rand::{thread_rng, Rng, SeedableRng};
 
 const ERROR_WITNESS_TOO_LONG: i8 = -22;
 const ERROR_PUBKEY_BLAKE160_HASH: i8 = -31;
 
 fn gen_tx(dummy: &mut DummyDataLoader, lock_args: Bytes) -> TransactionView {
-    get_tx_with_grouped_args(dummy, vec![(lock_args, 1)])
+    let mut rng = thread_rng();
+    get_tx_with_grouped_args(dummy, vec![(lock_args, 1)], &mut rng)
 }
 
-fn get_tx_with_grouped_args(
+fn get_tx_with_grouped_args<R: Rng>(
     dummy: &mut DummyDataLoader,
     grouped_args: Vec<(Bytes, usize)>,
+    rng: &mut R,
 ) -> TransactionView {
-    let mut rng = thread_rng();
     // setup sighash_all dep
     let sighash_all_out_point = {
         let contract_tx_hash = {
@@ -224,11 +225,12 @@ fn test_sighash_all_with_extra_witness_unlock() {
 
 #[test]
 fn test_sighash_all_with_grouped_inputs_unlock() {
+    let mut rng = thread_rng();
     let mut data_loader = DummyDataLoader::new();
     let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
-    let tx = get_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2)]);
+    let tx = get_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2)], &mut rng);
     {
         let tx = sign_tx(tx.clone(), &privkey);
         let resolved_tx = build_resolved_tx(&data_loader, &tx);
@@ -255,6 +257,7 @@ fn test_sighash_all_with_grouped_inputs_unlock() {
 
 #[test]
 fn test_sighash_all_with_2_different_inputs_unlock() {
+    let mut rng = thread_rng();
     let mut data_loader = DummyDataLoader::new();
     // key1
     let privkey = Generator::random_privkey();
@@ -266,7 +269,11 @@ fn test_sighash_all_with_2_different_inputs_unlock() {
     let pubkey_hash2 = blake160(&pubkey2.serialize());
 
     // sign with 2 keys
-    let tx = get_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2), (pubkey_hash2, 2)]);
+    let tx = get_tx_with_grouped_args(
+        &mut data_loader,
+        vec![(pubkey_hash, 2), (pubkey_hash2, 2)],
+        &mut rng,
+    );
     let tx = sign_tx_by_input_group(tx, &privkey, 0, 2);
     let tx = sign_tx_by_input_group(tx, &privkey2, 2, 2);
 
@@ -350,4 +357,37 @@ fn test_super_long_witness() {
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(ERROR_WITNESS_TOO_LONG),
     );
+}
+
+#[test]
+fn test_sighash_all_2_in_2_out_cycles() {
+    const CONSUME_CYCLES: u64 = 3390910;
+
+    let mut data_loader = DummyDataLoader::new();
+    let mut generator = Generator::non_crypto_safe_prng(42);
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
+
+    // key1
+    let privkey = generator.gen_privkey();
+    let pubkey = privkey.pubkey().expect("pubkey");
+    let pubkey_hash = blake160(&pubkey.serialize());
+    // key2
+    let privkey2 = generator.gen_privkey();
+    let pubkey2 = privkey2.pubkey().expect("pubkey");
+    let pubkey_hash2 = blake160(&pubkey2.serialize());
+
+    // sign with 2 keys
+    let tx = get_tx_with_grouped_args(
+        &mut data_loader,
+        vec![(pubkey_hash, 1), (pubkey_hash2, 1)],
+        &mut rng,
+    );
+    let tx = sign_tx_by_input_group(tx, &privkey, 0, 1);
+    let tx = sign_tx_by_input_group(tx, &privkey2, 1, 1);
+
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    let cycles = verify_result.expect("pass verification");
+    assert_eq!(CONSUME_CYCLES, cycles)
 }
