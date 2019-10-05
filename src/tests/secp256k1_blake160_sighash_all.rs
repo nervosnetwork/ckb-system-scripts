@@ -23,10 +23,10 @@ const ERROR_PUBKEY_BLAKE160_HASH: i8 = -31;
 
 fn gen_tx(dummy: &mut DummyDataLoader, lock_args: Bytes) -> TransactionView {
     let mut rng = thread_rng();
-    get_tx_with_grouped_args(dummy, vec![(lock_args, 1)], &mut rng)
+    gen_tx_with_grouped_args(dummy, vec![(lock_args, 1)], &mut rng)
 }
 
-fn get_tx_with_grouped_args<R: Rng>(
+fn gen_tx_with_grouped_args<R: Rng>(
     dummy: &mut DummyDataLoader,
     grouped_args: Vec<(Bytes, usize)>,
     rng: &mut R,
@@ -250,7 +250,7 @@ fn test_sighash_all_with_grouped_inputs_unlock() {
     let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
-    let tx = get_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2)], &mut rng);
+    let tx = gen_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2)], &mut rng);
     {
         let tx = sign_tx(tx.clone(), &privkey);
         let resolved_tx = build_resolved_tx(&data_loader, &tx);
@@ -301,7 +301,7 @@ fn test_sighash_all_with_2_different_inputs_unlock() {
     let pubkey_hash2 = blake160(&pubkey2.serialize());
 
     // sign with 2 keys
-    let tx = get_tx_with_grouped_args(
+    let tx = gen_tx_with_grouped_args(
         &mut data_loader,
         vec![(pubkey_hash, 2), (pubkey_hash2, 2)],
         &mut rng,
@@ -395,7 +395,7 @@ fn test_super_long_witness() {
 
 #[test]
 fn test_sighash_all_2_in_2_out_cycles() {
-    const CONSUME_CYCLES: u64 = 3392324;
+    const CONSUME_CYCLES: u64 = 3406275;
 
     let mut data_loader = DummyDataLoader::new();
     let mut generator = Generator::non_crypto_safe_prng(42);
@@ -411,7 +411,7 @@ fn test_sighash_all_2_in_2_out_cycles() {
     let pubkey_hash2 = blake160(&pubkey2.serialize());
 
     // sign with 2 keys
-    let tx = get_tx_with_grouped_args(
+    let tx = gen_tx_with_grouped_args(
         &mut data_loader,
         vec![(pubkey_hash, 1), (pubkey_hash2, 1)],
         &mut rng,
@@ -435,7 +435,7 @@ fn test_sighash_all_witness_append_junk_data() {
     let pubkey_hash = blake160(&pubkey.serialize());
 
     // sign with 2 keys
-    let tx = get_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2)], &mut rng);
+    let tx = gen_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2)], &mut rng);
     let tx = sign_tx_by_input_group(tx, &privkey, 0, 2);
     let mut witnesses: Vec<_> = Unpack::<Vec<_>>::unpack(&tx.witnesses());
     // append junk data to first witness
@@ -456,5 +456,94 @@ fn test_sighash_all_witness_append_junk_data() {
     assert_error_eq!(
         verify_result.unwrap_err(),
         ScriptError::ValidationFailure(ERROR_ENCODING),
+    );
+}
+
+#[test]
+fn test_sighash_all_witness_args_ambiguity() {
+    // This test case build tx with WitnessArgs(lock, data, "")
+    // and try unlock with WitnessArgs(lock, "", data)
+    //
+    // this case will fail if contract use a naive function to digest witness.
+
+    let mut rng = thread_rng();
+    let mut data_loader = DummyDataLoader::new();
+    let privkey = Generator::random_privkey();
+    let pubkey = privkey.pubkey().expect("pubkey");
+    let pubkey_hash = blake160(&pubkey.serialize());
+
+    let tx = gen_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2)], &mut rng);
+    let tx = sign_tx_by_input_group(tx, &privkey, 0, 2);
+    let witnesses: Vec<_> = Unpack::<Vec<_>>::unpack(&tx.witnesses());
+    // move extra data to type_
+    let witnesses: Vec<_> = witnesses
+        .into_iter()
+        .map(|witness| {
+            let witness = WitnessArgs::new_unchecked(witness);
+            let data = witness.extra().clone();
+            witness
+                .as_builder()
+                .extra(Bytes::new().pack())
+                .type_(data)
+                .build()
+        })
+        .collect();
+
+    let tx = tx
+        .as_advanced_builder()
+        .set_witnesses(witnesses.into_iter().map(|w| w.as_bytes().pack()).collect())
+        .build();
+
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    assert_error_eq!(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
+    );
+}
+
+#[test]
+fn test_sighash_all_witnesses_ambiguity() {
+    // This test case build tx with WitnessArgs(lock, data, "")
+    // and try unlock with WitnessArgs(lock, "", data)
+    //
+    // this case will fail if contract use a naive function to digest witness.
+
+    let mut rng = thread_rng();
+    let mut data_loader = DummyDataLoader::new();
+    let privkey = Generator::random_privkey();
+    let pubkey = privkey.pubkey().expect("pubkey");
+    let pubkey_hash = blake160(&pubkey.serialize());
+
+    let tx = gen_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 1)], &mut rng);
+    let witness = Unpack::<Vec<_>>::unpack(&tx.witnesses()).remove(0);
+    let tx = tx
+        .as_advanced_builder()
+        .set_witnesses(vec![
+            witness.pack(),
+            Bytes::new().pack(),
+            Bytes::from(vec![42]).pack(),
+        ])
+        .build();
+    let tx = sign_tx_by_input_group(tx, &privkey, 0, 3);
+
+    // exchange witness position
+    let witness = Unpack::<Vec<_>>::unpack(&tx.witnesses()).remove(0);
+    let tx = tx
+        .as_advanced_builder()
+        .set_witnesses(vec![
+            witness.pack(),
+            Bytes::from(vec![42]).pack(),
+            Bytes::new().pack(),
+        ])
+        .build();
+
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    assert_error_eq!(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
     );
 }

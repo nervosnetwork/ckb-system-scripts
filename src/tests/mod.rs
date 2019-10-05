@@ -15,6 +15,7 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 
 pub const MAX_CYCLES: u64 = std::u64::MAX;
+pub const SIGNATURE_SIZE: usize = 65;
 
 lazy_static! {
     pub static ref SIGHASH_ALL_BIN: Bytes =
@@ -90,13 +91,16 @@ pub fn sign_tx_by_input_group(
                 let mut blake2b = ckb_hash::new_blake2b();
                 let mut message = [0u8; 32];
                 blake2b.update(&tx_hash.raw_data());
+                // digest the first witness
                 let witness = WitnessArgs::new_unchecked(tx.witnesses().get(i).unwrap().unpack());
-                if !witness.type_().is_empty() {
-                    blake2b.update(&Unpack::<Bytes>::unpack(&witness.type_()));
-                }
-                if !witness.extra().is_empty() {
-                    blake2b.update(&Unpack::<Bytes>::unpack(&witness.extra()));
-                }
+                let zero_lock: Bytes = {
+                    let mut buf = Vec::new();
+                    buf.resize(SIGNATURE_SIZE, 0);
+                    buf.into()
+                };
+                let witness_for_digest =
+                    witness.clone().as_builder().lock(zero_lock.pack()).build();
+                blake2b.update(&witness_for_digest.as_bytes());
                 ((i + 1)..(i + len)).for_each(|n| {
                     let witness = tx.witnesses().get(n).unwrap();
                     if !witness.raw_data().is_empty() {

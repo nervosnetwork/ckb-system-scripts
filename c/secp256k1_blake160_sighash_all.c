@@ -23,13 +23,11 @@
 #define SCRIPT_SIZE 32768
 #define SIGNATURE_SIZE 65
 
-/* Extract lock, type, extra from WitnessArgs */
-int extract_witness(
+/* Extract lock from WitnessArgs */
+int extract_witness_lock(
   const uint8_t * witness,
   uint64_t len,
-  mol_read_res_t * lock_bytes_res, 
-  mol_read_res_t * type_bytes_res,
-  mol_read_res_t * extra_bytes_res) {
+  mol_read_res_t * lock_bytes_res) {
   mol_pos_t witness_pos;
   witness_pos.ptr = witness;
   witness_pos.size = len;
@@ -43,24 +41,6 @@ int extract_witness(
     return ERROR_ENCODING;
   } 
 
-  /* Load other fields of WitnessArgs */
-  mol_read_res_t type_res = mol_cut(&witness_pos, MOL_WitnessArgs_type_());
-  if (type_res.code != 0) {
-    return ERROR_ENCODING;
-  }
-  *type_bytes_res = mol_cut_bytes(&type_res.pos);
-  if (type_bytes_res->code != 0) {
-    return ERROR_ENCODING;
-  }
-  mol_read_res_t extra_res = mol_cut(&witness_pos, MOL_WitnessArgs_extra());
-  if (extra_res.code != 0) {
-    return ERROR_ENCODING;
-  }
-  *extra_bytes_res = mol_cut_bytes(&extra_res.pos);
-  if (extra_bytes_res->code != 0) {
-    return ERROR_ENCODING;
-  }
-
   return 0;
 }
 
@@ -70,12 +50,13 @@ int extract_witness(
  * shield the real pubkey.
  *
  * Witness:
- * signature used to present ownership.
+ * WitnessArgs with a signature in lock field used to present ownership.
  */
 int main() {
   int ret;
   volatile uint64_t len = 0;
   unsigned char temp[TEMP_SIZE];
+  unsigned char lock_bytes[SIGNATURE_SIZE];
 
   /* Load args */
   unsigned char script[SCRIPT_SIZE];
@@ -104,20 +85,19 @@ int main() {
 
   /* Load witness of first input */
   unsigned char witness[MAX_WITNESS_SIZE];
-  len = MAX_WITNESS_SIZE;
-  ret = ckb_load_witness(witness, &len, 0, 0, CKB_SOURCE_GROUP_INPUT);
+  volatile uint64_t witness_len = MAX_WITNESS_SIZE;
+  ret = ckb_load_witness(witness, &witness_len, 0, 0, CKB_SOURCE_GROUP_INPUT);
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
 
-  if (len > MAX_WITNESS_SIZE) {
+  if (witness_len > MAX_WITNESS_SIZE) {
     return ERROR_WITNESS_TOO_LONG;
   }
 
+  /* load signature */
   mol_read_res_t lock_bytes_res;
-  mol_read_res_t type_bytes_res;
-  mol_read_res_t extra_bytes_res;
-  ret = extract_witness(witness, len, &lock_bytes_res, &type_bytes_res, &extra_bytes_res);
+  ret = extract_witness_lock(witness, witness_len, &lock_bytes_res);
   if (ret != 0) {
      return ERROR_ENCODING;
   }
@@ -125,6 +105,7 @@ int main() {
   if (lock_bytes_res.pos.size != SIGNATURE_SIZE) {
     return ERROR_ARGUMENTS_LEN;
   }
+  memcpy(lock_bytes, lock_bytes_res.pos.ptr, lock_bytes_res.pos.size);
 
   /* Load tx hash */
   unsigned char tx_hash[BLAKE2B_BLOCK_SIZE];
@@ -140,13 +121,11 @@ int main() {
   blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
   blake2b_update(&blake2b_ctx, tx_hash, BLAKE2B_BLOCK_SIZE);
 
-  /* Digest extra fields of first witness and all other witnesses */
-  if (type_bytes_res.pos.size > 0) {
-    blake2b_update(&blake2b_ctx, type_bytes_res.pos.ptr, type_bytes_res.pos.size);
-  }
-  if (extra_bytes_res.pos.size > 0) {
-    blake2b_update(&blake2b_ctx, extra_bytes_res.pos.ptr, extra_bytes_res.pos.size);
-  }
+  /* Clear lock field to zero, then digest the first witness */
+  memset((void *)lock_bytes_res.pos.ptr, 0, lock_bytes_res.pos.size);
+  blake2b_update(&blake2b_ctx, witness, witness_len);
+
+  /* Digest other witnesses */
   size_t i = 1;
   while (1) {
     len = MAX_WITNESS_SIZE;
@@ -175,7 +154,7 @@ int main() {
 
   secp256k1_ecdsa_recoverable_signature signature;
   if (secp256k1_ecdsa_recoverable_signature_parse_compact(
-          &context, &signature, lock_bytes_res.pos.ptr, lock_bytes_res.pos.ptr[RECID_INDEX]) == 0) {
+          &context, &signature, lock_bytes, lock_bytes[RECID_INDEX]) == 0) {
     return ERROR_SECP_PARSE_SIGNATURE;
   }
 
