@@ -17,6 +17,7 @@ use ckb_types::{
 };
 use rand::{thread_rng, Rng, SeedableRng};
 
+const ERROR_ENCODING: i8 = -2;
 const ERROR_WITNESS_TOO_LONG: i8 = -22;
 const ERROR_PUBKEY_BLAKE160_HASH: i8 = -31;
 
@@ -423,4 +424,37 @@ fn test_sighash_all_2_in_2_out_cycles() {
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
     let cycles = verify_result.expect("pass verification");
     assert_eq!(CONSUME_CYCLES, cycles)
+}
+
+#[test]
+fn test_sighash_all_witness_append_junk_data() {
+    let mut rng = thread_rng();
+    let mut data_loader = DummyDataLoader::new();
+    let privkey = Generator::random_privkey();
+    let pubkey = privkey.pubkey().expect("pubkey");
+    let pubkey_hash = blake160(&pubkey.serialize());
+
+    // sign with 2 keys
+    let tx = get_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2)], &mut rng);
+    let tx = sign_tx_by_input_group(tx, &privkey, 0, 2);
+    let mut witnesses: Vec<_> = Unpack::<Vec<_>>::unpack(&tx.witnesses());
+    // append junk data to first witness
+    let mut witness = Vec::new();
+    witness.resize(witnesses[0].len(), 0);
+    witness.copy_from_slice(&witnesses[0]);
+    witness.push(0);
+    witnesses[0] = witness.into();
+
+    let tx = tx
+        .as_advanced_builder()
+        .set_witnesses(witnesses.into_iter().map(|w| w.pack()).collect())
+        .build();
+
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let verify_result =
+        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+    assert_error_eq!(
+        verify_result.unwrap_err(),
+        ScriptError::ValidationFailure(ERROR_ENCODING),
+    );
 }
