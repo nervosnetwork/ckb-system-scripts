@@ -191,8 +191,6 @@ pub fn sign_tx_by_input_group(
                     buf.extend_from_slice(&zero_lock[sig_type.signature_size()..]);
                     buf.into()
                 };
-                dbg!(zero_lock.len());
-                dbg!(lock.len(), sig.len());
                 witness
                     .as_builder()
                     .lock(lock.pack())

@@ -4,14 +4,17 @@
  * How to verify Bitcoin lock?
  *
  * We know that the format of the Bitcoin address is
- * base58(version + ripemd160(sha256(pubkey)) + sha256(sha256(version + ripemd160(sha256(pubkey))))[0..4])
+ * base58(version + ripemd160(sha256(pubkey)) + sha256(sha256(version +
+ * ripemd160(sha256(pubkey))))[0..4])
  *
- * So by verifying the hash of ripemd160(sha256(pubkey)) and verifying the ownership of the pubkey,
- * you can achieve the purpose of verifying the ownership of the private key.
+ * So by verifying the hash of ripemd160(sha256(pubkey)) and verifying the
+ * ownership of the pubkey, you can achieve the purpose of verifying the
+ * ownership of the private key.
  *
  * How to use this script?
  *
- * We need verify ripemd160(sha256(pubkey)), so transaction lock script like this:
+ * We need verify ripemd160(sha256(pubkey)), so transaction lock script like
+ * this:
  *
  * ```
  * dependence_code_hash = "this script binary hash"
@@ -104,7 +107,7 @@ int main() {
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
-  script_pos.ptr = (const uint8_t*)script;
+  script_pos.ptr = (const uint8_t *)script;
   script_pos.size = len;
   args_res = mol_cut(&script_pos, MOL_Script_args());
   if (args_res.code != 0) {
@@ -143,32 +146,37 @@ int main() {
   }
 
   volatile uint64_t lock_len = lock_bytes_res.pos.size;
-  if (lock_len != RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE
-      && lock_len != RECOVERABLE_SIGNATURE_SIZE + COMPRESSED_PUBKEY_SIZE
-      && lock_len != NONE_RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE
-      && lock_len != NONE_RECOVERABLE_SIGNATURE_SIZE + COMPRESSED_PUBKEY_SIZE) {
+  if (lock_len != RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE &&
+      lock_len != RECOVERABLE_SIGNATURE_SIZE + COMPRESSED_PUBKEY_SIZE &&
+      lock_len !=
+          NONE_RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE &&
+      lock_len != NONE_RECOVERABLE_SIGNATURE_SIZE + COMPRESSED_PUBKEY_SIZE) {
     return ERROR_WITNESS_SIZE;
   }
 
   secp256k1_ecdsa_signature signature;
-  if (secp256k1_ecdsa_signature_parse_compact(&context, &signature, lock_bytes_res.pos.ptr) == 0) {
-      return ERROR_SECP_PARSE_SIGNATURE;
+  if (secp256k1_ecdsa_signature_parse_compact(&context, &signature,
+                                              lock_bytes_res.pos.ptr) == 0) {
+    return ERROR_SECP_PARSE_SIGNATURE;
   }
-  
+
   /* parse pubkey */
   secp256k1_pubkey pubkey;
   volatile uint64_t signature_len;
-  if (lock_len == RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE
-    || lock_len == NONE_RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE) {
+  if (lock_len == RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE ||
+      lock_len ==
+          NONE_RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE) {
     signature_len = lock_len - NONE_COMPRESSED_PUBKEY_SIZE;
-    if (secp256k1_ec_pubkey_parse(&context, &pubkey, lock_bytes_res.pos.ptr + signature_len,
-                NONE_COMPRESSED_PUBKEY_SIZE) == 0) {
+    if (secp256k1_ec_pubkey_parse(&context, &pubkey,
+                                  lock_bytes_res.pos.ptr + signature_len,
+                                  NONE_COMPRESSED_PUBKEY_SIZE) == 0) {
       return ERROR_SECP_PARSE_PUBKEY;
     }
   } else {
     signature_len = lock_len - COMPRESSED_PUBKEY_SIZE;
-    if (secp256k1_ec_pubkey_parse(&context, &pubkey, lock_bytes_res.pos.ptr + signature_len,
-                COMPRESSED_PUBKEY_SIZE) == 0) {
+    if (secp256k1_ec_pubkey_parse(&context, &pubkey,
+                                  lock_bytes_res.pos.ptr + signature_len,
+                                  COMPRESSED_PUBKEY_SIZE) == 0) {
       return ERROR_SECP_PARSE_PUBKEY;
     }
   }
@@ -176,9 +184,10 @@ int main() {
   /* check pubkey hash */
   sha256_state sha256_ctx;
   sha256_init(&sha256_ctx);
-  sha256_update(&sha256_ctx, lock_bytes_res.pos.ptr + signature_len, lock_len - signature_len);
+  sha256_update(&sha256_ctx, lock_bytes_res.pos.ptr + signature_len,
+                lock_len - signature_len);
   sha256_finalize(&sha256_ctx, temp);
-  
+
   ripemd160_state ripe160_ctx;
   ripemd160_init(&ripe160_ctx);
   ripemd160_update(&ripe160_ctx, temp, SHA256_SIZE);
@@ -186,7 +195,6 @@ int main() {
   if (memcmp(bytes_res.pos.ptr, temp, RIPEMD160_SIZE) != 0) {
     return ERROR_PUBKEY_RIPEMD160_HASH;
   }
-  
 
   /* Calculate signature message */
   sha256_init(&sha256_ctx);
@@ -211,12 +219,11 @@ int main() {
   }
 
   sha256_finalize(&sha256_ctx, temp);
-  
+
   /* verify signature */
   if (secp256k1_ecdsa_verify(&context, &signature, temp, &pubkey) != 1) {
     return ERROR_SECP_VERIFICATION;
   }
-
 
   return 0;
 }

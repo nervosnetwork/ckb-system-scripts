@@ -24,10 +24,8 @@
 #define SIGNATURE_SIZE 65
 
 /* Extract lock from WitnessArgs */
-int extract_witness_lock(
-  const uint8_t * witness,
-  uint64_t len,
-  mol_read_res_t * lock_bytes_res) {
+int extract_witness_lock(const uint8_t *witness, uint64_t len,
+                         mol_read_res_t *lock_bytes_res) {
   mol_pos_t witness_pos;
   witness_pos.ptr = witness;
   witness_pos.size = len;
@@ -39,7 +37,7 @@ int extract_witness_lock(
   *lock_bytes_res = mol_cut_bytes(&lock_res.pos);
   if (lock_bytes_res->code != 0) {
     return ERROR_ENCODING;
-  } 
+  }
 
   return 0;
 }
@@ -69,7 +67,7 @@ int main() {
     return ERROR_SCRIPT_TOO_LONG;
   }
   mol_pos_t script_pos;
-  script_pos.ptr = (const uint8_t*)script;
+  script_pos.ptr = (const uint8_t *)script;
   script_pos.size = len;
 
   mol_read_res_t args_res = mol_cut(&script_pos, MOL_Script_args());
@@ -99,7 +97,7 @@ int main() {
   mol_read_res_t lock_bytes_res;
   ret = extract_witness_lock(witness, witness_len, &lock_bytes_res);
   if (ret != 0) {
-     return ERROR_ENCODING;
+    return ERROR_ENCODING;
   }
 
   if (lock_bytes_res.pos.size != SIGNATURE_SIZE) {
