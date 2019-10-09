@@ -1,4 +1,4 @@
-// Copy from ckb-types (#017afea).
+// Copy from ckb-types (#c34b5b0).
 
 /* Basic Types */
 
@@ -109,6 +109,11 @@ table Block {
     uncles:                 UncleBlockVec,
     transactions:           TransactionVec,
     proposals:              ProposalShortIdVec,
+}
+
+table CellbaseWitness {
+    lock:    Script,
+    message: Bytes,
 }
 
 /* Types for Storage */
@@ -345,4 +350,12 @@ table Identify {
     flag:                       Uint64,         // Flag
     name:                       Bytes,          // Network Name
     client_version:             Bytes,
+}
+
+/* Types for Contract */
+
+table WitnessArgs {
+    lock:                       Bytes,          // Lock args
+    type_:                      Bytes,          // Type args
+    extra:                      Bytes,
 }

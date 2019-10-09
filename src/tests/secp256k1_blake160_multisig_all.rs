@@ -8,16 +8,18 @@ use ckb_types::{
         cell::{CellMetaBuilder, ResolvedTransaction},
         Capacity, DepType, ScriptHashType, TransactionBuilder, TransactionView,
     },
-    packed::{self, CellDep, CellInput, CellOutput, OutPoint, Script},
+    packed::{self, CellDep, CellInput, CellOutput, OutPoint, Script, WitnessArgs},
     prelude::*,
     H256,
 };
 use rand::{thread_rng, Rng};
 
-const ERROR_WITNESS_TOO_SHORT: i8 = -23;
-const ERROR_INVALID_PUBKEYS_CNT: i8 = -24;
-const ERROR_INVALID_THRESHOLD: i8 = -25;
-const ERROR_INVALID_REQUIRE_FIRST_N: i8 = -26;
+const SIGNATURE_SIZE: usize = 65;
+
+const ERROR_WITNESS_LEN: i8 = -21;
+const ERROR_INVALID_PUBKEYS_CNT: i8 = -22;
+const ERROR_INVALID_THRESHOLD: i8 = -23;
+const ERROR_INVALID_REQUIRE_FIRST_N: i8 = -24;
 const ERROR_MULTSIG_SCRIPT_HASH: i8 = -31;
 const ERROR_VERIFICATION: i8 = -32;
 
@@ -120,7 +122,7 @@ fn test_multisig_0_2_3_unlock() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_WITNESS_TOO_SHORT),
+            ScriptError::ValidationFailure(ERROR_WITNESS_LEN),
         );
     }
     {
@@ -132,7 +134,7 @@ fn test_multisig_0_2_3_unlock() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_VERIFICATION),
+            ScriptError::ValidationFailure(ERROR_WITNESS_LEN),
         );
     }
 
@@ -202,7 +204,11 @@ fn test_multisig_1_2_3_with_extra_witness_unlock() {
     let extract_witness = vec![1, 2, 3, 4];
     let tx = tx
         .as_advanced_builder()
-        .set_witnesses(vec![Bytes::from(extract_witness).pack()])
+        .set_witnesses(vec![WitnessArgs::new_builder()
+            .extra(Bytes::from(extract_witness).pack())
+            .build()
+            .as_bytes()
+            .pack()])
         .build();
     {
         let tx = multi_sign_tx(tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
@@ -318,10 +324,22 @@ fn multi_sign_tx(
                 let mut blake2b = ckb_hash::new_blake2b();
                 let mut message = [0u8; 32];
                 blake2b.update(&tx_hash.raw_data());
-                let witness = tx.witnesses().get(0).unwrap();
-                if !witness.raw_data().is_empty() {
-                    blake2b.update(&witness.raw_data());
-                }
+                let witness = WitnessArgs::new_unchecked(Unpack::<Bytes>::unpack(
+                    &tx.witnesses().get(0).unwrap(),
+                ));
+                let mut lock = multi_sign_script.to_vec();
+                let lock_without_sig = {
+                    let sig_len = keys.len() * SIGNATURE_SIZE;
+                    let mut buf = lock.clone();
+                    buf.resize(buf.len() + sig_len, 0);
+                    buf
+                };
+                let witness_without_sig = witness
+                    .clone()
+                    .as_builder()
+                    .lock(Bytes::from(lock_without_sig).pack())
+                    .build();
+                blake2b.update(&witness_without_sig.as_bytes());
                 (1..tx.witnesses().len()).for_each(|n| {
                     let witness = tx.witnesses().get(n).unwrap();
                     if !witness.raw_data().is_empty() {
@@ -330,15 +348,16 @@ fn multi_sign_tx(
                 });
                 blake2b.finalize(&mut message);
                 let message = H256::from(message);
-                let mut signed_witness = Bytes::from(multi_sign_script.to_vec().as_slice());
                 keys.iter().for_each(|key| {
                     let sig = key.sign_recoverable(&message).expect("sign");
-                    signed_witness.extend_from_slice(&sig.serialize());
+                    lock.extend_from_slice(&sig.serialize());
                 });
-                if !witness.raw_data().is_empty() {
-                    signed_witness.extend_from_slice(&witness.raw_data());
-                }
-                signed_witness.pack()
+                witness
+                    .as_builder()
+                    .lock(Bytes::from(lock).pack())
+                    .build()
+                    .as_bytes()
+                    .pack()
             } else {
                 tx.witnesses().get(i).unwrap_or_default()
             }
@@ -450,23 +469,32 @@ fn gen_tx_with_extra_inputs(
         .output_data(Bytes::new().pack());
     if extra_inputs > 0 {
         let mut extra_inputs_tx_builder = tx_builder.clone();
-        extra_inputs_tx_builder = extra_inputs_tx_builder.witness(Bytes::new().pack());
+        extra_inputs_tx_builder =
+            extra_inputs_tx_builder.witness(WitnessArgs::new_builder().build().as_bytes().pack());
         let mut rng = thread_rng();
-        for i in 0..extra_inputs {
+        for i in 1..=extra_inputs {
             let extra_out_point = OutPoint::new(previous_tx_hash.clone(), i);
             dummy.cells.insert(
                 extra_out_point.clone(),
                 (previous_output_cell.clone(), Bytes::new()),
             );
-            let mut random_extra_witness = [0u8; 32];
-            rng.fill(&mut random_extra_witness);
+            let mut random_extra = [0u8; 32];
+            rng.fill(&mut random_extra);
             extra_inputs_tx_builder = extra_inputs_tx_builder
                 .input(CellInput::new(extra_out_point, 0))
-                .witness(Bytes::from(random_extra_witness.to_vec()).pack());
+                .witness(
+                    WitnessArgs::new_builder()
+                        .extra(Bytes::from(random_extra.to_vec()).pack())
+                        .build()
+                        .as_bytes()
+                        .pack(),
+                );
         }
         extra_inputs_tx_builder.build()
     } else {
-        tx_builder.witness(Bytes::new().pack()).build()
+        tx_builder
+            .witness(WitnessArgs::new_builder().build().as_bytes().pack())
+            .build()
     }
 }
 
@@ -475,11 +503,6 @@ fn gen_tx(dummy: &mut DummyDataLoader, lock_args: Bytes) -> TransactionView {
 }
 
 fn build_resolved_tx(data_loader: &DummyDataLoader, tx: &TransactionView) -> ResolvedTransaction {
-    let previous_out_point = tx
-        .inputs()
-        .get(0)
-        .expect("should have at least one input")
-        .previous_output();
     let resolved_cell_deps = tx
         .cell_deps()
         .into_iter()
@@ -492,15 +515,21 @@ fn build_resolved_tx(data_loader: &DummyDataLoader, tx: &TransactionView) -> Res
                 .build()
         })
         .collect();
-    let (input_output, input_data) = data_loader.cells.get(&previous_out_point).unwrap();
-    let input_cell =
-        CellMetaBuilder::from_cell_output(input_output.to_owned(), input_data.to_owned())
-            .out_point(previous_out_point)
-            .build();
+    let resolved_inputs = tx
+        .inputs()
+        .into_iter()
+        .map(|input| {
+            let previous_out_point = input.previous_output();
+            let (input_output, input_data) = data_loader.cells.get(&previous_out_point).unwrap();
+            CellMetaBuilder::from_cell_output(input_output.to_owned(), input_data.to_owned())
+                .out_point(previous_out_point)
+                .build()
+        })
+        .collect::<Vec<_>>();
     ResolvedTransaction {
         transaction: tx.clone(),
         resolved_cell_deps,
-        resolved_inputs: vec![input_cell],
+        resolved_inputs,
         resolved_dep_groups: vec![],
     }
 }
