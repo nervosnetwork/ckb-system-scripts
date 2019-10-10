@@ -1,6 +1,6 @@
 #include "blake2b.h"
 #include "ckb_syscalls.h"
-#include "protocol_reader.h"
+#include "protocol.h"
 #include "secp256k1_helper.h"
 
 #define ERROR_UNKNOWN -1
@@ -51,9 +51,9 @@ int main() {
   unsigned char witness[WITNESS_SIZE];
   unsigned char script[SCRIPT_SIZE];
   uint8_t secp_data[CKB_SECP256K1_DATA_SIZE];
-  mol_pos_t script_pos;
-  mol_read_res_t args_res;
-  mol_read_res_t bytes_res;
+  mol_seg_t script_seg;
+  mol_seg_t args_seg;
+  mol_seg_t bytes_seg;
 
   /* Load args */
   len = SCRIPT_SIZE;
@@ -61,25 +61,23 @@ int main() {
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
-  script_pos.ptr = (const uint8_t*)script;
-  script_pos.size = len;
-  args_res = mol_cut(&script_pos, MOL_Script_args());
-  if (args_res.code != 0) {
+  script_seg.ptr = (uint8_t*)script;
+  script_seg.size = len;
+  if (MolReader_Script_verify(&script_seg, false) != MOL_OK) {
     return ERROR_ENCODING;
   }
-  bytes_res = mol_cut_bytes(&args_res.pos);
-  if (bytes_res.code != 0) {
-    return ERROR_ENCODING;
-  } else if (bytes_res.pos.size == 0) {
+  args_seg = MolReader_Script_get_args(&script_seg);
+  bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
+  if (bytes_seg.size == 0) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
   }
 
   /* Calculate sigs count and threshold */
-  sigs_cnt = bytes_res.pos.size / BLAKE160_SIZE;
-  if (bytes_res.pos.size % BLAKE160_SIZE == 0) {
+  sigs_cnt = bytes_seg.size / BLAKE160_SIZE;
+  if (bytes_seg.size % BLAKE160_SIZE == 0) {
     threshold = sigs_cnt;
   } else {
-    threshold = bytes_res.pos.ptr[sigs_cnt * BLAKE160_SIZE];
+    threshold = bytes_seg.ptr[sigs_cnt * BLAKE160_SIZE];
   }
 
   if (threshold > sigs_cnt || threshold == 0) {
@@ -172,7 +170,7 @@ int main() {
         if (used_signatures[i] == 1) {
           continue;
         }
-        if (memcmp(&bytes_res.pos.ptr[i * BLAKE160_SIZE], temp, BLAKE160_SIZE) != 0) {
+        if (memcmp(&bytes_seg.ptr[i * BLAKE160_SIZE], temp, BLAKE160_SIZE) != 0) {
           continue;
         }
         valid = 1;
