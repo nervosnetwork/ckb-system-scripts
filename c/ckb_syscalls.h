@@ -6,6 +6,8 @@
 
 #include "ckb_consts.h"
 
+#define memory_barrier() asm volatile ("fence" ::: "memory")
+
 static inline long __internal_syscall(long n, long _a0, long _a1, long _a2,
                                       long _a3, long _a4, long _a5) {
   register long a0 asm("a0") = _a0;
@@ -24,6 +26,11 @@ static inline long __internal_syscall(long n, long _a0, long _a1, long _a2,
   asm volatile("scall"
                : "+r"(a0)
                : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(syscall_id));
+  /*
+   * Syscalls might modify memory sent as pointer, adding a barrier here ensures
+   * gcc won't do incorrect optimization.
+   */
+  memory_barrier();
 
   return a0;
 }
