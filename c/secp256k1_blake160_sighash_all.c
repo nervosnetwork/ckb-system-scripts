@@ -45,7 +45,7 @@ int main() {
   size_t index = 0;
   uint64_t sigs_cnt = 0;
   uint64_t threshold = 0;
-  volatile uint64_t len = 0;
+  uint64_t len = 0;
   unsigned char tx_hash[BLAKE2B_BLOCK_SIZE];
   unsigned char temp[TEMP_SIZE];
   unsigned char witness[WITNESS_SIZE];

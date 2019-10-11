@@ -38,7 +38,7 @@ int ckb_secp256k1_custom_verify_only_initialize(secp256k1_context* context,
   size_t index = 0;
   int running = 1;
   while (running && index < SIZE_MAX) {
-    volatile uint64_t len = 32;
+    uint64_t len = 32;
     uint8_t hash[32];
 
     int ret = ckb_load_cell_by_field(hash, &len, 0, index, CKB_SOURCE_CELL_DEP,
