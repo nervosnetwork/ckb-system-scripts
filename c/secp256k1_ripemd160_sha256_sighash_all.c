@@ -68,7 +68,7 @@
 int main() {
   int ret;
   size_t index = 0;
-  volatile uint64_t len = 0;
+  uint64_t len = 0;
   unsigned char tx_hash[BLAKE2B_BLOCK_SIZE];
   unsigned char temp[TEMP_SIZE];
   unsigned char witness[WITNESS_SIZE];
