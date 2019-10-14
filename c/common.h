@@ -18,20 +18,39 @@
 /* make sure witnesses is less or equals to inputs */
 int check_witnesses_len() {
   uint64_t len = 0;
-  int i = 0;
   uint8_t tmp[0];
+  /* lower bound, at least tx has one input */
+  int lo = 1;
+  /* higher bound */
+  int hi = 4;
   int ret;
-  /* count number of inputs */
+  /* try loading input until failed to increase lo and hi */
   while (1) {
-    ret = ckb_load_input_by_field(tmp, &len, 0, i, CKB_SOURCE_INPUT,
+    ret = ckb_load_input_by_field(tmp, &len, 0, hi, CKB_SOURCE_INPUT,
                                   CKB_INPUT_FIELD_SINCE);
-    if (ret != CKB_SUCCESS) {
+    if (ret == CKB_SUCCESS) {
+      lo = hi;
+      hi *= 2;
+    } else {
       break;
     }
-    i++;
   }
-  /* try load i-th witness */
-  ret = ckb_load_witness(tmp, &len, 0, i, CKB_SOURCE_INPUT);
+
+  /* now we get our lower bound and higher bound,
+   count number of inputs by binary search */
+  int i;
+  while (lo + 1 != hi) {
+    i = (lo + hi) / 2;
+    ret = ckb_load_input_by_field(tmp, &len, 0, i, CKB_SOURCE_INPUT,
+                                  CKB_INPUT_FIELD_SINCE);
+    if (ret == CKB_SUCCESS) {
+      lo = i;
+    } else {
+      hi = i;
+    }
+  }
+  /* try load witness */
+  ret = ckb_load_witness(tmp, &len, 0, hi, CKB_SOURCE_INPUT);
   if (ret == CKB_SUCCESS) {
     return ERROR_TOO_MANY_WITNESSES;
   }
