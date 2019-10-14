@@ -82,7 +82,7 @@ pub fn sign_tx_by_input_group(
     len: usize,
 ) -> TransactionView {
     let tx_hash = tx.hash();
-    let signed_witnesses: Vec<packed::Bytes> = tx
+    let mut signed_witnesses: Vec<packed::Bytes> = tx
         .inputs()
         .into_iter()
         .enumerate()
@@ -100,12 +100,14 @@ pub fn sign_tx_by_input_group(
                 };
                 let witness_for_digest =
                     witness.clone().as_builder().lock(zero_lock.pack()).build();
+                let witness_len = witness_for_digest.as_bytes().len() as u64;
+                blake2b.update(&witness_len.to_le_bytes());
                 blake2b.update(&witness_for_digest.as_bytes());
                 ((i + 1)..(i + len)).for_each(|n| {
                     let witness = tx.witnesses().get(n).unwrap();
-                    if !witness.raw_data().is_empty() {
-                        blake2b.update(&witness.raw_data());
-                    }
+                    let witness_len = witness.raw_data().len() as u64;
+                    blake2b.update(&witness_len.to_le_bytes());
+                    blake2b.update(&witness.raw_data());
                 });
                 blake2b.finalize(&mut message);
                 let message = H256::from(message);
@@ -121,6 +123,9 @@ pub fn sign_tx_by_input_group(
             }
         })
         .collect();
+    for i in signed_witnesses.len()..tx.witnesses().len() {
+        signed_witnesses.push(tx.witnesses().get(i).unwrap());
+    }
     // calculate message
     tx.as_advanced_builder()
         .set_witnesses(signed_witnesses)

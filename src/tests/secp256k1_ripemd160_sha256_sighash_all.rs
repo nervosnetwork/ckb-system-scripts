@@ -16,9 +16,9 @@ use ckb_types::{
 use rand::{thread_rng, Rng};
 use sha2::{Digest, Sha256};
 
-const ERROR_PUBKEY_RIPEMD160_HASH: i8 = -3;
-const ERROR_SECP_VERIFICATION: i8 = -9;
-const ERROR_WITNESS_SIZE: i8 = -12;
+const ERROR_PUBKEY_RIPEMD160_HASH: i8 = -32;
+const ERROR_SECP_VERIFICATION: i8 = -12;
+const ERROR_WITNESS_SIZE: i8 = -22;
 
 fn gen_tx(
     dummy: &mut DummyDataLoader,
@@ -162,12 +162,14 @@ pub fn sign_tx_by_input_group(
                 };
                 let witness_for_digest =
                     witness.clone().as_builder().lock(zero_lock.pack()).build();
+                let witness_len = witness_for_digest.as_bytes().len() as u64;
+                hasher.input(&witness_len.to_le_bytes());
                 hasher.input(&witness_for_digest.as_bytes());
                 ((i + 1)..(i + len)).for_each(|n| {
                     let witness = tx.witnesses().get(n).unwrap();
-                    if !witness.raw_data().is_empty() {
-                        hasher.input(&witness.raw_data());
-                    }
+                    let witness_len = witness.raw_data().len() as u64;
+                    hasher.input(&witness_len.to_le_bytes());
+                    hasher.input(&witness.raw_data());
                 });
                 let mut message = [0u8; 32];
                 message.copy_from_slice(&hasher.result());

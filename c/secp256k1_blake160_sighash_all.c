@@ -1,17 +1,8 @@
 #include "blake2b.h"
 #include "ckb_syscalls.h"
+#include "common.h"
 #include "protocol_reader.h"
 #include "secp256k1_helper.h"
-
-#define ERROR_ARGUMENTS_LEN -1
-#define ERROR_ENCODING -2
-#define ERROR_SYSCALL -3
-#define ERROR_SECP_RECOVER_PUBKEY -11
-#define ERROR_SECP_PARSE_SIGNATURE -12
-#define ERROR_SECP_SERIALIZE_PUBKEY -13
-#define ERROR_SCRIPT_TOO_LONG -21
-#define ERROR_WITNESS_TOO_LONG -22
-#define ERROR_PUBKEY_BLAKE160_HASH -31
 
 #define BLAKE2B_BLOCK_SIZE 32
 #define BLAKE160_SIZE 20
@@ -81,6 +72,12 @@ int main() {
     return ERROR_ARGUMENTS_LEN;
   }
 
+  /* Check witnesses is less than or equals to inputs  */
+  ret = check_witnesses_len();
+  if (ret != CKB_SUCCESS) {
+    return ERROR_TOO_MANY_WITNESSES;
+  }
+
   /* Load witness of first input */
   unsigned char witness[MAX_WITNESS_SIZE];
   volatile uint64_t witness_len = MAX_WITNESS_SIZE;
@@ -90,7 +87,7 @@ int main() {
   }
 
   if (witness_len > MAX_WITNESS_SIZE) {
-    return ERROR_WITNESS_TOO_LONG;
+    return ERROR_WITNESS_SIZE;
   }
 
   /* load signature */
@@ -121,6 +118,7 @@ int main() {
 
   /* Clear lock field to zero, then digest the first witness */
   memset((void *)lock_bytes_res.pos.ptr, 0, lock_bytes_res.pos.size);
+  blake2b_update(&blake2b_ctx, (char *)&witness_len, sizeof(uint64_t));
   blake2b_update(&blake2b_ctx, witness, witness_len);
 
   /* Digest other witnesses */
@@ -135,8 +133,9 @@ int main() {
       return ERROR_SYSCALL;
     }
     if (len > MAX_WITNESS_SIZE) {
-      return ERROR_WITNESS_TOO_LONG;
+      return ERROR_WITNESS_SIZE;
     }
+    blake2b_update(&blake2b_ctx, (char *)&len, sizeof(uint64_t));
     blake2b_update(&blake2b_ctx, temp, len);
     i += 1;
   }
