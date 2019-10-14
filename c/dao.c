@@ -97,7 +97,7 @@
  */
 static int extract_withdraw_header_index(size_t input_index, size_t *index) {
   int ret;
-  volatile uint64_t len = 0;
+  uint64_t len = 0;
   unsigned char witness[MAX_WITNESS_SIZE];
 
   len = MAX_WITNESS_SIZE;
@@ -161,7 +161,7 @@ typedef struct {
 static int load_dao_header_data(size_t index, size_t source,
                                 dao_header_data_t *data) {
   uint8_t buffer[HEADER_SIZE];
-  volatile uint64_t len = HEADER_SIZE;
+  uint64_t len = HEADER_SIZE;
   int ret = ckb_load_header(buffer, &len, 0, index, source);
   if (ret != CKB_SUCCESS) {
     return ret;
@@ -194,7 +194,7 @@ static int load_dao_header_data(size_t index, size_t source,
 static int calculate_dao_input_capacity(size_t input_index,
                                         uint64_t original_capacity,
                                         uint64_t *calculated_capacity) {
-  volatile uint64_t len = 0;
+  uint64_t len = 0;
   size_t withdraw_index = 0;
 
   int ret = extract_withdraw_header_index(input_index, &withdraw_index);
@@ -260,7 +260,7 @@ static int calculate_dao_input_capacity(size_t input_index,
   uint64_t minimal_since_epoch_index = deposit_data.epoch_index;
   uint64_t minimal_since_epoch_length = deposit_data.epoch_length;
 
-  volatile uint64_t input_since = 0;
+  uint64_t input_since = 0;
   len = 8;
   ret = ckb_load_input_by_field(((unsigned char *)&input_since), &len, 0,
                                 input_index, CKB_SOURCE_INPUT,
@@ -297,7 +297,7 @@ static int calculate_dao_input_capacity(size_t input_index,
   uint64_t deposit_accumulate_rate = *((uint64_t *)(&deposit_data.dao[8]));
   uint64_t withdraw_accumulate_rate = *((uint64_t *)(&withdraw_data.dao[8]));
 
-  volatile uint64_t occupied_capacity = 0;
+  uint64_t occupied_capacity = 0;
   len = 8;
   ret = ckb_load_cell_by_field(((unsigned char *)&occupied_capacity), &len, 0,
                                input_index, CKB_SOURCE_INPUT,
@@ -331,7 +331,7 @@ int main() {
   int ret;
   unsigned char script_hash[HASH_SIZE];
   unsigned char script[SCRIPT_SIZE];
-  volatile uint64_t len = 0;
+  uint64_t len = 0;
   mol_pos_t script_pos;
   mol_read_res_t args_res;
   mol_read_res_t bytes_res;
@@ -369,7 +369,7 @@ int main() {
   uint64_t input_capacities = 0;
   while (1) {
     int dao_input = 0;
-    volatile uint64_t capacity = 0;
+    uint64_t capacity = 0;
     len = 8;
     ret = ckb_load_cell_by_field(((unsigned char *)&capacity), &len, 0, index,
                                  CKB_SOURCE_INPUT, CKB_CELL_FIELD_CAPACITY);
@@ -416,7 +416,7 @@ int main() {
   index = 0;
   uint64_t output_capacities = 0;
   while (1) {
-    volatile uint64_t capacity = 0;
+    uint64_t capacity = 0;
     len = 8;
     ret = ckb_load_cell_by_field(((unsigned char *)&capacity), &len, 0, index,
                                  CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_CAPACITY);

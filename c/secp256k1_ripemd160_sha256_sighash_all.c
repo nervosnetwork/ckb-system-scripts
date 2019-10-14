@@ -79,7 +79,7 @@ int extract_witness_lock(const uint8_t *witness, uint64_t len,
  */
 int main() {
   int ret;
-  volatile uint64_t len = 0;
+  uint64_t len = 0;
   unsigned char tx_hash[BLAKE2B_BLOCK_SIZE];
   unsigned char temp[TEMP_SIZE];
   unsigned char witness[MAX_WITNESS_SIZE];
@@ -133,7 +133,7 @@ int main() {
     return ERROR_ENCODING;
   }
 
-  volatile uint64_t lock_len = lock_bytes_res.pos.size;
+  uint64_t lock_len = lock_bytes_res.pos.size;
   if (lock_len != RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE &&
       lock_len != RECOVERABLE_SIGNATURE_SIZE + COMPRESSED_PUBKEY_SIZE &&
       lock_len !=
@@ -156,7 +156,7 @@ int main() {
 
   /* parse pubkey */
   secp256k1_pubkey pubkey;
-  volatile uint64_t signature_len;
+  uint64_t signature_len;
   if (lock_len == RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE ||
       lock_len ==
           NONE_RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE) {

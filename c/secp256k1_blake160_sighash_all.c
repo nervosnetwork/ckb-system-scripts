@@ -43,7 +43,7 @@ int extract_witness_lock(const uint8_t *witness, uint64_t len,
  */
 int main() {
   int ret;
-  volatile uint64_t len = 0;
+  uint64_t len = 0;
   unsigned char temp[TEMP_SIZE];
   unsigned char lock_bytes[SIGNATURE_SIZE];
 
@@ -80,7 +80,7 @@ int main() {
 
   /* Load witness of first input */
   unsigned char witness[MAX_WITNESS_SIZE];
-  volatile uint64_t witness_len = MAX_WITNESS_SIZE;
+  uint64_t witness_len = MAX_WITNESS_SIZE;
   ret = ckb_load_witness(witness, &witness_len, 0, 0, CKB_SOURCE_GROUP_INPUT);
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
