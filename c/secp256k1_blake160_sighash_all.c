@@ -75,7 +75,7 @@ int main() {
   /* Check witnesses is less than or equals to inputs  */
   ret = check_witnesses_len();
   if (ret != CKB_SUCCESS) {
-    return ERROR_TOO_MANY_WITNESSES;
+    return ERROR_INVALID_WITNESSES_COUNT;
   }
 
   /* Load witness of first input */

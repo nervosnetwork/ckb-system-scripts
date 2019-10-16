@@ -19,7 +19,7 @@ use rand::{thread_rng, Rng, SeedableRng};
 
 const ERROR_ENCODING: i8 = -2;
 const ERROR_WITNESS_TOO_LONG: i8 = -22;
-const ERROR_TOO_MANY_WITNESSES: i8 = -23;
+const ERROR_INVALID_WITNESSES_COUNT: i8 = -23;
 const ERROR_PUBKEY_BLAKE160_HASH: i8 = -31;
 
 fn gen_tx(dummy: &mut DummyDataLoader, lock_args: Bytes) -> TransactionView {
@@ -80,13 +80,13 @@ fn gen_tx_with_grouped_args<R: Rng>(
         .cell_dep(
             CellDep::new_builder()
                 .out_point(sighash_all_out_point)
-                .dep_type(DepType::Code.pack())
+                .dep_type(DepType::Code.into())
                 .build(),
         )
         .cell_dep(
             CellDep::new_builder()
                 .out_point(secp256k1_data_out_point)
-                .dep_type(DepType::Code.pack())
+                .dep_type(DepType::Code.into())
                 .build(),
         )
         .output(
@@ -108,7 +108,7 @@ fn gen_tx_with_grouped_args<R: Rng>(
             let script = Script::new_builder()
                 .args(args.pack())
                 .code_hash(sighash_all_cell_data_hash.clone())
-                .hash_type(ScriptHashType::Data.pack())
+                .hash_type(ScriptHashType::Data.into())
                 .build();
             let previous_output_cell = CellOutput::new_builder()
                 .capacity(dummy_capacity.pack())
@@ -396,7 +396,7 @@ fn test_super_long_witness() {
 
 #[test]
 fn test_sighash_all_2_in_2_out_cycles() {
-    const CONSUME_CYCLES: u64 = 3394380;
+    const CONSUME_CYCLES: u64 = 3396622;
 
     let mut data_loader = DummyDataLoader::new();
     let mut generator = Generator::non_crypto_safe_prng(42);
@@ -575,6 +575,6 @@ fn test_sighash_all_too_many_witnesses() {
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(60000000);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_TOO_MANY_WITNESSES),
+        ScriptError::ValidationFailure(ERROR_INVALID_WITNESSES_COUNT),
     );
 }
