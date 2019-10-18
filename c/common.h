@@ -15,7 +15,7 @@
 #define ERROR_PUBKEY_BLAKE160_HASH -31
 #define ERROR_PUBKEY_RIPEMD160_HASH -32
 
-/* make sure witnesses is equals to inputs */
+/* make sure that witnesses and inputs have the same length */
 int check_witnesses_len() {
   uint64_t len = 0;
   uint8_t tmp[0];
@@ -24,7 +24,7 @@ int check_witnesses_len() {
   /* higher bound */
   int hi = 4;
   int ret;
-  /* try loading input until failed to increase lo and hi */
+  /* try to load input until failing to increase lo and hi */
   while (1) {
     ret = ckb_load_input_by_field(tmp, &len, 0, hi, CKB_SOURCE_INPUT,
                                   CKB_INPUT_FIELD_SINCE);
@@ -49,7 +49,7 @@ int check_witnesses_len() {
       hi = i;
     }
   }
-  /* count of witnesses should equals to inputs */
+  /* witnesses and inputs must have the same length */
   ret = ckb_load_witness(tmp, &len, 0, hi, CKB_SOURCE_INPUT);
   if (ret == CKB_SUCCESS) {
     return ERROR_INVALID_WITNESSES_COUNT;
