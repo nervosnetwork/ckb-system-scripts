@@ -1,7 +1,7 @@
 #include "blake2b.h"
 #include "ckb_syscalls.h"
 #include "common.h"
-#include "protocol_reader.h"
+#include "protocol.h"
 #include "secp256k1_helper.h"
 
 #define BLAKE2B_BLOCK_SIZE 32
@@ -15,22 +15,19 @@
 #define SIGNATURE_SIZE 65
 
 /* Extract lock from WitnessArgs */
-int extract_witness_lock(const uint8_t *witness, uint64_t len,
-                         mol_read_res_t *lock_bytes_res) {
-  mol_pos_t witness_pos;
-  witness_pos.ptr = witness;
-  witness_pos.size = len;
+int extract_witness_lock(uint8_t *witness, uint64_t len,
+                         mol_seg_t *lock_bytes_seg) {
+  mol_seg_t witness_seg;
+  witness_seg.ptr = witness;
+  witness_seg.size = len;
 
-  mol_read_res_t lock_res = mol_cut(&witness_pos, MOL_WitnessArgs_lock());
-  if (lock_res.code != 0) {
+  if (MolReader_WitnessArgs_verify(&witness_seg, false) != MOL_OK) {
     return ERROR_ENCODING;
   }
-  *lock_bytes_res = mol_cut_bytes(&lock_res.pos);
-  if (lock_bytes_res->code != 0) {
-    return ERROR_ENCODING;
-  }
+  mol_seg_t lock_seg = MolReader_WitnessArgs_get_lock(&witness_seg);
 
-  return 0;
+  *lock_bytes_seg = MolReader_Bytes_raw_bytes(&lock_seg);
+  return CKB_SUCCESS;
 }
 
 /*
@@ -57,18 +54,17 @@ int main() {
   if (len > SCRIPT_SIZE) {
     return ERROR_SCRIPT_TOO_LONG;
   }
-  mol_pos_t script_pos;
-  script_pos.ptr = (const uint8_t *)script;
-  script_pos.size = len;
+  mol_seg_t script_seg;
+  script_seg.ptr = (uint8_t*)script;
+  script_seg.size = len;
 
-  mol_read_res_t args_res = mol_cut(&script_pos, MOL_Script_args());
-  if (args_res.code != 0) {
+  if (MolReader_Script_verify(&script_seg, false) != MOL_OK) {
     return ERROR_ENCODING;
   }
-  mol_read_res_t args_bytes_res = mol_cut_bytes(&args_res.pos);
-  if (args_bytes_res.code != 0) {
-    return ERROR_ENCODING;
-  } else if (args_bytes_res.pos.size != BLAKE160_SIZE) {
+
+  mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
+  mol_seg_t args_bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
+  if (args_bytes_seg.size != BLAKE160_SIZE) {
     return ERROR_ARGUMENTS_LEN;
   }
 
@@ -91,16 +87,16 @@ int main() {
   }
 
   /* load signature */
-  mol_read_res_t lock_bytes_res;
-  ret = extract_witness_lock(witness, witness_len, &lock_bytes_res);
+  mol_seg_t lock_bytes_seg;
+  ret = extract_witness_lock(witness, witness_len, &lock_bytes_seg);
   if (ret != 0) {
     return ERROR_ENCODING;
   }
 
-  if (lock_bytes_res.pos.size != SIGNATURE_SIZE) {
+  if (lock_bytes_seg.size != SIGNATURE_SIZE) {
     return ERROR_ARGUMENTS_LEN;
   }
-  memcpy(lock_bytes, lock_bytes_res.pos.ptr, lock_bytes_res.pos.size);
+  memcpy(lock_bytes, lock_bytes_seg.ptr, lock_bytes_seg.size);
 
   /* Load tx hash */
   unsigned char tx_hash[BLAKE2B_BLOCK_SIZE];
@@ -117,7 +113,7 @@ int main() {
   blake2b_update(&blake2b_ctx, tx_hash, BLAKE2B_BLOCK_SIZE);
 
   /* Clear lock field to zero, then digest the first witness */
-  memset((void *)lock_bytes_res.pos.ptr, 0, lock_bytes_res.pos.size);
+  memset((void *)lock_bytes_seg.ptr, 0, lock_bytes_seg.size);
   blake2b_update(&blake2b_ctx, (char *)&witness_len, sizeof(uint64_t));
   blake2b_update(&blake2b_ctx, witness, witness_len);
 
@@ -172,7 +168,7 @@ int main() {
   blake2b_update(&blake2b_ctx, temp, pubkey_size);
   blake2b_final(&blake2b_ctx, temp, BLAKE2B_BLOCK_SIZE);
 
-  if (memcmp(args_bytes_res.pos.ptr, temp, BLAKE160_SIZE) != 0) {
+  if (memcmp(args_bytes_seg.ptr, temp, BLAKE160_SIZE) != 0) {
     return ERROR_PUBKEY_BLAKE160_HASH;
   }
 

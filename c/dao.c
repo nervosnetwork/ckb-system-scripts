@@ -53,7 +53,7 @@
  * capacities in all cases.
  */
 #include "ckb_syscalls.h"
-#include "protocol_reader.h"
+#include "protocol.h"
 
 #define ERROR_UNKNOWN -1
 #define ERROR_WRONG_NUMBER_OF_ARGUMENTS -2
@@ -109,23 +109,22 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
     return ERROR_WITNESS_TOO_LONG;
   }
 
-  mol_pos_t witness_pos;
-  witness_pos.ptr = (const uint8_t*)witness;
-  witness_pos.size = len;
+  mol_seg_t witness_seg;
+  witness_seg.ptr = (uint8_t*)witness;
+  witness_seg.size = len;
 
+  if (MolReader_WitnessArgs_verify(&witness_seg, false) != MOL_OK) {
+    return ERROR_ENCODING;
+  }
   /* Load type args */
-  mol_read_res_t type_res = mol_cut(&witness_pos, MOL_WitnessArgs_type_());
-  if (type_res.code != 0) {
-    return ERROR_ENCODING;
-  }
-  mol_read_res_t type_bytes_res = mol_cut_bytes(&type_res.pos);
-  if (type_bytes_res.code != 0) {
-    return ERROR_ENCODING;
-  } else if (type_bytes_res.pos.size != 8) {
+  mol_seg_t type_seg = MolReader_WitnessArgs_get_type_(&witness_seg);
+
+  mol_seg_t type_bytes_seg = MolReader_Bytes_raw_bytes(&type_seg);
+  if (type_bytes_seg.size != 8) {
     return ERROR_ENCODING;
   }
 
-  *index = *type_bytes_res.pos.ptr;
+  *index = *type_bytes_seg.ptr;
   return CKB_SUCCESS;
 }
 
@@ -170,23 +169,20 @@ static int load_dao_header_data(size_t index, size_t source,
     return ERROR_BUFFER_NOT_ENOUGH;
   }
 
-  mol_pos_t header_pos;
-  header_pos.ptr = (const uint8_t *)buffer;
-  header_pos.size = len;
-  mol_read_res_t raw_res = mol_cut(&header_pos, MOL_Header_raw());
-  if (raw_res.code != 0) {
+  mol_seg_t header_seg;
+  header_seg.ptr = (uint8_t *)buffer;
+  header_seg.size = len;
+
+  if (MolReader_Header_verify(&header_seg, false) != MOL_OK) {
     return ERROR_ENCODING;
   }
-  mol_read_res_t dao_res = mol_cut(&raw_res.pos, MOL_RawHeader_dao());
-  if (dao_res.code != 0 || dao_res.pos.size != 32) {
-    return ERROR_ENCODING;
-  }
-  memcpy(data->dao, dao_res.pos.ptr, 32);
-  mol_read_res_t epoch_res = mol_cut(&raw_res.pos, MOL_RawHeader_epoch());
-  if (epoch_res.code != 0 || epoch_res.pos.size != 8) {
-    return ERROR_ENCODING;
-  }
-  return extract_epoch_info(*((uint64_t *)epoch_res.pos.ptr), 0,
+
+  mol_seg_t raw_seg = MolReader_Header_get_raw(&header_seg);
+  mol_seg_t dao_seg = MolReader_RawHeader_get_dao(&raw_seg);
+  mol_seg_t epoch_seg = MolReader_RawHeader_get_epoch(&raw_seg);
+
+  memcpy(data->dao, dao_seg.ptr, 32);
+  return extract_epoch_info(*((uint64_t *)epoch_seg.ptr), 0,
                             &(data->epoch_number), &(data->epoch_index),
                             &(data->epoch_length));
 }
@@ -210,6 +206,7 @@ static int calculate_dao_input_capacity(size_t input_index,
   }
 
   dao_header_data_t deposit_data;
+  memset(&deposit_data, 0, sizeof(deposit_data)); // avoid mem2reg
   ret = load_dao_header_data(input_index, CKB_SOURCE_INPUT, &deposit_data);
   if (ret != CKB_SUCCESS) {
     return ret;
@@ -332,9 +329,9 @@ int main() {
   unsigned char script_hash[HASH_SIZE];
   unsigned char script[SCRIPT_SIZE];
   uint64_t len = 0;
-  mol_pos_t script_pos;
-  mol_read_res_t args_res;
-  mol_read_res_t bytes_res;
+  mol_seg_t script_seg;
+  mol_seg_t args_seg;
+  mol_seg_t bytes_seg;
 
   /*
    * DAO has no arguments, this way we can ensure all DAO related scripts
@@ -345,17 +342,14 @@ int main() {
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
-  script_pos.ptr = (const uint8_t*)script;
-  script_pos.size = len;
-  args_res = mol_cut(&script_pos, MOL_Script_args());
-  if (args_res.code != 0) {
+  script_seg.ptr = (uint8_t*)script;
+  script_seg.size = len;
+  if (MolReader_Script_verify(&script_seg, false) != MOL_OK) {
     return ERROR_ENCODING;
   }
-  bytes_res = mol_cut_bytes(&args_res.pos);
-  if (bytes_res.code != 0) {
-    return ERROR_ENCODING;
-  }
-  if (bytes_res.pos.size != 0) {
+  args_seg = MolReader_Script_get_args(&script_seg);
+  bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
+  if (bytes_seg.size != 0) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
   }
 

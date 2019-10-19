@@ -29,7 +29,7 @@
  */
 #include "ckb_syscalls.h"
 #include "common.h"
-#include "protocol_reader.h"
+#include "protocol.h"
 #include "ripemd160.h"
 #include "secp256k1_helper.h"
 #include "sha256.h"
@@ -50,22 +50,19 @@
 #define MAX_LOCK_SIZE 130
 
 /* Extract lock from WitnessArgs */
-int extract_witness_lock(const uint8_t *witness, uint64_t len,
-                         mol_read_res_t *lock_bytes_res) {
-  mol_pos_t witness_pos;
-  witness_pos.ptr = witness;
-  witness_pos.size = len;
+int extract_witness_lock(uint8_t *witness, uint64_t len,
+                         mol_seg_t *lock_bytes_seg) {
+  mol_seg_t witness_seg;
+  witness_seg.ptr = witness;
+  witness_seg.size = len;
 
-  mol_read_res_t lock_res = mol_cut(&witness_pos, MOL_WitnessArgs_lock());
-  if (lock_res.code != 0) {
+  if (MolReader_WitnessArgs_verify(&witness_seg, false) != MOL_OK) {
     return ERROR_ENCODING;
   }
-  *lock_bytes_res = mol_cut_bytes(&lock_res.pos);
-  if (lock_bytes_res->code != 0) {
-    return ERROR_ENCODING;
-  }
+  mol_seg_t lock_seg = MolReader_WitnessArgs_get_lock(&witness_seg);
 
-  return 0;
+  *lock_bytes_seg = MolReader_Bytes_raw_bytes(&lock_seg);
+  return CKB_SUCCESS;
 }
 
 /*
@@ -85,9 +82,9 @@ int main() {
   unsigned char witness[MAX_WITNESS_SIZE];
   unsigned char script[SCRIPT_SIZE];
   uint8_t secp_data[CKB_SECP256K1_DATA_SIZE];
-  mol_pos_t script_pos;
-  mol_read_res_t args_res;
-  mol_read_res_t bytes_res;
+  mol_seg_t script_seg;
+  mol_seg_t args_seg;
+  mol_seg_t bytes_seg;
 
   /* Load args */
   len = SCRIPT_SIZE;
@@ -95,16 +92,14 @@ int main() {
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
-  script_pos.ptr = (const uint8_t *)script;
-  script_pos.size = len;
-  args_res = mol_cut(&script_pos, MOL_Script_args());
-  if (args_res.code != 0) {
+  script_seg.ptr = (uint8_t *)script;
+  script_seg.size = len;
+  if (MolReader_Script_verify(&script_seg, false) != MOL_OK) {
     return ERROR_ENCODING;
   }
-  bytes_res = mol_cut_bytes(&args_res.pos);
-  if (bytes_res.code != 0) {
-    return ERROR_ENCODING;
-  } else if (bytes_res.pos.size != RIPEMD160_SIZE) {
+  args_seg = MolReader_Script_get_args(&script_seg);
+  bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
+  if (bytes_seg.size != RIPEMD160_SIZE) {
     return ERROR_ARGUMENTS_LEN;
   }
 
@@ -127,13 +122,13 @@ int main() {
     return ERROR_SYSCALL;
   }
   /* load signature */
-  mol_read_res_t lock_bytes_res;
-  ret = extract_witness_lock(witness, len, &lock_bytes_res);
+  mol_seg_t lock_bytes_seg;
+  ret = extract_witness_lock(witness, len, &lock_bytes_seg);
   if (ret != 0) {
     return ERROR_ENCODING;
   }
 
-  uint64_t lock_len = lock_bytes_res.pos.size;
+  uint64_t lock_len = lock_bytes_seg.size;
   if (lock_len != RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE &&
       lock_len != RECOVERABLE_SIGNATURE_SIZE + COMPRESSED_PUBKEY_SIZE &&
       lock_len !=
@@ -150,7 +145,7 @@ int main() {
 
   secp256k1_ecdsa_signature signature;
   if (secp256k1_ecdsa_signature_parse_compact(&context, &signature,
-                                              lock_bytes_res.pos.ptr) == 0) {
+                                              lock_bytes_seg.ptr) == 0) {
     return ERROR_SECP_PARSE_SIGNATURE;
   }
 
@@ -162,14 +157,14 @@ int main() {
           NONE_RECOVERABLE_SIGNATURE_SIZE + NONE_COMPRESSED_PUBKEY_SIZE) {
     signature_len = lock_len - NONE_COMPRESSED_PUBKEY_SIZE;
     if (secp256k1_ec_pubkey_parse(&context, &pubkey,
-                                  lock_bytes_res.pos.ptr + signature_len,
+                                  lock_bytes_seg.ptr + signature_len,
                                   NONE_COMPRESSED_PUBKEY_SIZE) == 0) {
       return ERROR_SECP_PARSE_PUBKEY;
     }
   } else {
     signature_len = lock_len - COMPRESSED_PUBKEY_SIZE;
     if (secp256k1_ec_pubkey_parse(&context, &pubkey,
-                                  lock_bytes_res.pos.ptr + signature_len,
+                                  lock_bytes_seg.ptr + signature_len,
                                   COMPRESSED_PUBKEY_SIZE) == 0) {
       return ERROR_SECP_PARSE_PUBKEY;
     }
@@ -178,7 +173,7 @@ int main() {
   /* check pubkey hash */
   sha256_state sha256_ctx;
   sha256_init(&sha256_ctx);
-  sha256_update(&sha256_ctx, lock_bytes_res.pos.ptr + signature_len,
+  sha256_update(&sha256_ctx, lock_bytes_seg.ptr + signature_len,
                 lock_len - signature_len);
   sha256_finalize(&sha256_ctx, temp);
 
@@ -186,7 +181,7 @@ int main() {
   ripemd160_init(&ripe160_ctx);
   ripemd160_update(&ripe160_ctx, temp, SHA256_SIZE);
   ripemd160_finalize(&ripe160_ctx, temp);
-  if (memcmp(bytes_res.pos.ptr, temp, RIPEMD160_SIZE) != 0) {
+  if (memcmp(bytes_seg.ptr, temp, RIPEMD160_SIZE) != 0) {
     return ERROR_PUBKEY_RIPEMD160_HASH;
   }
 
@@ -194,7 +189,7 @@ int main() {
   sha256_init(&sha256_ctx);
   sha256_update(&sha256_ctx, tx_hash, BLAKE2B_BLOCK_SIZE);
   /* Clear lock field signature to zero, then digest the first witness */
-  memset((void *)lock_bytes_res.pos.ptr, 0, signature_len);
+  memset((void *)lock_bytes_seg.ptr, 0, signature_len);
   sha256_update(&sha256_ctx, (unsigned char *)&len, sizeof(uint64_t));
   sha256_update(&sha256_ctx, witness, len);
 
