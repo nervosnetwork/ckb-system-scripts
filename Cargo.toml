@@ -1,6 +1,6 @@
 [package]
 name = "ckb-system-scripts"
-version = "0.4.0-alpha.9+expand-nonce"
+version = "0.4.0-alpha.10+witness-args"
 authors = ["Nervos Core Dev <dev@nervos.org>"]
 edition = "2018"
 build = "build.rs"
