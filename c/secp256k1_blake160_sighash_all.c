@@ -1,18 +1,8 @@
 #include "blake2b.h"
 #include "ckb_syscalls.h"
-#include "protocol_reader.h"
+#include "common.h"
+#include "protocol.h"
 #include "secp256k1_helper.h"
-
-#define ERROR_ARGUMENTS_LEN -1
-#define ERROR_ENCODING -2
-#define ERROR_SYSCALL -3
-#define ERROR_SECP_RECOVER_PUBKEY -11
-#define ERROR_SECP_PARSE_SIGNATURE -12
-#define ERROR_SECP_SERIALIZE_PUBKEY -13
-#define ERROR_SCRIPT_TOO_LONG -21
-#define ERROR_WITNESS_TOO_LONG -22
-#define ERROR_WITNESS_TOO_SHORT -23
-#define ERROR_PUBKEY_BLAKE160_HASH -31
 
 #define BLAKE2B_BLOCK_SIZE 32
 #define BLAKE160_SIZE 20
@@ -20,7 +10,7 @@
 #define TEMP_SIZE 1024
 #define RECID_INDEX 64
 /* 32 KB */
-#define WITNESS_SIZE 32768
+#define MAX_WITNESS_SIZE 32768
 #define SCRIPT_SIZE 32768
 #define SIGNATURE_SIZE 65
 
@@ -30,12 +20,13 @@
  * shield the real pubkey.
  *
  * Witness:
- * signature used to present ownership.
+ * WitnessArgs with a signature in lock field used to present ownership.
  */
 int main() {
   int ret;
-  volatile uint64_t len = 0;
+  uint64_t len = 0;
   unsigned char temp[TEMP_SIZE];
+  unsigned char lock_bytes[SIGNATURE_SIZE];
 
   /* Load args */
   unsigned char script[SCRIPT_SIZE];
@@ -47,35 +38,49 @@ int main() {
   if (len > SCRIPT_SIZE) {
     return ERROR_SCRIPT_TOO_LONG;
   }
-  mol_pos_t script_pos;
-  script_pos.ptr = (const uint8_t*)script;
-  script_pos.size = len;
+  mol_seg_t script_seg;
+  script_seg.ptr = (uint8_t*)script;
+  script_seg.size = len;
 
-  mol_read_res_t args_res = mol_cut(&script_pos, MOL_Script_args());
-  if (args_res.code != 0) {
+  if (MolReader_Script_verify(&script_seg, false) != MOL_OK) {
     return ERROR_ENCODING;
   }
-  mol_read_res_t args_bytes_res = mol_cut_bytes(&args_res.pos);
-  if (args_bytes_res.code != 0) {
-    return ERROR_ENCODING;
-  } else if (args_bytes_res.pos.size != BLAKE160_SIZE) {
+
+  mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
+  mol_seg_t args_bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
+  if (args_bytes_seg.size != BLAKE160_SIZE) {
     return ERROR_ARGUMENTS_LEN;
   }
 
+  /* Check witnesses is less than or equals to inputs  */
+  ret = check_witnesses_len();
+  if (ret != CKB_SUCCESS) {
+    return ERROR_INVALID_WITNESSES_COUNT;
+  }
+
   /* Load witness of first input */
-  unsigned char witness[WITNESS_SIZE];
-  len = WITNESS_SIZE;
-  ret = ckb_load_witness(witness, &len, 0, 0, CKB_SOURCE_GROUP_INPUT);
+  unsigned char witness[MAX_WITNESS_SIZE];
+  uint64_t witness_len = MAX_WITNESS_SIZE;
+  ret = ckb_load_witness(witness, &witness_len, 0, 0, CKB_SOURCE_GROUP_INPUT);
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
-  if (len > WITNESS_SIZE) {
-    return ERROR_WITNESS_TOO_LONG;
+
+  if (witness_len > MAX_WITNESS_SIZE) {
+    return ERROR_WITNESS_SIZE;
   }
-  if (len < SIGNATURE_SIZE) {
-    return ERROR_WITNESS_TOO_SHORT;
+
+  /* load signature */
+  mol_seg_t lock_bytes_seg;
+  ret = extract_witness_lock(witness, witness_len, &lock_bytes_seg);
+  if (ret != 0) {
+    return ERROR_ENCODING;
   }
-  size_t extra_witness_len = len - SIGNATURE_SIZE;
+
+  if (lock_bytes_seg.size != SIGNATURE_SIZE) {
+    return ERROR_ARGUMENTS_LEN;
+  }
+  memcpy(lock_bytes, lock_bytes_seg.ptr, lock_bytes_seg.size);
 
   /* Load tx hash */
   unsigned char tx_hash[BLAKE2B_BLOCK_SIZE];
@@ -91,23 +96,26 @@ int main() {
   blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
   blake2b_update(&blake2b_ctx, tx_hash, BLAKE2B_BLOCK_SIZE);
 
-  /* Load extra witness of first input and all witnesses of other inputs */
-  if (extra_witness_len > 0) {
-    blake2b_update(&blake2b_ctx, &witness[SIGNATURE_SIZE], extra_witness_len);
-  }
+  /* Clear lock field to zero, then digest the first witness */
+  memset((void *)lock_bytes_seg.ptr, 0, lock_bytes_seg.size);
+  blake2b_update(&blake2b_ctx, (char *)&witness_len, sizeof(uint64_t));
+  blake2b_update(&blake2b_ctx, witness, witness_len);
+
+  /* Digest other witnesses */
   size_t i = 1;
   while (1) {
-    len = WITNESS_SIZE;
-    ret = ckb_load_witness(temp, &len, 0, i, CKB_SOURCE_INPUT);
+    len = MAX_WITNESS_SIZE;
+    ret = ckb_load_witness(temp, &len, 0, i, CKB_SOURCE_GROUP_INPUT);
     if (ret == CKB_INDEX_OUT_OF_BOUND) {
       break;
     }
     if (ret != CKB_SUCCESS) {
       return ERROR_SYSCALL;
     }
-    if (len > WITNESS_SIZE) {
-      return ERROR_WITNESS_TOO_LONG;
+    if (len > MAX_WITNESS_SIZE) {
+      return ERROR_WITNESS_SIZE;
     }
+    blake2b_update(&blake2b_ctx, (char *)&len, sizeof(uint64_t));
     blake2b_update(&blake2b_ctx, temp, len);
     i += 1;
   }
@@ -123,7 +131,7 @@ int main() {
 
   secp256k1_ecdsa_recoverable_signature signature;
   if (secp256k1_ecdsa_recoverable_signature_parse_compact(
-          &context, &signature, witness, witness[RECID_INDEX]) == 0) {
+          &context, &signature, lock_bytes, lock_bytes[RECID_INDEX]) == 0) {
     return ERROR_SECP_PARSE_SIGNATURE;
   }
 
@@ -144,7 +152,7 @@ int main() {
   blake2b_update(&blake2b_ctx, temp, pubkey_size);
   blake2b_final(&blake2b_ctx, temp, BLAKE2B_BLOCK_SIZE);
 
-  if (memcmp(args_bytes_res.pos.ptr, temp, BLAKE160_SIZE) != 0) {
+  if (memcmp(args_bytes_seg.ptr, temp, BLAKE160_SIZE) != 0) {
     return ERROR_PUBKEY_BLAKE160_HASH;
   }
 

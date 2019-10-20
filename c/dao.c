@@ -53,7 +53,7 @@
  * capacities in all cases.
  */
 #include "ckb_syscalls.h"
-#include "protocol_reader.h"
+#include "protocol.h"
 
 #define ERROR_UNKNOWN -1
 #define ERROR_WRONG_NUMBER_OF_ARGUMENTS -2
@@ -70,7 +70,7 @@
 #define HASH_SIZE 32
 #define HEADER_SIZE 4096
 /* 32 KB */
-#define WITNESS_SIZE 32768
+#define MAX_WITNESS_SIZE 32768
 #define SCRIPT_SIZE 32768
 
 #define LOCK_PERIOD_BLOCKS 10
@@ -97,22 +97,34 @@
  */
 static int extract_withdraw_header_index(size_t input_index, size_t *index) {
   int ret;
-  volatile uint64_t len = 0;
-  unsigned char witness[WITNESS_SIZE];
+  uint64_t len = 0;
+  unsigned char witness[MAX_WITNESS_SIZE];
 
-  len = WITNESS_SIZE;
+  len = MAX_WITNESS_SIZE;
   ret = ckb_load_witness(witness, &len, 0, input_index, CKB_SOURCE_INPUT);
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
-  if (len > WITNESS_SIZE) {
+  if (len > MAX_WITNESS_SIZE) {
     return ERROR_WITNESS_TOO_LONG;
   }
-  if (len < 8) {
+
+  mol_seg_t witness_seg;
+  witness_seg.ptr = (uint8_t*)witness;
+  witness_seg.size = len;
+
+  if (MolReader_WitnessArgs_verify(&witness_seg, false) != MOL_OK) {
+    return ERROR_ENCODING;
+  }
+  /* Load type args */
+  mol_seg_t type_seg = MolReader_WitnessArgs_get_type_(&witness_seg);
+
+  mol_seg_t type_bytes_seg = MolReader_Bytes_raw_bytes(&type_seg);
+  if (type_bytes_seg.size != 8) {
     return ERROR_ENCODING;
   }
 
-  *index = *((size_t *)&witness[len - 8]);
+  *index = *type_bytes_seg.ptr;
   return CKB_SUCCESS;
 }
 
@@ -148,7 +160,7 @@ typedef struct {
 static int load_dao_header_data(size_t index, size_t source,
                                 dao_header_data_t *data) {
   uint8_t buffer[HEADER_SIZE];
-  volatile uint64_t len = HEADER_SIZE;
+  uint64_t len = HEADER_SIZE;
   int ret = ckb_load_header(buffer, &len, 0, index, source);
   if (ret != CKB_SUCCESS) {
     return ret;
@@ -157,23 +169,20 @@ static int load_dao_header_data(size_t index, size_t source,
     return ERROR_BUFFER_NOT_ENOUGH;
   }
 
-  mol_pos_t header_pos;
-  header_pos.ptr = (const uint8_t *)buffer;
-  header_pos.size = len;
-  mol_read_res_t raw_res = mol_cut(&header_pos, MOL_Header_raw());
-  if (raw_res.code != 0) {
+  mol_seg_t header_seg;
+  header_seg.ptr = (uint8_t *)buffer;
+  header_seg.size = len;
+
+  if (MolReader_Header_verify(&header_seg, false) != MOL_OK) {
     return ERROR_ENCODING;
   }
-  mol_read_res_t dao_res = mol_cut(&raw_res.pos, MOL_RawHeader_dao());
-  if (dao_res.code != 0 || dao_res.pos.size != 32) {
-    return ERROR_ENCODING;
-  }
-  memcpy(data->dao, dao_res.pos.ptr, 32);
-  mol_read_res_t epoch_res = mol_cut(&raw_res.pos, MOL_RawHeader_epoch());
-  if (epoch_res.code != 0 || epoch_res.pos.size != 8) {
-    return ERROR_ENCODING;
-  }
-  return extract_epoch_info(*((uint64_t *)epoch_res.pos.ptr), 0,
+
+  mol_seg_t raw_seg = MolReader_Header_get_raw(&header_seg);
+  mol_seg_t dao_seg = MolReader_RawHeader_get_dao(&raw_seg);
+  mol_seg_t epoch_seg = MolReader_RawHeader_get_epoch(&raw_seg);
+
+  memcpy(data->dao, dao_seg.ptr, 32);
+  return extract_epoch_info(*((uint64_t *)epoch_seg.ptr), 0,
                             &(data->epoch_number), &(data->epoch_index),
                             &(data->epoch_length));
 }
@@ -181,7 +190,7 @@ static int load_dao_header_data(size_t index, size_t source,
 static int calculate_dao_input_capacity(size_t input_index,
                                         uint64_t original_capacity,
                                         uint64_t *calculated_capacity) {
-  volatile uint64_t len = 0;
+  uint64_t len = 0;
   size_t withdraw_index = 0;
 
   int ret = extract_withdraw_header_index(input_index, &withdraw_index);
@@ -197,6 +206,7 @@ static int calculate_dao_input_capacity(size_t input_index,
   }
 
   dao_header_data_t deposit_data;
+  memset(&deposit_data, 0, sizeof(deposit_data)); // avoid mem2reg
   ret = load_dao_header_data(input_index, CKB_SOURCE_INPUT, &deposit_data);
   if (ret != CKB_SUCCESS) {
     return ret;
@@ -247,7 +257,7 @@ static int calculate_dao_input_capacity(size_t input_index,
   uint64_t minimal_since_epoch_index = deposit_data.epoch_index;
   uint64_t minimal_since_epoch_length = deposit_data.epoch_length;
 
-  volatile uint64_t input_since = 0;
+  uint64_t input_since = 0;
   len = 8;
   ret = ckb_load_input_by_field(((unsigned char *)&input_since), &len, 0,
                                 input_index, CKB_SOURCE_INPUT,
@@ -284,7 +294,7 @@ static int calculate_dao_input_capacity(size_t input_index,
   uint64_t deposit_accumulate_rate = *((uint64_t *)(&deposit_data.dao[8]));
   uint64_t withdraw_accumulate_rate = *((uint64_t *)(&withdraw_data.dao[8]));
 
-  volatile uint64_t occupied_capacity = 0;
+  uint64_t occupied_capacity = 0;
   len = 8;
   ret = ckb_load_cell_by_field(((unsigned char *)&occupied_capacity), &len, 0,
                                input_index, CKB_SOURCE_INPUT,
@@ -318,10 +328,10 @@ int main() {
   int ret;
   unsigned char script_hash[HASH_SIZE];
   unsigned char script[SCRIPT_SIZE];
-  volatile uint64_t len = 0;
-  mol_pos_t script_pos;
-  mol_read_res_t args_res;
-  mol_read_res_t bytes_res;
+  uint64_t len = 0;
+  mol_seg_t script_seg;
+  mol_seg_t args_seg;
+  mol_seg_t bytes_seg;
 
   /*
    * DAO has no arguments, this way we can ensure all DAO related scripts
@@ -332,17 +342,14 @@ int main() {
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
-  script_pos.ptr = (const uint8_t*)script;
-  script_pos.size = len;
-  args_res = mol_cut(&script_pos, MOL_Script_args());
-  if (args_res.code != 0) {
+  script_seg.ptr = (uint8_t*)script;
+  script_seg.size = len;
+  if (MolReader_Script_verify(&script_seg, false) != MOL_OK) {
     return ERROR_ENCODING;
   }
-  bytes_res = mol_cut_bytes(&args_res.pos);
-  if (bytes_res.code != 0) {
-    return ERROR_ENCODING;
-  }
-  if (bytes_res.pos.size != 0) {
+  args_seg = MolReader_Script_get_args(&script_seg);
+  bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
+  if (bytes_seg.size != 0) {
     return ERROR_WRONG_NUMBER_OF_ARGUMENTS;
   }
 
@@ -356,7 +363,7 @@ int main() {
   uint64_t input_capacities = 0;
   while (1) {
     int dao_input = 0;
-    volatile uint64_t capacity = 0;
+    uint64_t capacity = 0;
     len = 8;
     ret = ckb_load_cell_by_field(((unsigned char *)&capacity), &len, 0, index,
                                  CKB_SOURCE_INPUT, CKB_CELL_FIELD_CAPACITY);
@@ -403,7 +410,7 @@ int main() {
   index = 0;
   uint64_t output_capacities = 0;
   while (1) {
-    volatile uint64_t capacity = 0;
+    uint64_t capacity = 0;
     len = 8;
     ret = ckb_load_cell_by_field(((unsigned char *)&capacity), &len, 0, index,
                                  CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_CAPACITY);

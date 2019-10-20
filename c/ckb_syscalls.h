@@ -6,6 +6,8 @@
 
 #include "ckb_consts.h"
 
+#define memory_barrier() asm volatile("fence" ::: "memory")
+
 static inline long __internal_syscall(long n, long _a0, long _a1, long _a2,
                                       long _a3, long _a4, long _a5) {
   register long a0 asm("a0") = _a0;
@@ -24,6 +26,11 @@ static inline long __internal_syscall(long n, long _a0, long _a1, long _a2,
   asm volatile("scall"
                : "+r"(a0)
                : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(syscall_id));
+  /*
+   * Syscalls might modify memory sent as pointer, adding a barrier here ensures
+   * gcc won't do incorrect optimization.
+   */
+  memory_barrier();
 
   return a0;
 }
@@ -34,54 +41,89 @@ static inline long __internal_syscall(long n, long _a0, long _a1, long _a2,
 
 int ckb_exit(int8_t code) { return syscall(SYS_exit, code, 0, 0, 0, 0, 0); }
 
-int ckb_load_tx_hash(void* addr, volatile uint64_t* len, size_t offset) {
-  return syscall(SYS_ckb_load_tx_hash, addr, len, offset, 0, 0, 0);
+int ckb_load_tx_hash(void* addr, uint64_t* len, size_t offset) {
+  volatile uint64_t inner_len = *len;
+  int ret = syscall(SYS_ckb_load_tx_hash, addr, &inner_len, offset, 0, 0, 0);
+  *len = inner_len;
+  return ret;
 }
 
-int ckb_load_script_hash(void* addr, volatile uint64_t* len, size_t offset) {
-  return syscall(SYS_ckb_load_script_hash, addr, len, offset, 0, 0, 0);
+int ckb_load_script_hash(void* addr, uint64_t* len, size_t offset) {
+  volatile uint64_t inner_len = *len;
+  int ret =
+      syscall(SYS_ckb_load_script_hash, addr, &inner_len, offset, 0, 0, 0);
+  *len = inner_len;
+  return ret;
 }
 
-int ckb_load_cell(void* addr, volatile uint64_t* len, size_t offset,
-                  size_t index, size_t source) {
-  return syscall(SYS_ckb_load_cell, addr, len, offset, index, source, 0);
+int ckb_load_cell(void* addr, uint64_t* len, size_t offset, size_t index,
+                  size_t source) {
+  volatile uint64_t inner_len = *len;
+  int ret =
+      syscall(SYS_ckb_load_cell, addr, &inner_len, offset, index, source, 0);
+  *len = inner_len;
+  return ret;
 }
 
-int ckb_load_input(void* addr, volatile uint64_t* len, size_t offset,
-                   size_t index, size_t source) {
-  return syscall(SYS_ckb_load_input, addr, len, offset, index, source, 0);
+int ckb_load_input(void* addr, uint64_t* len, size_t offset, size_t index,
+                   size_t source) {
+  volatile uint64_t inner_len = *len;
+  int ret =
+      syscall(SYS_ckb_load_input, addr, &inner_len, offset, index, source, 0);
+  *len = inner_len;
+  return ret;
 }
 
-int ckb_load_header(void* addr, volatile uint64_t* len, size_t offset,
-                    size_t index, size_t source) {
-  return syscall(SYS_ckb_load_header, addr, len, offset, index, source, 0);
+int ckb_load_header(void* addr, uint64_t* len, size_t offset, size_t index,
+                    size_t source) {
+  volatile uint64_t inner_len = *len;
+  int ret =
+      syscall(SYS_ckb_load_header, addr, &inner_len, offset, index, source, 0);
+  *len = inner_len;
+  return ret;
 }
 
-int ckb_load_witness(void* addr, volatile uint64_t* len, size_t offset,
-                     size_t index, size_t source) {
-  return syscall(SYS_ckb_load_witness, addr, len, offset, index, source, 0);
+int ckb_load_witness(void* addr, uint64_t* len, size_t offset, size_t index,
+                     size_t source) {
+  volatile uint64_t inner_len = *len;
+  int ret =
+      syscall(SYS_ckb_load_witness, addr, &inner_len, offset, index, source, 0);
+  *len = inner_len;
+  return ret;
 }
 
-int ckb_load_script(void* addr, volatile uint64_t* len, size_t offset) {
-  return syscall(SYS_ckb_load_script, addr, len, offset, 0, 0, 0);
+int ckb_load_script(void* addr, uint64_t* len, size_t offset) {
+  volatile uint64_t inner_len = *len;
+  int ret = syscall(SYS_ckb_load_script, addr, &inner_len, offset, 0, 0, 0);
+  *len = inner_len;
+  return ret;
 }
 
-int ckb_load_cell_by_field(void* addr, volatile uint64_t* len, size_t offset,
+int ckb_load_cell_by_field(void* addr, uint64_t* len, size_t offset,
                            size_t index, size_t source, size_t field) {
-  return syscall(SYS_ckb_load_cell_by_field, addr, len, offset, index, source,
-                 field);
+  volatile uint64_t inner_len = *len;
+  int ret = syscall(SYS_ckb_load_cell_by_field, addr, &inner_len, offset, index,
+                    source, field);
+  *len = inner_len;
+  return ret;
 }
 
-int ckb_load_header_by_field(void* addr, volatile uint64_t* len, size_t offset,
+int ckb_load_header_by_field(void* addr, uint64_t* len, size_t offset,
                              size_t index, size_t source, size_t field) {
-  return syscall(SYS_ckb_load_header_by_field, addr, len, offset, index, source,
-                 field);
+  volatile uint64_t inner_len = *len;
+  int ret = syscall(SYS_ckb_load_header_by_field, addr, &inner_len, offset,
+                    index, source, field);
+  *len = inner_len;
+  return ret;
 }
 
-int ckb_load_input_by_field(void* addr, volatile uint64_t* len, size_t offset,
+int ckb_load_input_by_field(void* addr, uint64_t* len, size_t offset,
                             size_t index, size_t source, size_t field) {
-  return syscall(SYS_ckb_load_input_by_field, addr, len, offset, index, source,
-                 field);
+  volatile uint64_t inner_len = *len;
+  int ret = syscall(SYS_ckb_load_input_by_field, addr, &inner_len, offset,
+                    index, source, field);
+  *len = inner_len;
+  return ret;
 }
 
 int ckb_load_cell_code(void* addr, size_t memory_size, size_t content_offset,
@@ -90,9 +132,13 @@ int ckb_load_cell_code(void* addr, size_t memory_size, size_t content_offset,
                  content_offset, content_size, index, source);
 }
 
-int ckb_load_cell_data(void* addr, volatile uint64_t* len, size_t offset,
-                       size_t index, size_t source) {
-  return syscall(SYS_ckb_load_cell_data, addr, len, offset, index, source, 0);
+int ckb_load_cell_data(void* addr, uint64_t* len, size_t offset, size_t index,
+                       size_t source) {
+  volatile uint64_t inner_len = *len;
+  int ret = syscall(SYS_ckb_load_cell_data, addr, &inner_len, offset, index,
+                    source, 0);
+  *len = inner_len;
+  return ret;
 }
 
 int ckb_debug(const char* s) {

@@ -16,12 +16,12 @@ use rand::{thread_rng, Rng};
 
 const SIGNATURE_SIZE: usize = 65;
 
-const ERROR_WITNESS_LEN: i8 = -21;
-const ERROR_INVALID_PUBKEYS_CNT: i8 = -22;
-const ERROR_INVALID_THRESHOLD: i8 = -23;
-const ERROR_INVALID_REQUIRE_FIRST_N: i8 = -24;
-const ERROR_MULTSIG_SCRIPT_HASH: i8 = -31;
-const ERROR_VERIFICATION: i8 = -32;
+const ERROR_WITNESS_LEN: i8 = -22;
+const ERROR_INVALID_PUBKEYS_CNT: i8 = -42;
+const ERROR_INVALID_THRESHOLD: i8 = -43;
+const ERROR_INVALID_REQUIRE_FIRST_N: i8 = -44;
+const ERROR_MULTSIG_SCRIPT_HASH: i8 = -51;
+const ERROR_VERIFICATION: i8 = -52;
 
 #[test]
 fn test_multisig_script_hash() {
@@ -239,6 +239,7 @@ fn test_multisig_1_2_3_with_multiple_inputs_unlock() {
     let multi_sign_script = gen_multi_sign_script(&keys, 2, 1);
     let args = blake160(&multi_sign_script);
     let tx = gen_tx_with_extra_inputs(&mut data_loader, args, 1);
+    dbg!(format!("{}", &tx));
     {
         let tx = multi_sign_tx(tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
         verify(&data_loader, &tx).expect("pass verification");
@@ -339,12 +340,14 @@ fn multi_sign_tx(
                     .as_builder()
                     .lock(Bytes::from(lock_without_sig).pack())
                     .build();
+                let len = witness_without_sig.as_bytes().len() as u64;
+                blake2b.update(&len.to_le_bytes());
                 blake2b.update(&witness_without_sig.as_bytes());
                 (1..tx.witnesses().len()).for_each(|n| {
-                    let witness = tx.witnesses().get(n).unwrap();
-                    if !witness.raw_data().is_empty() {
-                        blake2b.update(&witness.raw_data());
-                    }
+                    let witness: Bytes = tx.witnesses().get(n).unwrap().unpack();
+                    let len = witness.len() as u64;
+                    blake2b.update(&len.to_le_bytes());
+                    blake2b.update(&witness);
                 });
                 blake2b.finalize(&mut message);
                 let message = H256::from(message);
@@ -441,7 +444,7 @@ fn gen_tx_with_extra_inputs(
     let script = Script::new_builder()
         .args(lock_args.pack())
         .code_hash(dep_cell_data_hash)
-        .hash_type(ScriptHashType::Data.pack())
+        .hash_type(ScriptHashType::Data.into())
         .build();
     let previous_output_cell = CellOutput::new_builder()
         .capacity(capacity.pack())
@@ -456,13 +459,13 @@ fn gen_tx_with_extra_inputs(
         .cell_dep(
             CellDep::new_builder()
                 .out_point(contract_out_point)
-                .dep_type(DepType::Code.pack())
+                .dep_type(DepType::Code.into())
                 .build(),
         )
         .cell_dep(
             CellDep::new_builder()
                 .out_point(secp256k1_data_out_point)
-                .dep_type(DepType::Code.pack())
+                .dep_type(DepType::Code.into())
                 .build(),
         )
         .output(CellOutput::new_builder().capacity(capacity.pack()).build())
