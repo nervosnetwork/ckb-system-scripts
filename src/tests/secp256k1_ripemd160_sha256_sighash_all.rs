@@ -9,21 +9,23 @@ use ckb_types::{
         Capacity, DepType, ScriptHashType, TransactionBuilder, TransactionView,
     },
     h160, h256,
-    packed::{self, CellDep, CellInput, CellOutput, OutPoint, Script},
+    packed::{self, CellDep, CellInput, CellOutput, OutPoint, Script, WitnessArgs},
     prelude::*,
     H160, H256,
 };
 use rand::{thread_rng, Rng};
+use secp256k1::SecretKey;
+use sha2::{Digest, Sha256};
 
-const ERROR_PUBKEY_RIPEMD160_HASH: i8 = -3;
-const ERROR_SECP_VERIFICATION: i8 = -9;
-const ERROR_WITNESS_SIZE: i8 = -12;
+const ERROR_PUBKEY_RIPEMD160_HASH: i8 = -32;
+const ERROR_SECP_VERIFICATION: i8 = -12;
+const ERROR_WITNESS_SIZE: i8 = -22;
 
 fn gen_tx(
     dummy: &mut DummyDataLoader,
     script_data: Bytes,
     lock_args: Bytes,
-    extra_witness: Bytes,
+    pubkey: Bytes,
 ) -> TransactionView {
     let previous_tx_hash = {
         let mut rng = thread_rng();
@@ -79,7 +81,7 @@ fn gen_tx(
     let script = Script::new_builder()
         .args(lock_args.pack())
         .code_hash(dep_cell_data_hash)
-        .hash_type(ScriptHashType::Data.pack())
+        .hash_type(ScriptHashType::Data.into())
         .build();
     let previous_output_cell = CellOutput::new_builder()
         .capacity(capacity.pack())
@@ -91,17 +93,23 @@ fn gen_tx(
     );
     TransactionBuilder::default()
         .input(CellInput::new(previous_out_point.clone(), 0))
-        .witness(extra_witness.pack())
+        .witness(
+            WitnessArgs::new_builder()
+                .lock(pubkey.pack())
+                .build()
+                .as_bytes()
+                .pack(),
+        )
         .cell_dep(
             CellDep::new_builder()
                 .out_point(contract_out_point)
-                .dep_type(DepType::Code.pack())
+                .dep_type(DepType::Code.into())
                 .build(),
         )
         .cell_dep(
             CellDep::new_builder()
                 .out_point(secp256k1_data_out_point)
-                .dep_type(DepType::Code.pack())
+                .dep_type(DepType::Code.into())
                 .build(),
         )
         .output(CellOutput::new_builder().capacity(capacity.pack()).build())
@@ -109,21 +117,93 @@ fn gen_tx(
         .build()
 }
 
+#[derive(Copy, Clone)]
+pub enum SigType {
+    Recoverable,
+    NonRecoverable,
+}
+
+impl SigType {
+    pub fn signature_size(self) -> usize {
+        match self {
+            SigType::Recoverable => 65,
+            SigType::NonRecoverable => 64,
+        }
+    }
+}
+
 // Special signature method, inconsistent with the default lock behavior,
 // witness signature only sign transaction hash
-pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
+pub fn sign_tx(tx: TransactionView, key: &SecretKey) -> TransactionView {
+    sign_tx_by_input_group(tx, key, 0, 0, SigType::Recoverable)
+}
+pub fn sign_tx_by_input_group(
+    tx: TransactionView,
+    key: &SecretKey,
+    begin_index: usize,
+    len: usize,
+    sig_type: SigType,
+) -> TransactionView {
     let tx_hash: H256 = tx.hash().unpack();
     let signed_witnesses: Vec<packed::Bytes> = tx
         .inputs()
         .into_iter()
         .enumerate()
         .map(|(i, _)| {
-            let sig = key.sign_recoverable(&tx_hash).expect("sign");
-            let mut signed_witness = Bytes::from(sig.serialize());
-            if let Some(witness) = tx.witnesses().get(i) {
-                signed_witness.extend_from_slice(&witness.raw_data());
+            // digest the first witness
+            if i == begin_index {
+                let mut hasher = sha2::Sha256::new();
+                hasher.input(&tx_hash);
+                let witness = WitnessArgs::new_unchecked(tx.witnesses().get(i).unwrap().unpack());
+                let zero_lock: Bytes = {
+                    let mut buf = Vec::new();
+                    buf.resize(sig_type.signature_size(), 0);
+                    buf.extend_from_slice(&Unpack::<Bytes>::unpack(&witness.lock()));
+                    buf.into()
+                };
+                let witness_for_digest =
+                    witness.clone().as_builder().lock(zero_lock.pack()).build();
+                let witness_len = witness_for_digest.as_bytes().len() as u64;
+                hasher.input(&witness_len.to_le_bytes());
+                hasher.input(&witness_for_digest.as_bytes());
+                ((i + 1)..(i + len)).for_each(|n| {
+                    let witness = tx.witnesses().get(n).unwrap();
+                    let witness_len = witness.raw_data().len() as u64;
+                    hasher.input(&witness_len.to_le_bytes());
+                    hasher.input(&witness.raw_data());
+                });
+                let mut message = [0u8; 32];
+                message.copy_from_slice(&hasher.result());
+                let sig = match sig_type {
+                    SigType::Recoverable => {
+                        let message = H256::from(message);
+                        let key = Privkey::from_slice(&key[..]);
+                        key.sign_recoverable(&message).expect("sign").serialize()
+                    }
+                    SigType::NonRecoverable => {
+                        let context = &ckb_crypto::secp::SECP256K1;
+                        let message = secp256k1::Message::from_slice(&message).unwrap();
+                        // let key = secp256k1::key::SecretKey::from_slice(key.as_bytes()).unwrap();
+                        let signature = context.sign(&message, &key);
+                        signature.serialize_compact().to_vec()
+                    }
+                };
+                assert_eq!(sig_type.signature_size(), sig.len());
+                let lock: Bytes = {
+                    let mut buf = Vec::new();
+                    buf.extend_from_slice(&sig);
+                    buf.extend_from_slice(&zero_lock[sig_type.signature_size()..]);
+                    buf.into()
+                };
+                witness
+                    .as_builder()
+                    .lock(lock.pack())
+                    .build()
+                    .as_bytes()
+                    .pack()
+            } else {
+                tx.witnesses().get(i).unwrap()
             }
-            signed_witness.pack()
         })
         .collect();
     // calculate message
@@ -164,13 +244,12 @@ fn build_resolved_tx(data_loader: &DummyDataLoader, tx: &TransactionView) -> Res
 }
 
 fn ripemd160(data: &[u8]) -> H160 {
-    use ripemd160::{Digest, Ripemd160};
+    use ripemd160::Ripemd160;
     let digest: [u8; 20] = Ripemd160::digest(data).into();
     H160::from(digest)
 }
 
 fn sha256(data: &[u8]) -> H256 {
-    use sha2::{Digest, Sha256};
     let digest: [u8; 32] = Sha256::digest(data).into();
     H256::from(digest)
 }
@@ -206,7 +285,8 @@ fn test_rust_crypto() {
 #[test]
 fn test_sighash_all_unlock() {
     let mut data_loader = DummyDataLoader::new();
-    let privkey = Generator::random_privkey();
+    let secret_key = Generator::random_secret_key();
+    let privkey = Privkey::from_slice(&secret_key[..]);
     let pubkey = pubkey_compressed(&privkey.pubkey().expect("pubkey"));
     // compute pubkey hash
     let pubkey_hash = pubkey_hash(&pubkey);
@@ -216,7 +296,7 @@ fn test_sighash_all_unlock() {
         pubkey_hash.into(),
         pubkey.into(),
     );
-    let tx = sign_tx(tx, &privkey);
+    let tx = sign_tx(tx, &secret_key);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
@@ -226,7 +306,8 @@ fn test_sighash_all_unlock() {
 #[test]
 fn test_sighash_all_unlock_with_uncompressed_pubkey() {
     let mut data_loader = DummyDataLoader::new();
-    let privkey = Generator::random_privkey();
+    let secret_key = Generator::random_secret_key();
+    let privkey = Privkey::from_slice(&secret_key[..]);
     let pubkey = pubkey_uncompressed(&privkey.pubkey().expect("pubkey"));
     let pubkey_hash = pubkey_hash(&pubkey);
     let tx = gen_tx(
@@ -235,7 +316,7 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey() {
         pubkey_hash.into(),
         pubkey.into(),
     );
-    let tx = sign_tx(tx, &privkey);
+    let tx = sign_tx(tx, &secret_key);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
@@ -245,7 +326,8 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey() {
 #[test]
 fn test_sighash_all_unlock_with_uncompressed_pubkey_and_non_recoverable_signature() {
     let mut data_loader = DummyDataLoader::new();
-    let privkey = Generator::random_privkey();
+    let secret_key = Generator::random_secret_key();
+    let privkey = Privkey::from_slice(&secret_key[..]);
     let pubkey = pubkey_uncompressed(&privkey.pubkey().expect("pubkey"));
     let pubkey_hash = pubkey_hash(&pubkey);
 
@@ -253,24 +335,10 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey_and_non_recoverable_signatur
         &mut data_loader,
         BITCOIN_P2PKH_BIN.clone(),
         pubkey_hash.into(),
-        Bytes::new(),
+        pubkey.into(),
     );
     // Create non-recoverable signature
-    let tx = {
-        let tx_hash: H256 = tx.hash().unpack();
-        let context = &ckb_crypto::secp::SECP256K1;
-        let message = secp256k1::Message::from_slice(tx_hash.as_bytes()).unwrap();
-        let privkey = secp256k1::key::SecretKey::from_slice(privkey.as_bytes()).unwrap();
-        let signature = context.sign(&message, &privkey);
-        let mut witness = Bytes::from(&signature.serialize_compact()[..]);
-        witness.extend_from_slice(&pubkey);
-
-        tx.as_advanced_builder()
-            .set_witnesses(vec![])
-            .witness(witness.pack())
-            .build()
-    };
-
+    let tx = sign_tx_by_input_group(tx, &secret_key, 0, 0, SigType::NonRecoverable);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
@@ -280,8 +348,10 @@ fn test_sighash_all_unlock_with_uncompressed_pubkey_and_non_recoverable_signatur
 #[test]
 fn test_signing_with_wrong_key() {
     let mut data_loader = DummyDataLoader::new();
-    let privkey = Generator::random_privkey();
-    let wrong_privkey = Generator::random_privkey();
+    let secret_key = Generator::random_secret_key();
+    let privkey = Privkey::from_slice(&secret_key[..]);
+    let wrong_secret_key = Generator::random_secret_key();
+    let wrong_privkey = Privkey::from_slice(&wrong_secret_key[..]);
     let wrong_pubkey = pubkey_compressed(&wrong_privkey.pubkey().expect("pubkey"));
     let pubkey = pubkey_compressed(&privkey.pubkey().expect("pubkey"));
     let pubkey_hash = pubkey_hash(&pubkey);
@@ -291,7 +361,7 @@ fn test_signing_with_wrong_key() {
         pubkey_hash.into(),
         wrong_pubkey.into(),
     );
-    let tx = sign_tx(tx, &wrong_privkey);
+    let tx = sign_tx(tx, &wrong_secret_key);
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
@@ -304,7 +374,8 @@ fn test_signing_with_wrong_key() {
 #[test]
 fn test_signing_wrong_tx_hash() {
     let mut data_loader = DummyDataLoader::new();
-    let privkey = Generator::random_privkey();
+    let secret_key = Generator::random_secret_key();
+    let privkey = Privkey::from_slice(&secret_key[..]);
     let pubkey = pubkey_compressed(&privkey.pubkey().expect("pubkey"));
     let pubkey_hash = pubkey_hash(&pubkey);
     let tx = gen_tx(
@@ -313,7 +384,7 @@ fn test_signing_wrong_tx_hash() {
         pubkey_hash.into(),
         pubkey.into(),
     );
-    let tx = sign_tx(tx, &privkey);
+    let tx = sign_tx(tx, &secret_key);
     // Change tx hash
     let tx = tx.as_advanced_builder().output(Default::default()).build();
 
@@ -345,12 +416,18 @@ fn test_super_long_witness() {
     super_long_message.resize(40000, 1);
 
     let sig = privkey.sign_recoverable(&tx_hash).expect("sign");
-    let mut witness = Bytes::from(sig.serialize());
-    witness.extend_from_slice(&super_long_message);
+    let mut lock = Bytes::from(sig.serialize());
+    lock.extend_from_slice(&super_long_message);
     let tx = tx
         .as_advanced_builder()
         .set_witnesses(vec![])
-        .witness(witness.pack())
+        .witness(
+            WitnessArgs::new_builder()
+                .lock(lock.pack())
+                .build()
+                .as_bytes()
+                .pack(),
+        )
         .build();
 
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
@@ -365,7 +442,8 @@ fn test_super_long_witness() {
 #[test]
 fn test_wrong_size_witness_args() {
     let mut data_loader = DummyDataLoader::new();
-    let privkey = Generator::random_privkey();
+    let secret_key = Generator::random_secret_key();
+    let privkey = Privkey::from_slice(&secret_key[..]);
     let pubkey = pubkey_uncompressed(&privkey.pubkey().expect("pubkey"));
     let pubkey_hash = pubkey_hash(&pubkey);
     let raw_tx = gen_tx(
@@ -374,13 +452,19 @@ fn test_wrong_size_witness_args() {
         pubkey_hash.into(),
         pubkey.into(),
     );
-    let other_witness = Bytes::from("1243");
     // witness less than 2 args
-    let tx = sign_tx(raw_tx.clone(), &privkey);
+    let tx = sign_tx(raw_tx.clone(), &secret_key);
+    let wrong_lock = Bytes::from("1243");
     let tx = tx
         .as_advanced_builder()
         .set_witnesses(vec![])
-        .witness(other_witness.pack())
+        .witness(
+            WitnessArgs::new_builder()
+                .lock(wrong_lock.pack())
+                .build()
+                .as_bytes()
+                .pack(),
+        )
         .build();
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =

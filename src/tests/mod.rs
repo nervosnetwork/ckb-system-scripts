@@ -7,7 +7,7 @@ use ckb_script::DataLoader;
 use ckb_types::{
     bytes::Bytes,
     core::{cell::CellMeta, BlockExt, EpochExt, HeaderView, TransactionView},
-    packed::{self, Byte32, CellOutput, OutPoint},
+    packed::{self, Byte32, CellOutput, OutPoint, WitnessArgs},
     prelude::*,
     H256,
 };
@@ -15,6 +15,7 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 
 pub const MAX_CYCLES: u64 = std::u64::MAX;
+pub const SIGNATURE_SIZE: usize = 65;
 
 lazy_static! {
     pub static ref SIGHASH_ALL_BIN: Bytes =
@@ -69,38 +70,64 @@ pub fn blake160(message: &[u8]) -> Bytes {
     Bytes::from(&ckb_hash::blake2b_256(message)[..20])
 }
 
-pub fn multi_sign_tx(tx: TransactionView, keys: &[&Privkey]) -> TransactionView {
+pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
+    let witnesses_len = tx.witnesses().len();
+    sign_tx_by_input_group(tx, key, 0, witnesses_len)
+}
+
+pub fn sign_tx_by_input_group(
+    tx: TransactionView,
+    key: &Privkey,
+    begin_index: usize,
+    len: usize,
+) -> TransactionView {
     let tx_hash = tx.hash();
-    let signed_witnesses: Vec<packed::Bytes> = tx
+    let mut signed_witnesses: Vec<packed::Bytes> = tx
         .inputs()
         .into_iter()
         .enumerate()
         .map(|(i, _)| {
-            let mut blake2b = ckb_hash::new_blake2b();
-            let mut message = [0u8; 32];
-            blake2b.update(&tx_hash.raw_data());
-            if let Some(witness) = tx.witnesses().get(i) {
-                blake2b.update(&witness.raw_data());
-            }
-            blake2b.finalize(&mut message);
-            let message = H256::from(message);
-            let mut signed_witness = Bytes::new();
-            keys.iter().for_each(|key| {
+            if i == begin_index {
+                let mut blake2b = ckb_hash::new_blake2b();
+                let mut message = [0u8; 32];
+                blake2b.update(&tx_hash.raw_data());
+                // digest the first witness
+                let witness = WitnessArgs::new_unchecked(tx.witnesses().get(i).unwrap().unpack());
+                let zero_lock: Bytes = {
+                    let mut buf = Vec::new();
+                    buf.resize(SIGNATURE_SIZE, 0);
+                    buf.into()
+                };
+                let witness_for_digest =
+                    witness.clone().as_builder().lock(zero_lock.pack()).build();
+                let witness_len = witness_for_digest.as_bytes().len() as u64;
+                blake2b.update(&witness_len.to_le_bytes());
+                blake2b.update(&witness_for_digest.as_bytes());
+                ((i + 1)..(i + len)).for_each(|n| {
+                    let witness = tx.witnesses().get(n).unwrap();
+                    let witness_len = witness.raw_data().len() as u64;
+                    blake2b.update(&witness_len.to_le_bytes());
+                    blake2b.update(&witness.raw_data());
+                });
+                blake2b.finalize(&mut message);
+                let message = H256::from(message);
                 let sig = key.sign_recoverable(&message).expect("sign");
-                signed_witness.extend_from_slice(&sig.serialize());
-            });
-            if let Some(witness) = tx.witnesses().get(i) {
-                signed_witness.extend_from_slice(&witness.raw_data());
+                witness
+                    .as_builder()
+                    .lock(sig.serialize().pack())
+                    .build()
+                    .as_bytes()
+                    .pack()
+            } else {
+                tx.witnesses().get(i).unwrap_or_default()
             }
-            signed_witness.pack()
         })
         .collect();
+    for i in signed_witnesses.len()..tx.witnesses().len() {
+        signed_witnesses.push(tx.witnesses().get(i).unwrap());
+    }
     // calculate message
     tx.as_advanced_builder()
         .set_witnesses(signed_witnesses)
         .build()
-}
-
-pub fn sign_tx(tx: TransactionView, key: &Privkey) -> TransactionView {
-    multi_sign_tx(tx, &[key])
 }
