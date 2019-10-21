@@ -117,7 +117,7 @@ static int extract_withdraw_header_index(size_t input_index, size_t *index) {
     return ERROR_ENCODING;
   }
   /* Load type args */
-  mol_seg_t type_seg = MolReader_WitnessArgs_get_type_(&witness_seg);
+  mol_seg_t type_seg = MolReader_WitnessArgs_get_input_type(&witness_seg);
 
   mol_seg_t type_bytes_seg = MolReader_Bytes_raw_bytes(&type_seg);
   if (type_bytes_seg.size != 8) {

@@ -8,7 +8,7 @@ MOLC := moleculec
 MOLC_VERSION := 0.4.1
 PROTOCOL_HEADER := c/protocol.h
 PROTOCOL_SCHEMA := c/blockchain.mol
-PROTOCOL_VERSION := 3615b65050173747c4a285b068bccaa44a3f0deb
+PROTOCOL_VERSION := d75e4c56ffa40e17fd2fe477da3f98c5578edcd1
 PROTOCOL_URL := https://raw.githubusercontent.com/nervosnetwork/ckb/${PROTOCOL_VERSION}/util/types/schemas/blockchain.mol
 
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
