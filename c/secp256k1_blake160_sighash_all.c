@@ -26,6 +26,9 @@ int extract_witness_lock(uint8_t *witness, uint64_t len,
   }
   mol_seg_t lock_seg = MolReader_WitnessArgs_get_lock(&witness_seg);
 
+  if (MolReader_BytesOpt_is_none(&lock_seg)) {
+    return ERROR_ENCODING;
+  }
   *lock_bytes_seg = MolReader_Bytes_raw_bytes(&lock_seg);
   return CKB_SUCCESS;
 }
@@ -55,7 +58,7 @@ int main() {
     return ERROR_SCRIPT_TOO_LONG;
   }
   mol_seg_t script_seg;
-  script_seg.ptr = (uint8_t*)script;
+  script_seg.ptr = (uint8_t *)script;
   script_seg.size = len;
 
   if (MolReader_Script_verify(&script_seg, false) != MOL_OK) {
