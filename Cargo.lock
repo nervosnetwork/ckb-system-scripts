@@ -383,6 +383,18 @@ dependencies = [
 [[package]]
 name = "ckb-system-scripts"
 version = "0.4.0-alpha.10+witness-args"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "blake2b-rs 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "faster-hex 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "includedir 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "includedir_codegen 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "phf 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "ckb-system-scripts"
+version = "0.4.0-alpha.12+nonstrict-witnesses-length"
 dependencies = [
  "blake2b-rs 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -401,18 +413,6 @@ dependencies = [
  "ripemd160 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "secp256k1 0.15.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "sha2 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "ckb-system-scripts"
-version = "0.4.0-alpha.10+witness-args"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "blake2b-rs 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "faster-hex 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "includedir 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "includedir_codegen 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "phf 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
