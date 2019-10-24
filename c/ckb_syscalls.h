@@ -145,4 +145,20 @@ int ckb_debug(const char* s) {
   return syscall(SYS_ckb_debug, s, 0, 0, 0, 0, 0);
 }
 
+/* load the actual witness for the current type verify group.
+   use this instead of ckb_load_witness if type contract needs args to verify input/output.
+ */
+int load_actual_type_witness(uint8_t *buf, uint64_t *len, size_t index,
+                             size_t *type_source) {
+  *type_source = CKB_SOURCE_GROUP_INPUT;
+  uint64_t tmp_len = 0;
+  if (ckb_load_cell_by_field(NULL, &tmp_len, 0, 0, CKB_SOURCE_GROUP_INPUT,
+                             CKB_CELL_FIELD_CAPACITY) ==
+      CKB_INDEX_OUT_OF_BOUND) {
+    *type_source = CKB_SOURCE_GROUP_OUTPUT;
+  }
+
+  return ckb_load_witness(buf, len, 0, index, *type_source);
+}
+
 #endif /* CKB_SYSCALLS_H_ */

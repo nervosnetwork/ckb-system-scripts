@@ -19,7 +19,6 @@ use rand::{thread_rng, Rng, SeedableRng};
 
 const ERROR_ENCODING: i8 = -2;
 const ERROR_WITNESS_TOO_LONG: i8 = -22;
-const ERROR_INVALID_WITNESSES_COUNT: i8 = -23;
 const ERROR_PUBKEY_BLAKE160_HASH: i8 = -31;
 
 fn gen_tx(dummy: &mut DummyDataLoader, lock_args: Bytes) -> TransactionView {
@@ -396,7 +395,7 @@ fn test_super_long_witness() {
 
 #[test]
 fn test_sighash_all_2_in_2_out_cycles() {
-    const CONSUME_CYCLES: u64 = 3395472;
+    const CONSUME_CYCLES: u64 = 3394620;
 
     let mut data_loader = DummyDataLoader::new();
     let mut generator = Generator::non_crypto_safe_prng(42);
@@ -551,7 +550,7 @@ fn test_sighash_all_witnesses_ambiguity() {
 }
 
 #[test]
-fn test_sighash_all_too_many_witnesses() {
+fn test_sighash_all_cover_extra_witnesses() {
     let mut rng = thread_rng();
     let mut data_loader = DummyDataLoader::new();
     let privkey = Generator::random_privkey();
@@ -564,17 +563,29 @@ fn test_sighash_all_too_many_witnesses() {
         .as_advanced_builder()
         .set_witnesses(vec![
             witness.pack(),
-            Bytes::new().pack(),
             Bytes::from(vec![42]).pack(),
+            Bytes::new().pack(),
         ])
         .build();
     let tx = sign_tx_by_input_group(tx, &privkey, 0, 3);
     assert!(tx.witnesses().len() > tx.inputs().len());
+
+    // change last witness
+    let mut witnesses = Unpack::<Vec<_>>::unpack(&tx.witnesses());
+    let tx = tx
+        .as_advanced_builder()
+        .set_witnesses(vec![
+            witnesses.remove(0).pack(),
+            witnesses.remove(1).pack(),
+            Bytes::from(vec![0]).pack(),
+        ])
+        .build();
+
     let resolved_tx = build_resolved_tx(&data_loader, &tx);
     let verify_result =
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(60000000);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_INVALID_WITNESSES_COUNT),
+        ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
     );
 }

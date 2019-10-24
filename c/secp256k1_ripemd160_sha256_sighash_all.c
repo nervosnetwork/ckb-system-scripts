@@ -61,6 +61,9 @@ int extract_witness_lock(uint8_t *witness, uint64_t len,
   }
   mol_seg_t lock_seg = MolReader_WitnessArgs_get_lock(&witness_seg);
 
+  if (MolReader_BytesOpt_is_none(&lock_seg)) {
+    return ERROR_ENCODING;
+  }
   *lock_bytes_seg = MolReader_Bytes_raw_bytes(&lock_seg);
   return CKB_SUCCESS;
 }
@@ -108,13 +111,6 @@ int main() {
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
-
-  /* Check witnesses is less than or equals to inputs  */
-  ret = check_witnesses_len();
-  if (ret != CKB_SUCCESS) {
-    return ERROR_INVALID_WITNESSES_COUNT;
-  }
-
   /* Now we load actual witness data using the same input index above. */
   len = MAX_WITNESS_SIZE;
   ret = ckb_load_witness(witness, &len, 0, 0, CKB_SOURCE_GROUP_INPUT);
@@ -193,7 +189,7 @@ int main() {
   sha256_update(&sha256_ctx, (unsigned char *)&len, sizeof(uint64_t));
   sha256_update(&sha256_ctx, witness, len);
 
-  /* Digest other witnesses */
+  /* Digest same group witnesses */
   size_t i = 1;
   while (1) {
     len = MAX_WITNESS_SIZE;
@@ -203,6 +199,25 @@ int main() {
     }
     if (ret != CKB_SUCCESS) {
       return ERROR_SYSCALL;
+    }
+    sha256_update(&sha256_ctx, (unsigned char *)&len, sizeof(uint64_t));
+    sha256_update(&sha256_ctx, temp, len);
+    i += 1;
+  }
+
+  /* Digest witnesses that not covered by inputs */
+  i = calculate_inputs_len();
+  while (1) {
+    len = MAX_WITNESS_SIZE;
+    ret = ckb_load_witness(temp, &len, 0, i, CKB_SOURCE_INPUT);
+    if (ret == CKB_INDEX_OUT_OF_BOUND) {
+      break;
+    }
+    if (ret != CKB_SUCCESS) {
+      return ERROR_SYSCALL;
+    }
+    if (len > MAX_WITNESS_SIZE) {
+      return ERROR_WITNESS_SIZE;
     }
     sha256_update(&sha256_ctx, (unsigned char *)&len, sizeof(uint64_t));
     sha256_update(&sha256_ctx, temp, len);
