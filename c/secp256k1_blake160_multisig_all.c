@@ -70,12 +70,6 @@ int main() {
     return ERROR_ARGUMENTS_LEN;
   }
 
-  /* Check witnesses is less than or equals to inputs  */
-  ret = check_witnesses_len();
-  if (ret != CKB_SUCCESS) {
-    return ERROR_INVALID_WITNESSES_COUNT;
-  }
-
   /* Load witness of first input */
   unsigned char witness[MAX_WITNESS_SIZE];
   uint64_t witness_len = MAX_WITNESS_SIZE;
@@ -85,6 +79,10 @@ int main() {
   }
   mol_seg_t lock_bytes_seg;
   ret = extract_witness_lock(witness, witness_len, &lock_bytes_seg);
+  if (ret != CKB_SUCCESS) {
+    return ret;
+  }
+
   if (lock_bytes_seg.size < FLAGS_SIZE) {
     return ERROR_WITNESS_SIZE;
   }
@@ -143,7 +141,7 @@ int main() {
   blake2b_update(&blake2b_ctx, (char *)&witness_len, sizeof(uint64_t));
   blake2b_update(&blake2b_ctx, witness, witness_len);
 
-  /* Digest other witnesses */
+  /* Digest same group witnesses */
   size_t i = 1;
   while (1) {
     len = MAX_WITNESS_SIZE;
@@ -153,6 +151,25 @@ int main() {
     }
     if (ret != CKB_SUCCESS) {
       return ERROR_SYSCALL;
+    }
+    blake2b_update(&blake2b_ctx, (char *)&len, sizeof(uint64_t));
+    blake2b_update(&blake2b_ctx, temp, len);
+    i += 1;
+  }
+
+  /* Digest witnesses that not covered by inputs */
+  i = calculate_inputs_len();
+  while (1) {
+    len = MAX_WITNESS_SIZE;
+    ret = ckb_load_witness(temp, &len, 0, i, CKB_SOURCE_INPUT);
+    if (ret == CKB_INDEX_OUT_OF_BOUND) {
+      break;
+    }
+    if (ret != CKB_SUCCESS) {
+      return ERROR_SYSCALL;
+    }
+    if (len > MAX_WITNESS_SIZE) {
+      return ERROR_WITNESS_SIZE;
     }
     blake2b_update(&blake2b_ctx, (char *)&len, sizeof(uint64_t));
     blake2b_update(&blake2b_ctx, temp, len);
