@@ -29,10 +29,6 @@ const BINARIES: &[(&str, &str)] = &[
         "secp256k1_blake160_multisig_all",
         "2a450c65ed903e7064a53f95a660bce48a9c94ca64f395c82d5e86884ee25195",
     ),
-    (
-        "secp256k1_ripemd160_sha256_sighash_all",
-        "7fb94d32318116755ba1a9c04572351278172531aa5947502e9c3a511bd77126",
-    ),
 ];
 
 fn main() {
