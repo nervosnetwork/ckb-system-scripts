@@ -11,6 +11,7 @@
 /* verification errors */
 #define ERROR_MULTSIG_SCRIPT_HASH -51
 #define ERROR_VERIFICATION -52
+#define ERROR_INCORRECT_SINCE -53
 
 #define BLAKE2B_BLOCK_SIZE 32
 #define BLAKE160_SIZE 20
@@ -21,7 +22,7 @@
 #define MAX_WITNESS_SIZE 32768
 #define MAX_SCRIPT_SIZE 32768
 #define SIGNATURE_SIZE 65
-#define FLAGS_SIZE 4
+#define FLAGS_SIZE 12
 
 /*
  * Arguments:
@@ -29,7 +30,7 @@
  *
  * Witness:
  * multisig_script | Signature1 | signature2 | ...
- * multisig_script: S | R | M | N | Pubkey1 | Pubkey2 | ...
+ * multisig_script: S | R | M | N | since | Pubkey1 | Pubkey2 | ...
  *
  * +------------+----------------------------------+-------+
  * |            |           Description            | Bytes |
@@ -38,6 +39,7 @@
  * | R          | first nth public keys must match |     1 |
  * | M          | threshold                        |     1 |
  * | N          | total public keys                |     1 |
+ * | since      | tx since verify                  |     8 |
  * | PubkeyN    | compressed pubkey                |    33 |
  * | SignatureN | recoverable signature            |    65 |
  * +------------+----------------------------------+-------+
@@ -95,6 +97,7 @@ int main() {
   uint8_t pubkeys_cnt = lock_bytes[3];
   uint8_t threshold = lock_bytes[2];
   uint8_t require_first_n = lock_bytes[1];
+  uint64_t since = *(uint64_t *)&lock_bytes[4];
   if (pubkeys_cnt == 0) {
     return ERROR_INVALID_PUBKEYS_CNT;
   }
@@ -122,6 +125,28 @@ int main() {
 
   if (memcmp(args_bytes_seg.ptr, temp, BLAKE160_SIZE) != 0) {
     return ERROR_MULTSIG_SCRIPT_HASH;
+  }
+
+  /* Check since */
+  if (since != 0) {
+    size_t i = 0;
+    uint64_t input_since;
+    while (1) {
+      len = sizeof(uint64_t);
+      ret = ckb_load_input_by_field(&input_since, &len, 0, i,
+                                    CKB_SOURCE_GROUP_INPUT,
+                                    CKB_INPUT_FIELD_SINCE);
+      if (ret == CKB_INDEX_OUT_OF_BOUND) {
+        break;
+      }
+      if (ret != CKB_SUCCESS || len != sizeof(uint64_t)) {
+        return ERROR_SYSCALL;
+      }
+      if (since != input_since) {
+        return ERROR_INCORRECT_SINCE;
+      }
+      i += 1;
+    }
   }
 
   /* Load tx hash */
