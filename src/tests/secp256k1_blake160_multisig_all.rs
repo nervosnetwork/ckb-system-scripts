@@ -240,7 +240,6 @@ fn test_multisig_1_2_3_with_multiple_inputs_unlock() {
     let multi_sign_script = gen_multi_sign_script(&keys, 2, 1, 0);
     let args = blake160(&multi_sign_script);
     let tx = gen_tx_with_extra_inputs(&mut data_loader, args, 1);
-    dbg!(format!("{}", &tx));
     {
         let tx = multi_sign_tx(tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
         verify(&data_loader, &tx).expect("pass verification");

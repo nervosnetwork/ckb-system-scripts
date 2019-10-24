@@ -13,7 +13,6 @@
 #define ERROR_SCRIPT_TOO_LONG -21
 #define ERROR_WITNESS_SIZE -22
 #define ERROR_PUBKEY_BLAKE160_HASH -31
-#define ERROR_PUBKEY_RIPEMD160_HASH -32
 
 /* calculate inputs length */
 int calculate_inputs_len() {
