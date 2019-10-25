@@ -22,15 +22,16 @@
 #define MAX_WITNESS_SIZE 32768
 #define MAX_SCRIPT_SIZE 32768
 #define SIGNATURE_SIZE 65
-#define FLAGS_SIZE 12
+#define FLAGS_SIZE 4
 
 /*
  * Arguments:
- * multisig script blake160 hash, 20 bytes.
+ * 1. multisig script blake160 hash, 20 bytes.
+ * 2. an optional since constraint, 4 bytes.
  *
  * Witness:
  * multisig_script | Signature1 | signature2 | ...
- * multisig_script: S | R | M | N | since | Pubkey1 | Pubkey2 | ...
+ * multisig_script: S | R | M | N | Pubkey1 | Pubkey2 | ...
  *
  * +------------+----------------------------------+-------+
  * |            |           Description            | Bytes |
@@ -39,7 +40,6 @@
  * | R          | first nth public keys must match |     1 |
  * | M          | threshold                        |     1 |
  * | N          | total public keys                |     1 |
- * | since      | tx since verify                  |     8 |
  * | PubkeyN    | compressed pubkey                |    33 |
  * | SignatureN | recoverable signature            |    65 |
  * +------------+----------------------------------+-------+
@@ -68,8 +68,13 @@ int main() {
 
   mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
   mol_seg_t args_bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
-  if (args_bytes_seg.size != BLAKE160_SIZE) {
+  if (args_bytes_seg.size != BLAKE160_SIZE &&
+      args_bytes_seg.size != BLAKE160_SIZE + sizeof(uint64_t)) {
     return ERROR_ARGUMENTS_LEN;
+  }
+  uint64_t since = 0;
+  if (args_bytes_seg.size == BLAKE160_SIZE + sizeof(uint64_t)) {
+    since = *(uint64_t *)&args_bytes_seg.ptr[BLAKE160_SIZE];
   }
 
   /* Load witness of first input */
@@ -97,7 +102,6 @@ int main() {
   uint8_t pubkeys_cnt = lock_bytes[3];
   uint8_t threshold = lock_bytes[2];
   uint8_t require_first_n = lock_bytes[1];
-  uint64_t since = *(uint64_t *)&lock_bytes[4];
   if (pubkeys_cnt == 0) {
     return ERROR_INVALID_PUBKEYS_CNT;
   }
