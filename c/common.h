@@ -1,4 +1,5 @@
 #include "ckb_syscalls.h"
+#include "protocol.h"
 
 /* Common errors */
 #define ERROR_ARGUMENTS_LEN -1
@@ -12,7 +13,6 @@
 #define ERROR_SCRIPT_TOO_LONG -21
 #define ERROR_WITNESS_SIZE -22
 #define ERROR_PUBKEY_BLAKE160_HASH -31
-#define ERROR_PUBKEY_RIPEMD160_HASH -32
 
 /* calculate inputs length */
 int calculate_inputs_len() {
@@ -49,4 +49,23 @@ int calculate_inputs_len() {
   }
   /* now lo is last input index and hi is length of inputs */
   return hi;
+}
+
+/* Extract lock from WitnessArgs */
+int extract_witness_lock(uint8_t *witness, uint64_t len,
+                         mol_seg_t *lock_bytes_seg) {
+  mol_seg_t witness_seg;
+  witness_seg.ptr = witness;
+  witness_seg.size = len;
+
+  if (MolReader_WitnessArgs_verify(&witness_seg, false) != MOL_OK) {
+    return ERROR_ENCODING;
+  }
+  mol_seg_t lock_seg = MolReader_WitnessArgs_get_lock(&witness_seg);
+
+  if (MolReader_BytesOpt_is_none(&lock_seg)) {
+    return ERROR_ENCODING;
+  }
+  *lock_bytes_seg = MolReader_Bytes_raw_bytes(&lock_seg);
+  return CKB_SUCCESS;
 }

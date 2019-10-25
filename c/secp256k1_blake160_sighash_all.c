@@ -14,25 +14,6 @@
 #define SCRIPT_SIZE 32768
 #define SIGNATURE_SIZE 65
 
-/* Extract lock from WitnessArgs */
-int extract_witness_lock(uint8_t *witness, uint64_t len,
-                         mol_seg_t *lock_bytes_seg) {
-  mol_seg_t witness_seg;
-  witness_seg.ptr = witness;
-  witness_seg.size = len;
-
-  if (MolReader_WitnessArgs_verify(&witness_seg, false) != MOL_OK) {
-    return ERROR_ENCODING;
-  }
-  mol_seg_t lock_seg = MolReader_WitnessArgs_get_lock(&witness_seg);
-
-  if (MolReader_BytesOpt_is_none(&lock_seg)) {
-    return ERROR_ENCODING;
-  }
-  *lock_bytes_seg = MolReader_Bytes_raw_bytes(&lock_seg);
-  return CKB_SUCCESS;
-}
-
 /*
  * Arguments:
  * pubkey blake160 hash, blake2b hash of pubkey first 20 bytes, used to

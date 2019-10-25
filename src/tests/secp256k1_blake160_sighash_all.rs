@@ -18,7 +18,7 @@ use ckb_types::{
 use rand::{thread_rng, Rng, SeedableRng};
 
 const ERROR_ENCODING: i8 = -2;
-const ERROR_WITNESS_TOO_LONG: i8 = -22;
+const ERROR_WITNESS_SIZE: i8 = -22;
 const ERROR_PUBKEY_BLAKE160_HASH: i8 = -31;
 
 fn gen_tx(dummy: &mut DummyDataLoader, lock_args: Bytes) -> TransactionView {
@@ -389,13 +389,13 @@ fn test_super_long_witness() {
         TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_WITNESS_TOO_LONG),
+        ScriptError::ValidationFailure(ERROR_WITNESS_SIZE),
     );
 }
 
 #[test]
 fn test_sighash_all_2_in_2_out_cycles() {
-    const CONSUME_CYCLES: u64 = 3394620;
+    const CONSUME_CYCLES: u64 = 3394652;
 
     let mut data_loader = DummyDataLoader::new();
     let mut generator = Generator::non_crypto_safe_prng(42);
