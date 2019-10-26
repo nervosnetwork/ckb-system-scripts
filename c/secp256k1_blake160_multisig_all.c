@@ -5,6 +5,7 @@
 #include "secp256k1_helper.h"
 
 /* script args errors */
+#define ERROR_INVALID_RESERVE_FIELD -41
 #define ERROR_INVALID_PUBKEYS_CNT -42
 #define ERROR_INVALID_THRESHOLD -43
 #define ERROR_INVALID_REQUIRE_FIRST_N -44
@@ -36,7 +37,7 @@
  * +------------+----------------------------------+-------+
  * |            |           Description            | Bytes |
  * +------------+----------------------------------+-------+
- * | S          | reserved for future use          |     1 |
+ * | S          | reserved field, must be zero     |     1 |
  * | R          | first nth public keys must match |     1 |
  * | M          | threshold                        |     1 |
  * | N          | total public keys                |     1 |
@@ -102,6 +103,10 @@ int main() {
   uint8_t pubkeys_cnt = lock_bytes[3];
   uint8_t threshold = lock_bytes[2];
   uint8_t require_first_n = lock_bytes[1];
+  uint8_t reserved_field = lock_bytes[0];
+  if (reserved_field != 0) {
+    return ERROR_INVALID_RESERVE_FIELD;
+  }
   if (pubkeys_cnt == 0) {
     return ERROR_INVALID_PUBKEYS_CNT;
   }
