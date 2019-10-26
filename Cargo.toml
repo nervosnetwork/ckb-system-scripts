@@ -1,6 +1,6 @@
 [package]
 name = "ckb-system-scripts"
-version = "0.4.0-alpha.13+nonstrict-witnesses-length2"
+version = "0.4.0-alpha.16+multisig-with-since2"
 authors = ["Nervos Core Dev <dev@nervos.org>"]
 edition = "2018"
 build = "build.rs"
