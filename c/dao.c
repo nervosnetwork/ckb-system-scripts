@@ -46,8 +46,8 @@
 #define EPOCH_LENGTH_MASK ((1 << EPOCH_LENGTH_BITS) - 1)
 
 /*
- * Fetch deposit header hash from the last 8 bytes
- * of witness. Kept as a separate function so witness buffer
+ * Fetch deposit header hash from the input type part in witness, it should be
+ * exactly 8 bytes long. Kept as a separate function so witness buffer
  * can be cleaned as soon as it is not needed.
  */
 static int extract_deposit_header_index(size_t input_index, size_t *index) {
