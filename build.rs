@@ -23,7 +23,7 @@ const BINARIES: &[(&str, &str)] = &[
     ),
     (
         "dao",
-        "007c21b2593e645f390b068a14f6941aa3382ec88edf594e8bffbbb4bbf444f5",
+        "516be0333273bbe12a723f3be583c524f0b6089326f89c49fc61e24d1f56be21",
     ),
     (
         "secp256k1_blake160_multisig_all",
