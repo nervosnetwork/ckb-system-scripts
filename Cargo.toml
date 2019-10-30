@@ -1,6 +1,6 @@
 [package]
 name = "ckb-system-scripts"
-version = "0.4.0-alpha.14+2-phase-dao"
+version = "0.4.0-alpha.17+multisig-since"
 authors = ["Nervos Core Dev <dev@nervos.org>"]
 edition = "2018"
 build = "build.rs"

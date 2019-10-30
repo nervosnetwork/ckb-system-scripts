@@ -28,11 +28,11 @@ const ERROR_INCORRECT_SINCE: i8 = -53;
 fn test_multisig_script_hash() {
     let mut data_loader = DummyDataLoader::new();
     let keys = generate_keys(3);
-    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0, 0);
+    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
     let args = blake160(&multi_sign_script);
     let raw_tx = gen_tx(&mut data_loader, args);
     {
-        let wrong_multi_sign_script = gen_multi_sign_script(&keys, 2, 1, 0);
+        let wrong_multi_sign_script = gen_multi_sign_script(&keys, 2, 1);
         let tx = multi_sign_tx(
             raw_tx.clone(),
             &wrong_multi_sign_script,
@@ -50,11 +50,11 @@ fn test_multisig_script_hash() {
 fn test_invalid_flags() {
     let mut data_loader = DummyDataLoader::new();
     let keys = generate_keys(3);
-    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0, 0);
+    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
     let args = blake160(&multi_sign_script);
     let raw_tx = gen_tx(&mut data_loader, args);
     {
-        let wrong_multi_sign_script = gen_multi_sign_script(&vec![], 2, 0, 0);
+        let wrong_multi_sign_script = gen_multi_sign_script(&vec![], 2, 0);
         let tx = multi_sign_tx(
             raw_tx.clone(),
             &wrong_multi_sign_script,
@@ -67,7 +67,7 @@ fn test_invalid_flags() {
         );
     }
     {
-        let wrong_multi_sign_script = gen_multi_sign_script(&keys, 4, 0, 0);
+        let wrong_multi_sign_script = gen_multi_sign_script(&keys, 4, 0);
         let tx = multi_sign_tx(
             raw_tx.clone(),
             &wrong_multi_sign_script,
@@ -80,7 +80,7 @@ fn test_invalid_flags() {
         );
     }
     {
-        let wrong_multi_sign_script = gen_multi_sign_script(&keys, 2, 3, 0);
+        let wrong_multi_sign_script = gen_multi_sign_script(&keys, 2, 3);
         let tx = multi_sign_tx(
             raw_tx.clone(),
             &wrong_multi_sign_script,
@@ -98,7 +98,7 @@ fn test_invalid_flags() {
 fn test_multisig_0_2_3_unlock() {
     let mut data_loader = DummyDataLoader::new();
     let keys = generate_keys(3);
-    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0, 0);
+    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
     let args = blake160(&multi_sign_script);
     let raw_tx = gen_tx(&mut data_loader, args);
     {
@@ -170,7 +170,7 @@ fn test_multisig_0_2_3_unlock() {
 fn test_multisig_1_2_3_unlock() {
     let mut data_loader = DummyDataLoader::new();
     let keys = generate_keys(3);
-    let multi_sign_script = gen_multi_sign_script(&keys, 2, 1, 0);
+    let multi_sign_script = gen_multi_sign_script(&keys, 2, 1);
     let args = blake160(&multi_sign_script);
     let tx = gen_tx(&mut data_loader, args);
     {
@@ -199,7 +199,7 @@ fn test_multisig_1_2_3_unlock() {
 fn test_multisig_1_2_3_with_extra_witness_unlock() {
     let mut data_loader = DummyDataLoader::new();
     let keys = generate_keys(3);
-    let multi_sign_script = gen_multi_sign_script(&keys, 2, 1, 0);
+    let multi_sign_script = gen_multi_sign_script(&keys, 2, 1);
     let args = blake160(&multi_sign_script);
     let tx = gen_tx(&mut data_loader, args);
     let extract_witness = vec![1, 2, 3, 4];
@@ -237,10 +237,9 @@ fn test_multisig_1_2_3_with_extra_witness_unlock() {
 fn test_multisig_1_2_3_with_multiple_inputs_unlock() {
     let mut data_loader = DummyDataLoader::new();
     let keys = generate_keys(3);
-    let multi_sign_script = gen_multi_sign_script(&keys, 2, 1, 0);
+    let multi_sign_script = gen_multi_sign_script(&keys, 2, 1);
     let args = blake160(&multi_sign_script);
     let tx = gen_tx_with_extra_inputs(&mut data_loader, args, 1);
-    dbg!(format!("{}", &tx));
     {
         let tx = multi_sign_tx(tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
         verify(&data_loader, &tx).expect("pass verification");
@@ -267,7 +266,7 @@ fn test_multisig_1_2_3_with_multiple_inputs_unlock() {
 fn test_multisig_0_1_1_unlock() {
     let mut data_loader = DummyDataLoader::new();
     let keys = generate_keys(1);
-    let multi_sign_script = gen_multi_sign_script(&keys, 1, 0, 0);
+    let multi_sign_script = gen_multi_sign_script(&keys, 1, 0);
     let args = blake160(&multi_sign_script);
     let raw_tx = gen_tx(&mut data_loader, args);
     {
@@ -289,7 +288,7 @@ fn test_multisig_0_1_1_unlock() {
 fn test_multisig_0_2_2_unlock() {
     let mut data_loader = DummyDataLoader::new();
     let keys = generate_keys(2);
-    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0, 0);
+    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
     let args = blake160(&multi_sign_script);
     let raw_tx = gen_tx(&mut data_loader, args);
     {
@@ -378,21 +377,15 @@ fn test_multisig_0_2_3_unlock_with_since() {
     let mut data_loader = DummyDataLoader::new();
     let keys = generate_keys(3);
     let since = 0x0000_0000_8888_8888u64;
-    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0, since);
-    let args = blake160(&multi_sign_script);
+    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
+    let args = {
+        let mut buf = blake160(&multi_sign_script).to_vec();
+        buf.extend(since.to_le_bytes().into_iter());
+        Bytes::from(buf)
+    };
     let raw_tx = gen_tx(&mut data_loader, args);
     {
-        let since2 = 0;
-        let multi_sign_script = gen_multi_sign_script(&keys, 2, 0, since2);
         let tx = multi_sign_tx(raw_tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
-        let verify_result = verify(&data_loader, &tx);
-        assert_error_eq!(
-            verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_MULTSIG_SCRIPT_HASH),
-        );
-    }
-    {
-        let tx = multi_sign_tx(raw_tx.clone(), &multi_sign_script, &[&keys[1], &keys[2]]);
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
@@ -453,18 +446,12 @@ fn test_multisig_0_2_3_unlock_with_since() {
     }
 }
 
-fn gen_multi_sign_script(
-    keys: &[Privkey],
-    threshold: u8,
-    require_first_n: u8,
-    since: u64,
-) -> Bytes {
+fn gen_multi_sign_script(keys: &[Privkey], threshold: u8, require_first_n: u8) -> Bytes {
     let pubkeys = keys
         .iter()
         .map(|key| key.pubkey().unwrap())
         .collect::<Vec<_>>();
     let mut script = vec![0u8, require_first_n, threshold, pubkeys.len() as u8];
-    script.extend(since.to_le_bytes().into_iter());
     pubkeys.iter().for_each(|pubkey| {
         script.extend_from_slice(&pubkey.serialize());
     });
