@@ -34,16 +34,16 @@
  * multisig_script | Signature1 | signature2 | ...
  * multisig_script: S | R | M | N | Pubkey1 | Pubkey2 | ...
  *
- * +------------+----------------------------------+-------+
- * |            |           Description            | Bytes |
- * +------------+----------------------------------+-------+
- * | S          | reserved field, must be zero     |     1 |
- * | R          | first nth public keys must match |     1 |
- * | M          | threshold                        |     1 |
- * | N          | total public keys                |     1 |
- * | PubkeyN    | compressed pubkey                |    33 |
- * | SignatureN | recoverable signature            |    65 |
- * +------------+----------------------------------+-------+
+ * +-------------+------------------------------------+-------+
+ * |             |           Description              | Bytes |
+ * +-------------+------------------------------------+-------+
+ * | S           | reserved field, must be zero       |     1 |
+ * | R           | first nth public keys must match   |     1 |
+ * | M           | threshold                          |     1 |
+ * | N           | total public keys                  |     1 |
+ * | PubkeyHashN | blake160 hash of compressed pubkey |    20 |
+ * | SignatureN  | recoverable signature              |    65 |
+ * +-------------+------------------------------------+-------+
  *
  */
 
@@ -119,7 +119,7 @@ int main() {
   if (require_first_n > threshold) {
     return ERROR_INVALID_REQUIRE_FIRST_N;
   }
-  size_t multisig_script_len = FLAGS_SIZE + PUBKEY_SIZE * pubkeys_cnt;
+  size_t multisig_script_len = FLAGS_SIZE + BLAKE160_SIZE * pubkeys_cnt;
   size_t signatures_len = SIGNATURE_SIZE * threshold;
   size_t required_lock_len = multisig_script_len + signatures_len;
   if (lock_bytes_len != required_lock_len) {
@@ -244,14 +244,21 @@ int main() {
       return ERROR_SECP_SERIALIZE_PUBKEY;
     }
 
+    unsigned char calculated_pubkey_hash[BLAKE2B_BLOCK_SIZE];
+    blake2b_state blake2b_ctx;
+    blake2b_init(&blake2b_ctx, BLAKE2B_BLOCK_SIZE);
+    blake2b_update(&blake2b_ctx, temp, PUBKEY_SIZE);
+    blake2b_final(&blake2b_ctx, calculated_pubkey_hash, BLAKE2B_BLOCK_SIZE);
+
     /* Check pubkeys */
     uint8_t matched = 0;
     for (size_t i = 0; i < pubkeys_cnt; i++) {
       if (used_signatures[i] == 1) {
         continue;
       }
-      if (memcmp(&lock_bytes[FLAGS_SIZE + i * PUBKEY_SIZE], temp,
-                 PUBKEY_SIZE) != 0) {
+      if (memcmp(&lock_bytes[FLAGS_SIZE + i * BLAKE160_SIZE],
+                 calculated_pubkey_hash,
+                 BLAKE160_SIZE) != 0) {
         continue;
       }
       matched = 1;
