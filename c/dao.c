@@ -418,6 +418,9 @@ int main() {
   len = HASH_SIZE;
   ret = ckb_load_script_hash(script_hash, &len, 0);
   if (ret != CKB_SUCCESS) {
+    return ret;
+  }
+  if (len != HASH_SIZE) {
     return ERROR_SYSCALL;
   }
 
@@ -436,6 +439,9 @@ int main() {
     if (ret == CKB_INDEX_OUT_OF_BOUND) {
       break;
     } else if (ret == CKB_SUCCESS) {
+      if (len != 8) {
+        return ERROR_SYSCALL;
+      }
       unsigned char current_script_hash[HASH_SIZE];
       len = HASH_SIZE;
       ret = ckb_load_cell_by_field(current_script_hash, &len, 0, index,
@@ -521,6 +527,9 @@ int main() {
       break;
     }
     if (ret != CKB_SUCCESS) {
+      return ret;
+    }
+    if (len != 8) {
       return ERROR_SYSCALL;
     }
     if (index >= MAX_OUTPUT_LENGTH) {
