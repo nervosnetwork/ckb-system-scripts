@@ -295,6 +295,7 @@ static int calculate_dao_input_capacity(size_t input_index,
  * be met:
  *
  * * withdrawing cell uses the same lock script as deposited cell
+ * Is it an anti-pattern to let user reuse the key?
  * * withdrawing cell uses Nervos DAO type script
  * * withdrawing cell has the same capacity as the input deposited cell
  * * withdrawing cell has an 8-byte long cell data, the content is the
@@ -396,6 +397,7 @@ int main() {
   }
   script_seg.ptr = (uint8_t *)script;
   script_seg.size = len;
+  // Check len <= SCRIPT_SIZE
   if (MolReader_Script_verify(&script_seg, false) != MOL_OK) {
     return ERROR_ENCODING;
   }
@@ -434,6 +436,7 @@ int main() {
           (memcmp(script_hash, current_script_hash, HASH_SIZE) == 0)) {
         dao_input = 1;
       }
+    // Capacity must exist for all inputs?
     } else if (ret == CKB_ITEM_MISSING) {
       /* DAO Issuing input here, we can just skip it */
     } else {
