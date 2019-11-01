@@ -17,13 +17,17 @@
 #define BLAKE2B_BLOCK_SIZE 32
 #define BLAKE160_SIZE 20
 #define PUBKEY_SIZE 33
-#define TEMP_SIZE 1024
+#define TEMP_SIZE 32768
 #define RECID_INDEX 64
 /* 32 KB */
 #define MAX_WITNESS_SIZE 32768
 #define MAX_SCRIPT_SIZE 32768
 #define SIGNATURE_SIZE 65
 #define FLAGS_SIZE 4
+
+#if (MAX_WITNESS_SIZE > TEMP_SIZE) || (MAX_SCRIPT_SIZE > TEMP_SIZE)
+#error "Temp buffer is not big enough!"
+#endif
 
 /*
  * Arguments:
@@ -59,6 +63,9 @@ int main() {
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
+  if (len > MAX_SCRIPT_SIZE) {
+    return ERROR_SCRIPT_TOO_LONG;
+  }
   mol_seg_t script_seg;
   script_seg.ptr = (uint8_t *)script;
   script_seg.size = len;
@@ -84,6 +91,9 @@ int main() {
   ret = ckb_load_witness(witness, &witness_len, 0, 0, CKB_SOURCE_GROUP_INPUT);
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
+  }
+  if (witness_len > MAX_WITNESS_SIZE) {
+    return ERROR_WITNESS_SIZE;
   }
   mol_seg_t lock_bytes_seg;
   ret = extract_witness_lock(witness, witness_len, &lock_bytes_seg);
@@ -163,6 +173,9 @@ int main() {
   len = BLAKE2B_BLOCK_SIZE;
   ret = ckb_load_tx_hash(tx_hash, &len, 0);
   if (ret != CKB_SUCCESS) {
+    return ret;
+  }
+  if (len != BLAKE2B_BLOCK_SIZE) {
     return ERROR_SYSCALL;
   }
 
@@ -185,6 +198,9 @@ int main() {
     }
     if (ret != CKB_SUCCESS) {
       return ERROR_SYSCALL;
+    }
+    if (len > MAX_WITNESS_SIZE) {
+      return ERROR_WITNESS_SIZE;
     }
     blake2b_update(&blake2b_ctx, (char *)&len, sizeof(uint64_t));
     blake2b_update(&blake2b_ctx, temp, len);
