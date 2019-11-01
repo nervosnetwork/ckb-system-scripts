@@ -19,6 +19,7 @@
 #define ERROR_TOO_MANY_OUTPUT_CELLS -18
 #define ERROR_NEWLY_CREATED_CELL -19
 #define ERROR_INVALID_WITHDRAWING_CELL -20
+#define ERROR_SCRIPT_TOO_LONG -21
 
 #define HASH_SIZE 32
 #define HEADER_SIZE 4096
@@ -231,6 +232,9 @@ static int calculate_dao_input_capacity(size_t input_index,
   if (ret != CKB_SUCCESS) {
     return ret;
   }
+  if (len != 8) {
+    return ERROR_SYSCALL;
+  }
   /*
    * NervosDAO requires DAO input field to have a since value represented
    * via absolute epoch number.
@@ -266,6 +270,9 @@ static int calculate_dao_input_capacity(size_t input_index,
                                input_index, CKB_SOURCE_INPUT,
                                CKB_CELL_FIELD_OCCUPIED_CAPACITY);
   if (ret != CKB_SUCCESS) {
+    return ERROR_SYSCALL;
+  }
+  if (len != 8) {
     return ERROR_SYSCALL;
   }
 
@@ -394,6 +401,9 @@ int main() {
   if (ret != CKB_SUCCESS) {
     return ERROR_SYSCALL;
   }
+  if (len > SCRIPT_SIZE) {
+    return ERROR_SCRIPT_TOO_LONG;
+  }
   script_seg.ptr = (uint8_t *)script;
   script_seg.size = len;
   if (MolReader_Script_verify(&script_seg, false) != MOL_OK) {
@@ -408,6 +418,9 @@ int main() {
   len = HASH_SIZE;
   ret = ckb_load_script_hash(script_hash, &len, 0);
   if (ret != CKB_SUCCESS) {
+    return ret;
+  }
+  if (len != HASH_SIZE) {
     return ERROR_SYSCALL;
   }
 
@@ -426,6 +439,9 @@ int main() {
     if (ret == CKB_INDEX_OUT_OF_BOUND) {
       break;
     } else if (ret == CKB_SUCCESS) {
+      if (len != 8) {
+        return ERROR_SYSCALL;
+      }
       unsigned char current_script_hash[HASH_SIZE];
       len = HASH_SIZE;
       ret = ckb_load_cell_by_field(current_script_hash, &len, 0, index,
@@ -511,6 +527,9 @@ int main() {
       break;
     }
     if (ret != CKB_SUCCESS) {
+      return ret;
+    }
+    if (len != 8) {
       return ERROR_SYSCALL;
     }
     if (index >= MAX_OUTPUT_LENGTH) {
