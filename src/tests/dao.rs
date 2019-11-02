@@ -1160,7 +1160,7 @@ fn test_dao_invalid_withdraw_from_deposited_cell() {
     let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_INVALID_WITHDRAWING_CELL),
+        ScriptError::ValidationFailure(2),
     );
 }
 
@@ -1381,7 +1381,7 @@ fn test_dao_create_withdrawing_cell() {
 }
 
 #[test]
-fn test_dao_create_withdrawing_cell_with_invalid_lock() {
+fn test_dao_create_withdrawing_cell_with_different_lock() {
     let mut data_loader = DummyDataLoader::new();
     let (privkey, lock_args) = gen_lock();
     let (_, lock_args2) = gen_lock();
@@ -1441,10 +1441,7 @@ fn test_dao_create_withdrawing_cell_with_invalid_lock() {
     };
 
     let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
-    assert_error_eq!(
-        verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_INVALID_WITHDRAWING_CELL),
-    );
+    verify_result.expect("pass verification");
 }
 
 #[test]
