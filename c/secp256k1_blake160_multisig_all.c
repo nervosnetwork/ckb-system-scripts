@@ -105,6 +105,15 @@ int main() {
     return ERROR_WITNESS_SIZE;
   }
 
+  /*
+   * This is more of a safe guard, since lock is a field in witness, it
+   * cannot exceed the maximum size of the enclosing witness, this way
+   * we should still be at the safe side even if any of the lock extracting
+   * code has a bug.
+   */
+  if (lock_bytes_seg.size > witness_len) {
+    return ERROR_ENCODING;
+  }
   unsigned char lock_bytes[lock_bytes_seg.size];
   uint64_t lock_bytes_len = lock_bytes_seg.size;
   memcpy(lock_bytes, lock_bytes_seg.ptr, lock_bytes_len);
@@ -227,7 +236,10 @@ int main() {
   }
   blake2b_final(&blake2b_ctx, message, BLAKE2B_BLOCK_SIZE);
 
-  /* Verify threshold signatures */
+  /*
+   * Verify threshold signatures, threshold is a uint8_t, at most it is
+   * 255, meaning this array will definitely have a reasonable upper bound.
+   */
   uint8_t used_signatures[threshold];
   memset(used_signatures, 0, threshold);
 
