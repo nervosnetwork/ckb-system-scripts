@@ -6,7 +6,8 @@ use ckb_types::{
     bytes::Bytes,
     core::{
         cell::{CellMetaBuilder, ResolvedTransaction},
-        Capacity, DepType, ScriptHashType, TransactionBuilder, TransactionView,
+        Capacity, DepType, EpochNumberWithFraction, ScriptHashType, TransactionBuilder,
+        TransactionView,
     },
     packed::{self, CellDep, CellInput, CellOutput, OutPoint, Script, WitnessArgs},
     prelude::*,
@@ -22,7 +23,8 @@ const ERROR_INVALID_THRESHOLD: i8 = -43;
 const ERROR_INVALID_REQUIRE_FIRST_N: i8 = -44;
 const ERROR_MULTSIG_SCRIPT_HASH: i8 = -51;
 const ERROR_VERIFICATION: i8 = -52;
-const ERROR_INCORRECT_SINCE: i8 = -53;
+const ERROR_INCORRECT_SINCE_FLAG: i8 = -23;
+const ERROR_INCORRECT_SINCE_VALUE: i8 = -24;
 
 #[test]
 fn test_multisig_script_hash() {
@@ -389,21 +391,7 @@ fn test_multisig_0_2_3_unlock_with_since() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE),
-        );
-    }
-    {
-        let inputs: Vec<CellInput> = raw_tx
-            .inputs()
-            .into_iter()
-            .map(|i| i.as_builder().since((since + 1).pack()).build())
-            .collect();
-        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
-        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
-        let verify_result = verify(&data_loader, &tx);
-        assert_error_eq!(
-            verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE),
+            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_VALUE),
         );
     }
     {
@@ -417,7 +405,7 @@ fn test_multisig_0_2_3_unlock_with_since() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE),
+            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_VALUE),
         );
     }
     {
@@ -431,7 +419,26 @@ fn test_multisig_0_2_3_unlock_with_since() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE),
+            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_VALUE),
+        );
+    }
+    {
+        // use a different flags
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((since | 0x2000_0000_0000_0000).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_FLAG),
         );
     }
     {
@@ -439,6 +446,141 @@ fn test_multisig_0_2_3_unlock_with_since() {
             .inputs()
             .into_iter()
             .map(|i| i.as_builder().since(since.pack()).build())
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+    {
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| i.as_builder().since((since + 1).pack()).build())
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+}
+
+#[test]
+fn test_multisig_0_2_3_unlock_with_since_epoch() {
+    let mut data_loader = DummyDataLoader::new();
+    let keys = generate_keys(3);
+    let since_epoch = EpochNumberWithFraction::new(200, 5, 100);
+    let since = 0x2000_0000_0000_0000u64 + since_epoch.full_value();
+    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
+    let args = {
+        let mut buf = blake160(&multi_sign_script).to_vec();
+        buf.extend(since.to_le_bytes().into_iter());
+        Bytes::from(buf)
+    };
+    let raw_tx = gen_tx(&mut data_loader, args);
+    {
+        let tx = multi_sign_tx(raw_tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_FLAG),
+        );
+    }
+    {
+        let epoch = EpochNumberWithFraction::new(200, 2, 200);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0x2000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_VALUE),
+        );
+    }
+    {
+        let epoch = EpochNumberWithFraction::new(200, 6, 50);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0x2000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_VALUE),
+        );
+    }
+    {
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| i.as_builder().since(0.pack()).build())
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_FLAG),
+        );
+    }
+    {
+        let epoch = EpochNumberWithFraction::new(200, 1, 600);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0x2000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+    {
+        let epoch = EpochNumberWithFraction::new(200, 6, 100);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0x2000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+    {
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| i.as_builder().since(since.pack()).build())
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+    {
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| i.as_builder().since((since + 1).pack()).build())
             .collect();
         let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
         let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
