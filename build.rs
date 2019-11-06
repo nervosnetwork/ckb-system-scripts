@@ -27,7 +27,7 @@ const BINARIES: &[(&str, &str)] = &[
     ),
     (
         "secp256k1_blake160_multisig_all",
-        "aa8b9a53a07784ec4189f92f0263bec4a2e54c656d7292b3de2572b29fa5f1ac",
+        "43400de165f0821abf63dcac299bbdf7fd73898675ee4ddb099b0a0d8db63bfb",
     ),
 ];
 

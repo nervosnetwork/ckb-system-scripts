@@ -504,7 +504,21 @@ fn test_multisig_0_2_3_unlock_with_since_epoch() {
         );
     }
     {
-        let epoch = EpochNumberWithFraction::new(200, 6, 50);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| i.as_builder().since(0.pack()).build())
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_FLAG),
+        );
+    }
+    {
+        let epoch = EpochNumberWithFraction::new(200, 1, 600);
         let inputs: Vec<CellInput> = raw_tx
             .inputs()
             .into_iter()
@@ -523,21 +537,22 @@ fn test_multisig_0_2_3_unlock_with_since_epoch() {
         );
     }
     {
+        let epoch = EpochNumberWithFraction::new(200, 6, 50);
         let inputs: Vec<CellInput> = raw_tx
             .inputs()
             .into_iter()
-            .map(|i| i.as_builder().since(0.pack()).build())
+            .map(|i| {
+                i.as_builder()
+                    .since((0x2000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
             .collect();
         let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
         let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
-        let verify_result = verify(&data_loader, &tx);
-        assert_error_eq!(
-            verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_FLAG),
-        );
+        verify(&data_loader, &tx).expect("pass verification");
     }
     {
-        let epoch = EpochNumberWithFraction::new(200, 1, 600);
+        let epoch = EpochNumberWithFraction::new(200, 1, 2);
         let inputs: Vec<CellInput> = raw_tx
             .inputs()
             .into_iter()

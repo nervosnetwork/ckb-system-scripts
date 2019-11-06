@@ -19,10 +19,10 @@ all: specs/cells/secp256k1_blake160_sighash_all specs/cells/dao specs/cells/secp
 all-via-docker: ${PROTOCOL_HEADER}
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
 
-specs/cells/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c ${PROTOCOL_HEADER} c/common.h build/secp256k1_data_info.h $(SECP256K1_SRC)
+specs/cells/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c ${PROTOCOL_HEADER} c/common.h c/utils.h build/secp256k1_data_info.h $(SECP256K1_SRC)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
-specs/cells/secp256k1_blake160_multisig_all: c/secp256k1_blake160_multisig_all.c ${PROTOCOL_HEADER} c/common.h build/secp256k1_data_info.h $(SECP256K1_SRC)
+specs/cells/secp256k1_blake160_multisig_all: c/secp256k1_blake160_multisig_all.c ${PROTOCOL_HEADER} c/common.h c/utils.h build/secp256k1_data_info.h $(SECP256K1_SRC)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 specs/cells/dao: c/dao.c ${PROTOCOL_HEADER}

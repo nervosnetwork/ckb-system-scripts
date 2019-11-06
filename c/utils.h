@@ -40,9 +40,11 @@ int epoch_number_with_fraction_cmp(uint64_t a, uint64_t b) {
   } else if (a_epoch > b_epoch) {
     return 1;
   } else {
-    /* a and b is in the same epoch */
-    uint64_t a_block = a_index * a_len;
-    uint64_t b_block = b_index * b_len;
+    /* a and b is in the same epoch,
+       compare a_index / a_len <=> b_index / b_len
+     */
+    uint64_t a_block = a_index * b_len;
+    uint64_t b_block = b_index * a_len;
     /* compare block */
     if (a_block < b_block) {
       return -1;
