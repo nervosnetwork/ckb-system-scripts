@@ -50,7 +50,7 @@ ${PROTOCOL_HEADER}: ${PROTOCOL_SCHEMA}
 	${MOLC} --language c --schema-file $< > $@
 
 ${PROTOCOL_SCHEMA}:
-	wget -O $@ ${PROTOCOL_URL}
+	curl -L -o $@ ${PROTOCOL_URL}
 
 install-tools:
 	if [ ! -x "$$(command -v "${MOLC}")" ] \
