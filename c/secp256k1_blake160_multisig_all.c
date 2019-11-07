@@ -31,11 +31,11 @@
 /*
  * Arguments:
  * 1. multisig script blake160 hash, 20 bytes.
- * 2. an optional since constraint, 4 bytes.
+ * 2. an optional since constraint, 8 bytes.
  *
  * Witness:
- * multisig_script | Signature1 | signature2 | ...
- * multisig_script: S | R | M | N | Pubkey1 | Pubkey2 | ...
+ * multisig_script | Signature1 | Signature2 | ...
+ * multisig_script: S | R | M | N | PubKeyHash1 | PubKeyHash2 | ...
  *
  * +-------------+------------------------------------+-------+
  * |             |           Description              | Bytes |
