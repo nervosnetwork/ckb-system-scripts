@@ -301,41 +301,23 @@ static int calculate_dao_input_capacity(size_t input_index,
  * For a newly generated withdrawing cell, the following conditions should
  * be met:
  *
- * * withdrawing cell uses the same lock script as deposited cell
  * * withdrawing cell uses Nervos DAO type script
  * * withdrawing cell has the same capacity as the input deposited cell
  * * withdrawing cell has an 8-byte long cell data, the content is the
  * block number containing deposited cell in 64-bit little endian unsigned
  * integer format.
+ *
+ * Note the withdrawing cell is free to use any lock script as they wish.
+ * Since this will be part of the transaction, an input lock script shall
+ * validate the lock script cannot be tampered.
  */
 static int validate_withdrawing_cell(size_t index, uint64_t input_capacity,
                                      unsigned char *dao_script_hash) {
-  unsigned char hash1[HASH_SIZE], hash2[HASH_SIZE];
+  unsigned char hash1[HASH_SIZE];
   uint64_t len = HASH_SIZE;
-  /* Check lock script */
-  int ret = ckb_load_cell_by_field(hash1, &len, 0, index, CKB_SOURCE_INPUT,
-                                   CKB_CELL_FIELD_LOCK_HASH);
-  if (ret != CKB_SUCCESS) {
-    return ret;
-  }
-  if (len != HASH_SIZE) {
-    return ERROR_SYSCALL;
-  }
-  len = HASH_SIZE;
-  ret = ckb_load_cell_by_field(hash2, &len, 0, index, CKB_SOURCE_OUTPUT,
-                               CKB_CELL_FIELD_LOCK_HASH);
-  if (ret != CKB_SUCCESS) {
-    return ret;
-  }
-  if (len != HASH_SIZE) {
-    return ERROR_SYSCALL;
-  }
-  if (memcmp(hash1, hash2, HASH_SIZE) != 0) {
-    return ERROR_INVALID_WITHDRAWING_CELL;
-  }
   /* Check type script */
   len = HASH_SIZE;
-  ret = ckb_load_cell_by_field(hash1, &len, 0, index, CKB_SOURCE_OUTPUT,
+  int ret = ckb_load_cell_by_field(hash1, &len, 0, index, CKB_SOURCE_OUTPUT,
                                CKB_CELL_FIELD_TYPE_HASH);
   if (ret != CKB_SUCCESS) {
     return ret;
@@ -450,8 +432,6 @@ int main() {
           (memcmp(script_hash, current_script_hash, HASH_SIZE) == 0)) {
         dao_input = 1;
       }
-    } else if (ret == CKB_ITEM_MISSING) {
-      /* DAO Issuing input here, we can just skip it */
     } else {
       return ERROR_SYSCALL;
     }
