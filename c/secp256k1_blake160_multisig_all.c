@@ -12,7 +12,6 @@
 /* verification errors */
 #define ERROR_MULTSIG_SCRIPT_HASH -51
 #define ERROR_VERIFICATION -52
-#define ERROR_INCORRECT_SINCE -53
 
 #define BLAKE2B_BLOCK_SIZE 32
 #define BLAKE160_SIZE 20
@@ -156,25 +155,9 @@ int main() {
   }
 
   /* Check since */
-  if (since != 0) {
-    size_t i = 0;
-    uint64_t input_since;
-    while (1) {
-      len = sizeof(uint64_t);
-      ret = ckb_load_input_by_field(&input_since, &len, 0, i,
-                                    CKB_SOURCE_GROUP_INPUT,
-                                    CKB_INPUT_FIELD_SINCE);
-      if (ret == CKB_INDEX_OUT_OF_BOUND) {
-        break;
-      }
-      if (ret != CKB_SUCCESS || len != sizeof(uint64_t)) {
-        return ERROR_SYSCALL;
-      }
-      if (since != input_since) {
-        return ERROR_INCORRECT_SINCE;
-      }
-      i += 1;
-    }
+  ret = check_since(since);
+  if (ret != CKB_SUCCESS) {
+    return ret;
   }
 
   /* Load tx hash */
@@ -285,8 +268,7 @@ int main() {
         continue;
       }
       if (memcmp(&lock_bytes[FLAGS_SIZE + i * BLAKE160_SIZE],
-                 calculated_pubkey_hash,
-                 BLAKE160_SIZE) != 0) {
+                 calculated_pubkey_hash, BLAKE160_SIZE) != 0) {
         continue;
       }
       matched = 1;
