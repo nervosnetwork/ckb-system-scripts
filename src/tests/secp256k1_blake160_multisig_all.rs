@@ -603,6 +603,71 @@ fn test_multisig_0_2_3_unlock_with_since_epoch() {
     }
 }
 
+#[test]
+fn test_genesis_time_locked_cell() {
+    // Test against ckb1qyqxs3hhwx2ttqcrk2yk2nsgqteglvfjt4hsjpzgxs,5200,2020-02-09
+    let mut data_loader = DummyDataLoader::new();
+
+    let args = {
+        let mut args_buffer = vec![0u8; 28];
+        faster_hex::hex_decode(
+            "6a7d3560d87009c5dcfdc76a4ac60d8a47bb1f312b02008403080720".as_bytes(),
+            args_buffer.as_mut_slice(),
+        )
+        .unwrap();
+        Bytes::from(args_buffer)
+    };
+    let keys = {
+        let mut privkey_buffer = vec![0u8; 32];
+        faster_hex::hex_decode(
+            "41a0bf7d6102fed4183acb0affa72cfb31726d9900964c7cb363632a26ecca18".as_bytes(),
+            privkey_buffer.as_mut_slice(),
+        )
+        .unwrap();
+        vec![Privkey::from_slice(privkey_buffer.as_slice())]
+    };
+
+    let multi_sign_script = gen_multi_sign_script(&keys, 1, 0);
+    let raw_tx = gen_tx(&mut data_loader, args);
+
+    // locked until 2020-02-09
+    // 555 + 900/1800
+    {
+        let epoch = EpochNumberWithFraction::new(555, 899, 1800);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0x2000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[0]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_VALUE),
+        );
+    }
+    {
+        let epoch = EpochNumberWithFraction::new(555, 900, 1800);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0x2000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[0]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+}
+
 fn gen_multi_sign_script(keys: &[Privkey], threshold: u8, require_first_n: u8) -> Bytes {
     let pubkeys = keys
         .iter()
