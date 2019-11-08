@@ -1,7 +1,7 @@
 # ckb-system-scripts
 
 [![Build Status](https://travis-ci.com/nervosnetwork/ckb-system-scripts.svg?branch=master)](https://travis-ci.com/nervosnetwork/ckb-system-scripts)
-![Crates.io](https://img.shields.io/crates/v/ckb-system-scripts)
+[![Crates.io](https://img.shields.io/crates/v/ckb-system-scripts)](https://crates.io/crates/ckb-system-scripts)
 
 CKB's system scripts, which included in the system cells in the genesis block.
 
