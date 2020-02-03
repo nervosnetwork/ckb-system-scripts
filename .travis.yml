@@ -18,16 +18,12 @@ matrix:
   include:
     - name: Test
       script:
-        - make install-tools
-        - make generate-protocol
         - make all-via-docker
         - cargo test --tests
 
     - name: Publish
       if: 'tag IS present AND env(CRATES_IO_TOKEN) IS present'
       script:
-        - make install-tools
-        - make generate-protocol
         - make all-via-docker
         - cargo login $CRATES_IO_TOKEN
         - make publish
