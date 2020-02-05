@@ -52,8 +52,6 @@ Mkfile.old
 dkms.conf
 
 build/
-c/blockchain.mol
-c/protocol.h
 
 target
 ./tmp

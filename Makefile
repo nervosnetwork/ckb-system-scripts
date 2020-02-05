@@ -84,7 +84,6 @@ package-clean:
 	rm -rf Cargo.toml.bak target/package/
 
 clean:
-	rm -rf ${PROTOCOL_HEADER} ${PROTOCOL_SCHEMA}
 	rm -rf specs/cells/secp256k1_blake160_sighash_all specs/cells/dao specs/cells/secp256k1_blake160_multisig_all
 	rm -rf build/secp256k1_data_info.h build/dump_secp256k1_data
 	rm -rf specs/cells/secp256k1_data
