@@ -1,1 +1,2 @@
-0.4.1
+base on molecule 0.4.1
+fix: offsets are incorrect when all items in a Vector are None
