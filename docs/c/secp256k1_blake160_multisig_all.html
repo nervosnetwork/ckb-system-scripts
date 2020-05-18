@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>secp256k1-blake160-multisig-all</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="../docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page_wrapper">
+            <div id="jump_page">
+              
+                
+                <a class="source" href="dao.html">
+                  c/dao.c
+                </a>
+              
+                
+                <a class="source" href="secp256k1_blake160_multisig_all.html">
+                  c/secp256k1_blake160_multisig_all.c
+                </a>
+              
+                
+                <a class="source" href="secp256k1_blake160_sighash_all.html">
+                  c/secp256k1_blake160_sighash_all.c
+                </a>
+              
+            </div>
+          </div>
+        </li>
+      </ul>
+    
+    <ul class="sections">
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              <h1 id="secp256k1-blake160-multisig-all">secp256k1-blake160-multisig-all</h1>
+<p>This is a lock script that serves multiple purposes:</p>
+<ul>
+<li>It provides a multiple signature verification solution</li>
+<li>It provides a way to enforce lock period to a cell.</li>
+</ul>
+<p>It uses a similar (but slightly different) way to prepare the signing message
+as the <a href="./secp256k1_blake160_sighash_all">single signing script</a>. What’s different,
+is that the lock field of the first witness treated as WitnessArgs object, uses the
+following structure:</p>
+<p>multisig_script | Signature1 | Signature2 | …</p>
+<p>Where the components are of the following format:</p>
+<p>multisig_script: S | R | M | N | PubKeyHash1 | PubKeyHash2 | …</p>
+<p>+————-+————————————+——-+
+|             |           Description              | Bytes |
++————-+————————————+——-+
+| S           | reserved field, must be zero       |     1 |
+| R           | first nth public keys must match   |     1 |
+| M           | threshold                          |     1 |
+| N           | total public keys                  |     1 |
+| PubkeyHashN | blake160 hash of compressed pubkey |    20 |
+| SignatureN  | recoverable signature              |    65 |
++————-+————————————+——-+</p>
+<p>To preserve script size, this lock script also uses a scheme similar to Bitcoin’s
+P2SH solution: the script args part only contains the blake160 hash of <code>multisig_script</code>
+part, this way no matter how many public keys we are including, and how many signatures
+we are testing, the lock script size remains a constant value. One implicit rule, is that
+<code>multisig_script</code> remains a constant since the hash is already fixed in script args part.</p>
+
+            </div>
+            
+        </li>
+        
+        
+        <li id="section-2">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <p>First we will need to include a few headers here, for legacy reasons, this repository
+ships with those headers. We are now maintaining a new <a href="https://github.com/nervosnetwork/ckb-c-stdlib">repository</a>
+with most of those headers included. If you are building a new script, we do recommend
+you to take a look at what’s in the new repository, and use the code there directly.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">"blake2b.h"</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">"ckb_syscalls.h"</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">"common.h"</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">"protocol.h"</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">"secp256k1_helper.h"</span></span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-3">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <p>Script args validation errors</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_INVALID_RESERVE_FIELD -41</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_INVALID_PUBKEYS_CNT -42</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_INVALID_THRESHOLD -43</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_INVALID_REQUIRE_FIRST_N -44</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-4">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-4">&#182;</a>
+              </div>
+              <p>Multi-sigining validation errors</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_MULTSIG_SCRIPT_HASH -51</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_VERIFICATION -52</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-5">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-5">&#182;</a>
+              </div>
+              <p>Common definitions here, one important limitation, is that this lock script only works
+with scripts and witnesses that are no larger than 32KB. We believe this should be enough
+for most cases.</p>
+<p>Here we are also employing a common convention: we append the recovery ID to the end of
+the 64-byte compact recoverable signature.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> BLAKE2B_BLOCK_SIZE 32</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> BLAKE160_SIZE 20</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> PUBKEY_SIZE 33</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> TEMP_SIZE 32768</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> RECID_INDEX 64</span>
+<span class="hljs-comment">/* 32 KB */</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> MAX_WITNESS_SIZE 32768</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> MAX_SCRIPT_SIZE 32768</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> SIGNATURE_SIZE 65</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> FLAGS_SIZE 4</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-6">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-6">&#182;</a>
+              </div>
+              <p>Compile-time guard against buffer abuse</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">if</span> (MAX_WITNESS_SIZE &gt; TEMP_SIZE) || (MAX_SCRIPT_SIZE &gt; TEMP_SIZE)</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">error</span> <span class="hljs-meta-string">"Temp buffer is not big enough!"</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">endif</span></span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-7">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <p>To use this script, the script args part must contain the blake160 hash of the
+<code>multisig_script</code> part mentioned above. The blake160 hash is calculated as the
+first 20 bytes of the blake2b hash(with “ckb-default-hash” as personalization).</p>
+<p>The args part can store an optional 64-bit unsigned little endian value denoting
+a lock period. The format of the lock period value should confront to the
+<a href="https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0017-tx-valid-since/0017-tx-valid-since.md">RFC specification</a>.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-keyword">int</span> ret;
+  <span class="hljs-keyword">uint64_t</span> len;
+  <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> temp[TEMP_SIZE];</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-8">&#182;</a>
+              </div>
+              <p>First let’s load and extract script args part, which is also the blake160 hash of public
+key from current running script.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> script[MAX_SCRIPT_SIZE];
+  len = MAX_SCRIPT_SIZE;
+  ret = ckb_load_script(script, &amp;len, <span class="hljs-number">0</span>);
+  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+    <span class="hljs-keyword">return</span> ERROR_SYSCALL;
+  }
+  <span class="hljs-keyword">if</span> (len &gt; MAX_SCRIPT_SIZE) {
+    <span class="hljs-keyword">return</span> ERROR_SCRIPT_TOO_LONG;
+  }
+  <span class="hljs-keyword">mol_seg_t</span> script_seg;
+  script_seg.ptr = (<span class="hljs-keyword">uint8_t</span> *)script;
+  script_seg.size = len;
+
+  <span class="hljs-keyword">if</span> (MolReader_Script_verify(&amp;script_seg, <span class="hljs-literal">false</span>) != MOL_OK) {
+    <span class="hljs-keyword">return</span> ERROR_ENCODING;
+  }
+
+  <span class="hljs-keyword">mol_seg_t</span> args_seg = MolReader_Script_get_args(&amp;script_seg);
+  <span class="hljs-keyword">mol_seg_t</span> args_bytes_seg = MolReader_Bytes_raw_bytes(&amp;args_seg);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-9">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-9">&#182;</a>
+              </div>
+              <p>The script args part should either be 20 bytes(containing only the blake160 hash),
+or 28 bytes(containing blake160 hash and since value).</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">if</span> (args_bytes_seg.size != BLAKE160_SIZE &amp;&amp;
+      args_bytes_seg.size != BLAKE160_SIZE + <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">uint64_t</span>)) {
+    <span class="hljs-keyword">return</span> ERROR_ARGUMENTS_LEN;
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-10">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-10">&#182;</a>
+              </div>
+              <p>Extract optional since value.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">uint64_t</span> since = <span class="hljs-number">0</span>;
+  <span class="hljs-keyword">if</span> (args_bytes_seg.size == BLAKE160_SIZE + <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">uint64_t</span>)) {
+    since = *(<span class="hljs-keyword">uint64_t</span> *)&amp;args_bytes_seg.ptr[BLAKE160_SIZE];
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-11">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-11">&#182;</a>
+              </div>
+              <p>Load the first witness, or the witness of the same index as the first input using
+current script.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> witness[MAX_WITNESS_SIZE];
+  <span class="hljs-keyword">uint64_t</span> witness_len = MAX_WITNESS_SIZE;
+  ret = ckb_load_witness(witness, &amp;witness_len, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, CKB_SOURCE_GROUP_INPUT);
+  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+    <span class="hljs-keyword">return</span> ERROR_SYSCALL;
+  }
+  <span class="hljs-keyword">if</span> (witness_len &gt; MAX_WITNESS_SIZE) {
+    <span class="hljs-keyword">return</span> ERROR_WITNESS_SIZE;
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-12">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-12">&#182;</a>
+              </div>
+              <p>We will treat the first witness as WitnessArgs object, and extract the lock field
+from the object.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">mol_seg_t</span> lock_bytes_seg;
+  ret = extract_witness_lock(witness, witness_len, &amp;lock_bytes_seg);
+  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+    <span class="hljs-keyword">return</span> ret;
+  }
+
+  <span class="hljs-keyword">if</span> (lock_bytes_seg.size &lt; FLAGS_SIZE) {
+    <span class="hljs-keyword">return</span> ERROR_WITNESS_SIZE;
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-13">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-13">&#182;</a>
+              </div>
+              <p>This is more of a safe guard, since lock is a field in witness, it
+cannot exceed the maximum size of the enclosing witness, this way
+we should still be at the safe side even if any of the lock extracting
+code has a bug.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">if</span> (lock_bytes_seg.size &gt; witness_len) {
+    <span class="hljs-keyword">return</span> ERROR_ENCODING;
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-14">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-14">&#182;</a>
+              </div>
+              <p>Keep the full lock field somewhere, since later we will modify this field in place.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> lock_bytes[lock_bytes_seg.size];
+  <span class="hljs-keyword">uint64_t</span> lock_bytes_len = lock_bytes_seg.size;
+  <span class="hljs-built_in">memcpy</span>(lock_bytes, lock_bytes_seg.ptr, lock_bytes_len);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-15">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-15">&#182;</a>
+              </div>
+              <p>Extract multisig script flags.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">uint8_t</span> pubkeys_cnt = lock_bytes[<span class="hljs-number">3</span>];
+  <span class="hljs-keyword">uint8_t</span> threshold = lock_bytes[<span class="hljs-number">2</span>];
+  <span class="hljs-keyword">uint8_t</span> require_first_n = lock_bytes[<span class="hljs-number">1</span>];
+  <span class="hljs-keyword">uint8_t</span> reserved_field = lock_bytes[<span class="hljs-number">0</span>];
+  <span class="hljs-keyword">if</span> (reserved_field != <span class="hljs-number">0</span>) {
+    <span class="hljs-keyword">return</span> ERROR_INVALID_RESERVE_FIELD;
+  }
+  <span class="hljs-keyword">if</span> (pubkeys_cnt == <span class="hljs-number">0</span>) {
+    <span class="hljs-keyword">return</span> ERROR_INVALID_PUBKEYS_CNT;
+  }
+  <span class="hljs-keyword">if</span> (threshold &gt; pubkeys_cnt) {
+    <span class="hljs-keyword">return</span> ERROR_INVALID_THRESHOLD;
+  }
+  <span class="hljs-keyword">if</span> (threshold == <span class="hljs-number">0</span>) {
+    <span class="hljs-keyword">return</span> ERROR_INVALID_THRESHOLD;
+  }
+  <span class="hljs-keyword">if</span> (require_first_n &gt; threshold) {
+    <span class="hljs-keyword">return</span> ERROR_INVALID_REQUIRE_FIRST_N;
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-16">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-16">&#182;</a>
+              </div>
+              <p>Based on the number of public keys and thresholds, we can calculate
+the required length of the lock field.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">size_t</span> multisig_script_len = FLAGS_SIZE + BLAKE160_SIZE * pubkeys_cnt;
+  <span class="hljs-keyword">size_t</span> signatures_len = SIGNATURE_SIZE * threshold;
+  <span class="hljs-keyword">size_t</span> required_lock_len = multisig_script_len + signatures_len;
+  <span class="hljs-keyword">if</span> (lock_bytes_len != required_lock_len) {
+    <span class="hljs-keyword">return</span> ERROR_WITNESS_SIZE;
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-17">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-17">&#182;</a>
+              </div>
+              <p>Perform hash check of the <code>multisig_script</code> part, notice the signature part
+is not included here.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  blake2b_state blake2b_ctx;
+  blake2b_init(&amp;blake2b_ctx, BLAKE2B_BLOCK_SIZE);
+  blake2b_update(&amp;blake2b_ctx, lock_bytes, multisig_script_len);
+  blake2b_final(&amp;blake2b_ctx, temp, BLAKE2B_BLOCK_SIZE);
+
+  <span class="hljs-keyword">if</span> (<span class="hljs-built_in">memcmp</span>(args_bytes_seg.ptr, temp, BLAKE160_SIZE) != <span class="hljs-number">0</span>) {
+    <span class="hljs-keyword">return</span> ERROR_MULTSIG_SCRIPT_HASH;
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-18">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-18">&#182;</a>
+              </div>
+              <p>Check lock period logic, we have prepared a handy utility function for this.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  ret = check_since(since);
+  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+    <span class="hljs-keyword">return</span> ret;
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-19">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-19">&#182;</a>
+              </div>
+              <p>Load the current transaction hash.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> tx_hash[BLAKE2B_BLOCK_SIZE];
+  len = BLAKE2B_BLOCK_SIZE;
+  ret = ckb_load_tx_hash(tx_hash, &amp;len, <span class="hljs-number">0</span>);
+  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+    <span class="hljs-keyword">return</span> ret;
+  }
+  <span class="hljs-keyword">if</span> (len != BLAKE2B_BLOCK_SIZE) {
+    <span class="hljs-keyword">return</span> ERROR_SYSCALL;
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-20">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-20">&#182;</a>
+              </div>
+              <p>Erase the signature part to all zeros, so we can prepare the sining message.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-built_in">memset</span>((<span class="hljs-keyword">void</span> *)(lock_bytes_seg.ptr + multisig_script_len), <span class="hljs-number">0</span>, signatures_len);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-21">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-21">&#182;</a>
+              </div>
+              <p>Here we start to prepare the message used in signature verification. First, let’s
+hash the just loaded transaction hash.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> message[BLAKE2B_BLOCK_SIZE];
+  blake2b_init(&amp;blake2b_ctx, BLAKE2B_BLOCK_SIZE);
+  blake2b_update(&amp;blake2b_ctx, tx_hash, BLAKE2B_BLOCK_SIZE);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-22">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-22">&#182;</a>
+              </div>
+              <p>Before hashing each witness, we need to hash the witness length first as a 64-bit
+unsigned little endian integer.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  blake2b_update(&amp;blake2b_ctx, (<span class="hljs-keyword">char</span> *)&amp;witness_len, <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">uint64_t</span>));</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-23">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-23">&#182;</a>
+              </div>
+              <p>Like shown above, we will fill the signature section with all 0, then used the modified
+first witness here as the value to hash.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  blake2b_update(&amp;blake2b_ctx, witness, witness_len);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-24">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-24">&#182;</a>
+              </div>
+              <p>Let’s loop and hash all witnesses with the same indices as the remaining input cells
+using current running lock script.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">size_t</span> i = <span class="hljs-number">1</span>;
+  <span class="hljs-keyword">while</span> (<span class="hljs-number">1</span>) {
+    len = MAX_WITNESS_SIZE;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-25">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-25">&#182;</a>
+              </div>
+              <p>Using <em>CKB_SOURCE_GROUP_INPUT</em> as the source value provides us with a quick way to
+loop through all input cells using current running lock script. We don’t have to
+loop and check each individual cell by ourselves.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    ret = ckb_load_witness(temp, &amp;len, <span class="hljs-number">0</span>, i, CKB_SOURCE_GROUP_INPUT);
+    <span class="hljs-keyword">if</span> (ret == CKB_INDEX_OUT_OF_BOUND) {
+      <span class="hljs-keyword">break</span>;
+    }
+    <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+      <span class="hljs-keyword">return</span> ERROR_SYSCALL;
+    }
+    <span class="hljs-keyword">if</span> (len &gt; MAX_WITNESS_SIZE) {
+      <span class="hljs-keyword">return</span> ERROR_WITNESS_SIZE;
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-26">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-26">&#182;</a>
+              </div>
+              <p>Before hashing each witness, we need to hash the witness length first as a 64-bit
+unsigned little endian integer.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    blake2b_update(&amp;blake2b_ctx, (<span class="hljs-keyword">char</span> *)&amp;len, <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">uint64_t</span>));
+    blake2b_update(&amp;blake2b_ctx, temp, len);
+    i += <span class="hljs-number">1</span>;
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-27">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-27">&#182;</a>
+              </div>
+              <p>For safety consideration, this lock script will also hash and guard all witnesses that
+have index values equal to or larger than the number of input cells. It assumes all
+witnesses that do have an input cell with the same index, will be guarded by the lock
+script of the input cell.</p>
+<p>For convenience reason, we provide a utility function here to calculate the number of
+input cells in a transaction.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  i = calculate_inputs_len();
+  <span class="hljs-keyword">while</span> (<span class="hljs-number">1</span>) {
+    len = MAX_WITNESS_SIZE;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-28">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-28">&#182;</a>
+              </div>
+              <p>Here we are guarding input cells with any arbitrary lock script, hence we are using
+the plain <em>CKB_SOURCE_INPUT</em> source to loop all witnesses.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    ret = ckb_load_witness(temp, &amp;len, <span class="hljs-number">0</span>, i, CKB_SOURCE_INPUT);
+    <span class="hljs-keyword">if</span> (ret == CKB_INDEX_OUT_OF_BOUND) {
+      <span class="hljs-keyword">break</span>;
+    }
+    <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+      <span class="hljs-keyword">return</span> ERROR_SYSCALL;
+    }
+    <span class="hljs-keyword">if</span> (len &gt; MAX_WITNESS_SIZE) {
+      <span class="hljs-keyword">return</span> ERROR_WITNESS_SIZE;
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-29">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-29">&#182;</a>
+              </div>
+              <p>Before hashing each witness, we need to hash the witness length first as a 64-bit
+unsigned little endian integer.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    blake2b_update(&amp;blake2b_ctx, (<span class="hljs-keyword">char</span> *)&amp;len, <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">uint64_t</span>));
+    blake2b_update(&amp;blake2b_ctx, temp, len);
+    i += <span class="hljs-number">1</span>;
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-30">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-30">&#182;</a>
+              </div>
+              <p>Now the message preparation is completed.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  blake2b_final(&amp;blake2b_ctx, message, BLAKE2B_BLOCK_SIZE);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-31">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-31">&#182;</a>
+              </div>
+              <p>Verify threshold signatures, threshold is a uint8_t, at most it is
+255, meaning this array will definitely have a reasonable upper bound.
+Also this code uses C99’s new feature to allocate a variable length array.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">uint8_t</span> used_signatures[threshold];
+  <span class="hljs-built_in">memset</span>(used_signatures, <span class="hljs-number">0</span>, threshold);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-32">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-32">&#182;</a>
+              </div>
+              <p>We are using bitcoin’s <a href="https://github.com/bitcoin-core/secp256k1">secp256k1 library</a>
+for signature verification here. To the best of our knowledge, this is an unmatched
+advantage of CKB: you can ship cryptographic algorithm within your smart contract,
+you don’t have to wait for the foundation to ship a new cryptographic algorithm. You
+can just build and ship your own.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  secp256k1_context context;
+  <span class="hljs-keyword">uint8_t</span> secp_data[CKB_SECP256K1_DATA_SIZE];
+  ret = ckb_secp256k1_custom_verify_only_initialize(&amp;context, secp_data);
+  <span class="hljs-keyword">if</span> (ret != <span class="hljs-number">0</span>) {
+    <span class="hljs-keyword">return</span> ret;
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-33">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-33">&#182;</a>
+              </div>
+              <p>We will perform <em>threshold</em> number of signature verifications here.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">size_t</span> i = <span class="hljs-number">0</span>; i &lt; threshold; i++) {</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-34">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-34">&#182;</a>
+              </div>
+              <p>Load signature</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    secp256k1_ecdsa_recoverable_signature signature;
+    <span class="hljs-keyword">size_t</span> signature_offset = multisig_script_len + i * SIGNATURE_SIZE;
+    <span class="hljs-keyword">if</span> (secp256k1_ecdsa_recoverable_signature_parse_compact(
+            &amp;context, &amp;signature, &amp;lock_bytes[signature_offset],
+            lock_bytes[signature_offset + RECID_INDEX]) == <span class="hljs-number">0</span>) {
+      <span class="hljs-keyword">return</span> ERROR_SECP_PARSE_SIGNATURE;
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-35">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-35">&#182;</a>
+              </div>
+              <p>verifiy signature and Recover pubkey</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    secp256k1_pubkey pubkey;
+    <span class="hljs-keyword">if</span> (secp256k1_ecdsa_recover(&amp;context, &amp;pubkey, &amp;signature, message) != <span class="hljs-number">1</span>) {
+      <span class="hljs-keyword">return</span> ERROR_SECP_RECOVER_PUBKEY;
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-36">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-36">&#182;</a>
+              </div>
+              <p>Calculate the blake160 hash of the derived public key</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">size_t</span> pubkey_size = PUBKEY_SIZE;
+    <span class="hljs-keyword">if</span> (secp256k1_ec_pubkey_serialize(&amp;context, temp, &amp;pubkey_size, &amp;pubkey,
+                                      SECP256K1_EC_COMPRESSED) != <span class="hljs-number">1</span>) {
+      <span class="hljs-keyword">return</span> ERROR_SECP_SERIALIZE_PUBKEY;
+    }
+
+    <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> calculated_pubkey_hash[BLAKE2B_BLOCK_SIZE];
+    blake2b_state blake2b_ctx;
+    blake2b_init(&amp;blake2b_ctx, BLAKE2B_BLOCK_SIZE);
+    blake2b_update(&amp;blake2b_ctx, temp, PUBKEY_SIZE);
+    blake2b_final(&amp;blake2b_ctx, calculated_pubkey_hash, BLAKE2B_BLOCK_SIZE);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-37">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-37">&#182;</a>
+              </div>
+              <p>Check if this signature is signed with one of the provided public key.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">uint8_t</span> matched = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">size_t</span> i = <span class="hljs-number">0</span>; i &lt; pubkeys_cnt; i++) {
+      <span class="hljs-keyword">if</span> (used_signatures[i] == <span class="hljs-number">1</span>) {
+        <span class="hljs-keyword">continue</span>;
+      }
+      <span class="hljs-keyword">if</span> (<span class="hljs-built_in">memcmp</span>(&amp;lock_bytes[FLAGS_SIZE + i * BLAKE160_SIZE],
+                 calculated_pubkey_hash, BLAKE160_SIZE) != <span class="hljs-number">0</span>) {
+        <span class="hljs-keyword">continue</span>;
+      }
+      matched = <span class="hljs-number">1</span>;
+      used_signatures[i] = <span class="hljs-number">1</span>;
+      <span class="hljs-keyword">break</span>;
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-38">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-38">&#182;</a>
+              </div>
+              <p>If the signature doesn’t match any of the provided public key, the script
+will exit with an error.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">if</span> (matched != <span class="hljs-number">1</span>) {
+      <span class="hljs-keyword">return</span> ERROR_VERIFICATION;
+    }
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-39">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-39">&#182;</a>
+              </div>
+              <p>The above scheme just ensures that a <em>threshold</em> number of signatures have
+successfully been verified, and they all come from the provided public keys.
+However, the multisig script might also require some numbers of public keys
+to always be signed for the script to pass verification. This is indicated
+via the <em>required_first_n</em> flag. Here we also checks to see that this rule
+is also satisfied.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">size_t</span> i = <span class="hljs-number">0</span>; i &lt; require_first_n; i++) {
+    <span class="hljs-keyword">if</span> (used_signatures[i] != <span class="hljs-number">1</span>) {
+      <span class="hljs-keyword">return</span> ERROR_VERIFICATION;
+    }
+  }
+
+  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>
