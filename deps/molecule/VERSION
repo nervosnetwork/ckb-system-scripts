@@ -1,2 +1,2 @@
-base on molecule 0.4.1
+0.4.1 + commit f714c99905ff148f6088f905c6579e78aa7d099
 fix: offsets are incorrect when all items in a Vector are None
