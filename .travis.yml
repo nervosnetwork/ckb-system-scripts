@@ -28,5 +28,13 @@ matrix:
         - cargo login $CRATES_IO_TOKEN
         - make publish
 
+    - name: Docco
+      language: node_js
+      node_js: node
+      script:
+        - npm install -g docco@0.8.0
+        - docco c/secp256k1_blake160_sighash_all.c c/secp256k1_blake160_multisig_all.c c/dao.c
+        - git diff --exit-code
+
 before_cache:
   - rm -rf ~/.cargo/registry
