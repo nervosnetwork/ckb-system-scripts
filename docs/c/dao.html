@@ -70,8 +70,8 @@ transaction structure, then parse WitnessArgs data structure in molecule format.
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">"ckb_syscalls.h"</span></span>
-<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">"protocol.h"</span></span></pre></div></div>
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&quot;ckb_syscalls.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&quot;protocol.h&quot;</span></span></pre></div></div>
             
         </li>
         
@@ -884,7 +884,7 @@ containing the <em>true</em> capacities of all the input cells here.</p>
             <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">size_t</span> index = <span class="hljs-number">0</span>;
   <span class="hljs-keyword">uint64_t</span> input_capacities = <span class="hljs-number">0</span>;
 <span class="hljs-meta">#<span class="hljs-meta-keyword">if</span> MAX_OUTPUT_LENGTH &gt; 64</span>
-<span class="hljs-meta">#<span class="hljs-meta-keyword">error</span> <span class="hljs-meta-string">"Masking solutioin can only work with 64 outputs at most!"</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">error</span> <span class="hljs-meta-string">&quot;Masking solutioin can only work with 64 outputs at most!&quot;</span></span>
 <span class="hljs-meta">#<span class="hljs-meta-keyword">endif</span></span>
   <span class="hljs-keyword">uint64_t</span> output_withdrawing_mask = <span class="hljs-number">0</span>;
   <span class="hljs-keyword">while</span> (<span class="hljs-number">1</span>) {
