@@ -62,7 +62,7 @@ fn main() {
         let mut hash = [0u8; 32];
         blake2b.finalize(&mut hash);
 
-        let actual_hash = faster_hex::hex_string(&hash).unwrap();
+        let actual_hash = faster_hex::hex_string(&hash);
         if expected_hash != &actual_hash {
             errors.push((name, expected_hash, actual_hash));
             continue;
