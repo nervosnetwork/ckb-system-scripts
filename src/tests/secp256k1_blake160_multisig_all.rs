@@ -382,7 +382,7 @@ fn test_multisig_0_2_3_unlock_with_since() {
     let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
     let args = {
         let mut buf = blake160(&multi_sign_script).to_vec();
-        buf.extend(since.to_le_bytes().into_iter());
+        buf.extend(since.to_le_bytes().iter());
         Bytes::from(buf)
     };
     let raw_tx = gen_tx(&mut data_loader, args);
@@ -472,7 +472,7 @@ fn test_multisig_0_2_3_unlock_with_since_epoch() {
     let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
     let args = {
         let mut buf = blake160(&multi_sign_script).to_vec();
-        buf.extend(since.to_le_bytes().into_iter());
+        buf.extend(since.to_le_bytes().iter());
         Bytes::from(buf)
     };
     let raw_tx = gen_tx(&mut data_loader, args);
