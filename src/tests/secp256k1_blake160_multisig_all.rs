@@ -35,11 +35,7 @@ fn test_multisig_script_hash() {
     let raw_tx = gen_tx(&mut data_loader, args);
     {
         let wrong_multi_sign_script = gen_multi_sign_script(&keys, 2, 1);
-        let tx = multi_sign_tx(
-            raw_tx.clone(),
-            &wrong_multi_sign_script,
-            &[&keys[0], &keys[1]],
-        );
+        let tx = multi_sign_tx(raw_tx, &wrong_multi_sign_script, &[&keys[0], &keys[1]]);
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
@@ -56,7 +52,7 @@ fn test_invalid_flags() {
     let args = blake160(&multi_sign_script);
     let raw_tx = gen_tx(&mut data_loader, args);
     {
-        let wrong_multi_sign_script = gen_multi_sign_script(&vec![], 2, 0);
+        let wrong_multi_sign_script = gen_multi_sign_script(&[], 2, 0);
         let tx = multi_sign_tx(
             raw_tx.clone(),
             &wrong_multi_sign_script,
@@ -83,11 +79,7 @@ fn test_invalid_flags() {
     }
     {
         let wrong_multi_sign_script = gen_multi_sign_script(&keys, 2, 3);
-        let tx = multi_sign_tx(
-            raw_tx.clone(),
-            &wrong_multi_sign_script,
-            &[&keys[0], &keys[1]],
-        );
+        let tx = multi_sign_tx(raw_tx, &wrong_multi_sign_script, &[&keys[0], &keys[1]]);
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
@@ -155,11 +147,7 @@ fn test_multisig_0_2_3_unlock() {
         );
     }
     {
-        let tx = multi_sign_tx(
-            raw_tx.clone(),
-            &multi_sign_script,
-            &[&keys[0], &wrong_keys[0]],
-        );
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[0], &wrong_keys[0]]);
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
@@ -188,7 +176,7 @@ fn test_multisig_1_2_3_unlock() {
         verify(&data_loader, &tx).expect("pass verification");
     }
     {
-        let tx = multi_sign_tx(tx.clone(), &multi_sign_script, &[&keys[1], &keys[2]]);
+        let tx = multi_sign_tx(tx, &multi_sign_script, &[&keys[1], &keys[2]]);
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
@@ -226,7 +214,7 @@ fn test_multisig_1_2_3_with_extra_witness_unlock() {
         verify(&data_loader, &tx).expect("pass verification");
     }
     {
-        let tx = multi_sign_tx(tx.clone(), &multi_sign_script, &[&keys[1], &keys[2]]);
+        let tx = multi_sign_tx(tx, &multi_sign_script, &[&keys[1], &keys[2]]);
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
@@ -255,7 +243,7 @@ fn test_multisig_1_2_3_with_multiple_inputs_unlock() {
         verify(&data_loader, &tx).expect("pass verification");
     }
     {
-        let tx = multi_sign_tx(tx.clone(), &multi_sign_script, &[&keys[1], &keys[2]]);
+        let tx = multi_sign_tx(tx, &multi_sign_script, &[&keys[1], &keys[2]]);
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
@@ -277,7 +265,7 @@ fn test_multisig_0_1_1_unlock() {
     }
     let wrong_keys = generate_keys(1);
     {
-        let tx = multi_sign_tx(raw_tx.clone(), &multi_sign_script, &[&wrong_keys[0]]);
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&wrong_keys[0]]);
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
@@ -299,11 +287,7 @@ fn test_multisig_0_2_2_unlock() {
     }
     let wrong_keys = generate_keys(2);
     {
-        let tx = multi_sign_tx(
-            raw_tx.clone(),
-            &multi_sign_script,
-            &[&keys[0], &wrong_keys[1]],
-        );
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[0], &wrong_keys[1]]);
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
@@ -701,7 +685,7 @@ fn gen_tx_with_extra_inputs(
         buf.pack()
     };
     let contract_index = 0;
-    let contract_out_point = OutPoint::new(contract_tx_hash.clone(), contract_index);
+    let contract_out_point = OutPoint::new(contract_tx_hash, contract_index);
     // dep contract code
     let dep_cell = CellOutput::new_builder()
         .capacity(
@@ -751,7 +735,7 @@ fn gen_tx_with_extra_inputs(
         (previous_output_cell.clone(), Bytes::new()),
     );
     let tx_builder = TransactionBuilder::default()
-        .input(CellInput::new(previous_out_point.clone(), 0))
+        .input(CellInput::new(previous_out_point, 0))
         .cell_dep(
             CellDep::new_builder()
                 .out_point(contract_out_point)
@@ -767,7 +751,7 @@ fn gen_tx_with_extra_inputs(
         .output(CellOutput::new_builder().capacity(capacity.pack()).build())
         .output_data(Bytes::new().pack());
     if extra_inputs > 0 {
-        let mut extra_inputs_tx_builder = tx_builder.clone();
+        let mut extra_inputs_tx_builder = tx_builder;
         extra_inputs_tx_builder =
             extra_inputs_tx_builder.witness(WitnessArgs::new_builder().build().as_bytes().pack());
         let mut rng = thread_rng();
@@ -805,12 +789,11 @@ fn build_resolved_tx(data_loader: &DummyDataLoader, tx: &TransactionView) -> Res
     let resolved_cell_deps = tx
         .cell_deps()
         .into_iter()
-        .map(|dep| {
-            let deps_out_point = dep.clone();
+        .map(|deps_out_point| {
             let (dep_output, dep_data) =
                 data_loader.cells.get(&deps_out_point.out_point()).unwrap();
             CellMetaBuilder::from_cell_output(dep_output.to_owned(), dep_data.to_owned())
-                .out_point(deps_out_point.out_point().clone())
+                .out_point(deps_out_point.out_point())
                 .build()
         })
         .collect();

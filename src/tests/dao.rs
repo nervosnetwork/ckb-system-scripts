@@ -204,10 +204,7 @@ fn complete_tx(
         )
         .build();
 
-    let mut resolved_cell_deps = vec![];
-    resolved_cell_deps.push(secp_cell_meta);
-    resolved_cell_deps.push(secp_data_cell_meta);
-    resolved_cell_deps.push(dao_cell_meta);
+    let resolved_cell_deps = vec![secp_cell_meta, secp_data_cell_meta, dao_cell_meta];
 
     (tx, resolved_cell_deps)
 }
@@ -233,10 +230,10 @@ fn test_dao_single_cell() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1554);
@@ -302,10 +299,10 @@ fn test_dao_single_cell_epoch_edge() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1554);
@@ -371,10 +368,10 @@ fn test_dao_single_cell_start_of_epoch() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1000);
@@ -440,10 +437,10 @@ fn test_dao_single_cell_end_of_epoch() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1999);
@@ -509,10 +506,10 @@ fn test_dao_single_cell_with_fees() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1554);
@@ -578,10 +575,10 @@ fn test_dao_single_cell_with_dao_output_cell() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1554);
@@ -669,16 +666,16 @@ fn test_dao_multiple_cells() {
         .insert(withdraw_header2.hash(), withdraw_header2.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(deposit_header2.hash(), deposit_epoch2.clone());
+        .insert(deposit_header2.hash(), deposit_epoch2);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header2.hash(), withdraw_epoch2.clone());
+        .insert(withdraw_header2.hash(), withdraw_epoch2);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1554);
@@ -760,9 +757,9 @@ fn test_dao_missing_deposit_header() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let cell_out_point = previous_out_point.clone();
+    let cell_out_point = previous_out_point;
     let previous_out_point = OutPoint::new_builder()
         .tx_hash(cell_out_point.tx_hash())
         .index(cell_out_point.index())
@@ -831,7 +828,7 @@ fn test_dao_missing_withdraw_header() {
         .insert(deposit_header.hash(), deposit_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1554);
@@ -899,10 +896,10 @@ fn test_dao_invalid_deposit_header() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1554);
@@ -970,10 +967,10 @@ fn test_dao_invalid_withdraw_amount() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1554);
@@ -1042,10 +1039,10 @@ fn test_dao_invalid_since() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1554);
@@ -1115,10 +1112,10 @@ fn test_dao_invalid_withdraw_from_deposited_cell() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&[0; 8][..]))
         .out_point(previous_out_point.clone())
@@ -1334,7 +1331,7 @@ fn test_dao_create_withdrawing_cell() {
         .insert(deposit_header.hash(), deposit_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
 
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&[0; 8][..]))
         .out_point(previous_out_point.clone())
@@ -1390,7 +1387,7 @@ fn test_dao_create_withdrawing_cell_with_different_lock() {
     let (cell, previous_out_point) = gen_dao_cell(
         &mut data_loader,
         Capacity::shannons(123456780000),
-        lock_args.clone(),
+        lock_args,
     );
 
     data_loader
@@ -1398,7 +1395,7 @@ fn test_dao_create_withdrawing_cell_with_different_lock() {
         .insert(deposit_header.hash(), deposit_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
 
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&[0; 8][..]))
         .out_point(previous_out_point.clone())
@@ -1461,7 +1458,7 @@ fn test_dao_create_withdrawing_cell_with_invalid_type() {
         .insert(deposit_header.hash(), deposit_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
 
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&[0; 8][..]))
         .out_point(previous_out_point.clone())
@@ -1527,7 +1524,7 @@ fn test_dao_create_withdrawing_cell_with_invalid_data() {
         .insert(deposit_header.hash(), deposit_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
 
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&[0; 8][..]))
         .out_point(previous_out_point.clone())
@@ -1593,7 +1590,7 @@ fn test_dao_create_withdrawing_cell_with_invalid_capacity() {
         .insert(deposit_header.hash(), deposit_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
 
     let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&[0; 8][..]))
         .out_point(previous_out_point.clone())
@@ -1660,10 +1657,10 @@ fn test_dao_too_many_output_cells() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1554);
@@ -1740,10 +1737,10 @@ fn test_dao_all_dao_actions() {
         .insert(withdraw_header.hash(), withdraw_header.clone());
     data_loader
         .epoches
-        .insert(deposit_header.hash(), deposit_epoch.clone());
+        .insert(deposit_header.hash(), deposit_epoch);
     data_loader
         .epoches
-        .insert(withdraw_header.hash(), withdraw_epoch.clone());
+        .insert(withdraw_header.hash(), withdraw_epoch);
 
     let mut b = [0; 8];
     LittleEndian::write_u64(&mut b, 1554);

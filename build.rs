@@ -68,9 +68,9 @@ fn main() {
             continue;
         }
 
-        write!(
+        writeln!(
             &mut out_file,
-            "pub const {}: [u8; 32] = {:?};\n",
+            "pub const {}: [u8; 32] = {:?};",
             format!("CODE_HASH_{}", name.to_uppercase()),
             hash
         )
