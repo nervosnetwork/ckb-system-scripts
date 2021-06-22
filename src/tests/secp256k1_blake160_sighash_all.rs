@@ -38,7 +38,7 @@ fn gen_tx_with_grouped_args<R: Rng>(
             rng.fill(&mut buf);
             buf.pack()
         };
-        OutPoint::new(contract_tx_hash.clone(), 0)
+        OutPoint::new(contract_tx_hash, 0)
     };
     // dep contract code
     let sighash_all_cell = CellOutput::new_builder()
@@ -151,12 +151,11 @@ fn build_resolved_tx(data_loader: &DummyDataLoader, tx: &TransactionView) -> Res
     let resolved_cell_deps = tx
         .cell_deps()
         .into_iter()
-        .map(|dep| {
-            let deps_out_point = dep.clone();
+        .map(|deps_out_point| {
             let (dep_output, dep_data) =
                 data_loader.cells.get(&deps_out_point.out_point()).unwrap();
             CellMetaBuilder::from_cell_output(dep_output.to_owned(), dep_data.to_owned())
-                .out_point(deps_out_point.out_point().clone())
+                .out_point(deps_out_point.out_point())
                 .build()
         })
         .collect();
@@ -259,7 +258,7 @@ fn test_sighash_all_with_grouped_inputs_unlock() {
         verify_result.expect("pass verification");
     }
     {
-        let tx = sign_tx(tx.clone(), &privkey);
+        let tx = sign_tx(tx, &privkey);
         let wrong_witness = tx
             .witnesses()
             .get(1)
@@ -480,7 +479,7 @@ fn test_sighash_all_witness_args_ambiguity() {
         .into_iter()
         .map(|witness| {
             let witness = WitnessArgs::new_unchecked(witness);
-            let data = witness.extra().clone();
+            let data = witness.extra();
             witness
                 .as_builder()
                 .extra(Bytes::new().pack())

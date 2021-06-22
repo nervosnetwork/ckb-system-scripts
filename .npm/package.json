@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "docco": "=0.8.0"
+  }
+}
