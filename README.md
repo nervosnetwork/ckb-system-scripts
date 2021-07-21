@@ -14,3 +14,7 @@ make install-tools
 make all-via-docker
 cargo test --all
 ```
+
+## Release
+
+Tag and publish the release. GitHub Actions will publish the crate.
