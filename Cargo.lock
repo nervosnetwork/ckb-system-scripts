@@ -440,7 +440,7 @@ dependencies = [
 
 [[package]]
 name = "ckb-system-scripts"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "blake2b-rs 0.2.0",
  "byteorder",
@@ -454,6 +454,7 @@ dependencies = [
  "includedir 0.6.0",
  "includedir_codegen 0.6.0",
  "lazy_static",
+ "phf 0.8.0",
  "rand 0.7.0",
  "ripemd160",
  "secp256k1",
@@ -946,9 +947,9 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "0.12.33"
+version = "0.12.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cb44cbce9d8ee4fb36e4c0ad7b794ac44ebaad924b9c8291a63215bb44c2c8f"
+checksum = "9dbe6ed1438e1f8ad955a4701e9a944938e9519f6888d12d8558b645e247d5f6"
 dependencies = [
  "bytes",
  "futures",
