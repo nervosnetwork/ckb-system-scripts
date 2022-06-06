@@ -440,7 +440,7 @@ dependencies = [
 
 [[package]]
 name = "ckb-system-scripts"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "blake2b-rs 0.2.0",
  "byteorder",
@@ -454,6 +454,7 @@ dependencies = [
  "includedir 0.6.0",
  "includedir_codegen 0.6.0",
  "lazy_static",
+ "phf 0.8.0",
  "rand 0.7.0",
  "ripemd160",
  "secp256k1",
@@ -902,9 +903,9 @@ dependencies = [
 
 [[package]]
 name = "http"
-version = "0.1.18"
+version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "372bcb56f939e449117fb0869c2e8fd8753a8223d92a172c6e808cf123a5b6e4"
+checksum = "d6ccf5ede3a895d8856620237b2f02972c1bbc78d2965ad7fe8838d4a0ed41f0"
 dependencies = [
  "bytes",
  "fnv",
