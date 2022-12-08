@@ -235,7 +235,7 @@ dependencies = [
  "faster-hex 0.4.1",
  "lazy_static",
  "rand 0.6.5",
- "secp256k1",
+ "secp256k1 0.15.5",
 ]
 
 [[package]]
@@ -440,7 +440,7 @@ dependencies = [
 
 [[package]]
 name = "ckb-system-scripts"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "blake2b-rs 0.2.0",
  "byteorder",
@@ -454,9 +454,10 @@ dependencies = [
  "includedir 0.6.0",
  "includedir_codegen 0.6.0",
  "lazy_static",
+ "phf 0.8.0",
  "rand 0.7.0",
  "ripemd160",
- "secp256k1",
+ "secp256k1 0.22.2",
  "sha2",
 ]
 
@@ -1918,12 +1919,30 @@ dependencies = [
 
 [[package]]
 name = "secp256k1"
-version = "0.15.1"
+version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae5fd6cb1984f1e875bc40d427f45d20c335df48728e31bc49c12cf49c2ac27c"
+checksum = "4d311229f403d64002e9eed9964dfa5a0a0c1ac443344f7546bf48e916c6053a"
 dependencies = [
  "cc",
  "rand 0.6.5",
+]
+
+[[package]]
+name = "secp256k1"
+version = "0.22.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "295642060261c80709ac034f52fca8e5a9fa2c7d341ded5cdb164b7c33768b2a"
+dependencies = [
+ "secp256k1-sys",
+]
+
+[[package]]
+name = "secp256k1-sys"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "152e20a0fd0519390fc43ab404663af8a0b794273d2a91d60ad4a39f13ffe110"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
