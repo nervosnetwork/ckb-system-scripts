@@ -40,8 +40,8 @@
 // script to relax this limitation.
 #define MAX_OUTPUT_LENGTH 64
 
-// One lock period of NervosDAO is set as 180 epoches, which is roughly 30 days.
-#define LOCK_PERIOD_EPOCHES 180
+// One lock period of NervosDAO is set as 180 epochs, which is roughly 30 days.
+#define LOCK_PERIOD_EPOCHS 180
 
 // Common definitions to parse epoch value in block headers.
 #define EPOCH_NUMBER_OFFSET 0
@@ -54,7 +54,7 @@
 #define EPOCH_LENGTH_BITS 16
 #define EPOCH_LENGTH_MASK ((1 << EPOCH_LENGTH_BITS) - 1)
 
-// Fetches deposit header index. The index is kepted in the witness of the same
+// Fetches deposit header index. The index is kept in the witness of the same
 // index as the input cell. The witness is first treated as a WitnessArgs object
 // in molecule format. Then we extract the value from the `input_type` field of
 // WitnessArgs. The value is kept as a 64-bit unsigned little endian value.
@@ -208,16 +208,16 @@ static int calculate_dao_input_capacity(size_t input_index,
     return ERROR_INVALID_WITHDRAW_BLOCK;
   }
 
-  // Full deposited epoches
-  uint64_t deposited_epoches =
+  // Full deposited epochs
+  uint64_t deposited_epochs =
       withdraw_data.epoch_number - deposit_data.epoch_number;
   // This is essentially a round-up operation. Suppose withdraw epoch is
-  // a + b / c, deposit epoch is d + e / f, the deposited epoches will be:
+  // a + b / c, deposit epoch is d + e / f, the deposited epochs will be:
   //
   // (a - d) + (b / c - e / f) == (a - d) + (b * f - e * c) / (c * f)
   //
   // If (b * f - e * c) is larger than 0, we will have a fraction part in
-  // the deposited epoches, we just add one full epoch to deposited_epoches
+  // the deposited epochs, we just add one full epoch to deposited_epochs
   // to round it up.
   // If (b * f - e * c) is no larger than 0, let's look back at (b / c - e / f),
   // by the definition of a fraction, we will know 0 <= b / c < 1, and
@@ -225,18 +225,18 @@ static int calculate_dao_input_capacity(size_t input_index,
   // (a - d) - 1 < (a - d) + (b / c - e / f) <= (a - d), we won't need to do
   // anything for a round-up operation.
   if (withdraw_fraction > deposit_fraction) {
-    deposited_epoches++;
+    deposited_epochs++;
   }
-  uint64_t lock_epoches = (deposited_epoches + (LOCK_PERIOD_EPOCHES - 1)) /
-                          LOCK_PERIOD_EPOCHES * LOCK_PERIOD_EPOCHES;
-  // Cell must at least be locked for one full lock period(180 epoches)
-  if (lock_epoches < LOCK_PERIOD_EPOCHES) {
+  uint64_t lock_epochs = (deposited_epochs + (LOCK_PERIOD_EPOCHS - 1)) /
+                          LOCK_PERIOD_EPOCHS * LOCK_PERIOD_EPOCHS;
+  // Cell must at least be locked for one full lock period(180 epochs)
+  if (lock_epochs < LOCK_PERIOD_EPOCHS) {
     return ERROR_INVALID_WITHDRAW_BLOCK;
   }
   // Since actually just stores an epoch integer with a fraction part, it is
   // not necessary a valid epoch number with fraction.
   uint64_t minimal_since_epoch_number =
-      deposit_data.epoch_number + lock_epoches;
+      deposit_data.epoch_number + lock_epochs;
   uint64_t minimal_since_epoch_index = deposit_data.epoch_index;
   uint64_t minimal_since_epoch_length = deposit_data.epoch_length;
 
@@ -266,7 +266,7 @@ static int calculate_dao_input_capacity(size_t input_index,
     return ret;
   }
 
-  // Validates that correct since value is set to ensure 180 epoches lock period.
+  // Validates that correct since value is set to ensure 180 epochs lock period.
   uint64_t minimal_since_epoch_fraction =
       minimal_since_epoch_index * input_since_epoch_length;
   uint64_t input_since_epoch_fraction =
@@ -282,7 +282,7 @@ static int calculate_dao_input_capacity(size_t input_index,
   uint64_t deposit_accumulate_rate = *((uint64_t *)(&deposit_data.dao[8]));
   uint64_t withdraw_accumulate_rate = *((uint64_t *)(&withdraw_data.dao[8]));
 
-  // Nervos DAO interest is only calculated on *oocupied capacity*, which means all
+  // Nervos DAO interest is only calculated on *occupied capacity*, which means all
   // capacities that are not used as storage cost in a cell.
   uint64_t occupied_capacity = 0;
   len = 8;
@@ -433,14 +433,14 @@ int main() {
 
   // First, we will need to loop against all input cells in current transaction.
   // For a normal transaction, we will just add up its own capacity. For a
-  // NervosDAO related cell, we will perform some checkings first of course, then
+  // NervosDAO related cell, we will perform some checks first of course, then
   // we will calculate the maximum capacity one can withdraw from it, and add up
   // the maximum withdraw capacity here. After this loop we will have a value
   // containing the *true* capacities of all the input cells here.
   size_t index = 0;
   uint64_t input_capacities = 0;
 #if MAX_OUTPUT_LENGTH > 64
-#error "Masking solutioin can only work with 64 outputs at most!"
+#error "Masking solution can only work with 64 outputs at most!"
 #endif
   uint64_t output_withdrawing_mask = 0;
   while (1) {
@@ -527,7 +527,7 @@ int main() {
         // Note that `validate_withdrawing_cell` above already verifies that an
         // output cell for the current input cell at the same location exists. If
         // the current input cell has index equal to or larger than 64, it means we
-        // will also have an output cell that thas index equal to or larger than
+        // will also have an output cell that has index equal to or larger than
         // 64, which will trigger an error. Hence we don't need to check for
         // overflows for `1 << index` operation.
         output_withdrawing_mask |= (1 << index);
@@ -610,7 +610,7 @@ int main() {
 
   // The final thing we need to check here, is that the sum of capacities in output
   // cells, cannot exceed the sum of capacities in all input cells with Nervos DAO
-  // issurance considered.
+  // issuance considered.
   if (output_capacities > input_capacities) {
     return ERROR_INCORRECT_CAPACITY;
   }
