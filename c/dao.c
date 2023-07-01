@@ -386,6 +386,108 @@ static int validate_withdrawing_cell(size_t index, uint64_t input_capacity,
   return CKB_SUCCESS;
 }
 
+static int validate_input(size_t index, uint64_t *input_capacities, 
+                          uint64_t *output_withdrawing_mask,
+                          unsigned char *script_hash) {
+  int dao_input = 0;
+  uint64_t capacity = 0;
+  uint64_t len = 8;
+  int ret = ckb_load_cell_by_field(((unsigned char *)&capacity), &len, 0, index,
+                                CKB_SOURCE_INPUT, CKB_CELL_FIELD_CAPACITY);
+  if (ret == CKB_INDEX_OUT_OF_BOUND) {
+    return ret;
+  } else if (ret == CKB_SUCCESS) {
+    if (len != 8) {
+      return ERROR_SYSCALL;
+    }
+    unsigned char current_script_hash[HASH_SIZE];
+    len = HASH_SIZE;
+    ret = ckb_load_cell_by_field(current_script_hash, &len, 0, index,
+                                  CKB_SOURCE_INPUT, CKB_CELL_FIELD_TYPE_HASH);
+    // When an input cell has the same type script hash as current running
+    // we know we are dealing with a script using NervosDAO script.
+    if ((ret == CKB_SUCCESS) && len == HASH_SIZE &&
+        (memcmp(script_hash, current_script_hash, HASH_SIZE) == 0)) {
+      dao_input = 1;
+    }
+  } else {
+    return ERROR_SYSCALL;
+  }
+
+  if (!dao_input) {
+    // Normal input, use its own capacity
+    if (__builtin_uaddl_overflow(*input_capacities, capacity,
+                                  input_capacities)) {
+      return ERROR_OVERFLOW;
+    }
+  } else {
+    // In a Nervos DAO transaction, we might have 2 types of input cells using
+    // Nervos DAO type script:
+    //
+    // * A deposited cell
+    // * A withdrawing cell
+    //
+    // If you are also looking at the Nervos DAO RFC, a deposited cell is created in
+    // the initial deposit phase, and spent in withdraw phase 1; a withdrawing cell
+    // is created in withdraw phase 1, then spent in withdraw phase 2.
+    //
+    // The way to tell them apart, is that a deposited cell always contains 8 bytes
+    // of 0 as cell data, while a withdrawing cell would contain a positive number
+    // denoting the original deposited block number.
+    uint64_t block_number = 0;
+    len = 8;
+    ret = ckb_load_cell_data((unsigned char *)&block_number, &len, 0, index,
+                              CKB_SOURCE_INPUT);
+    if (ret != CKB_SUCCESS) {
+      return ret;
+    }
+    if (len != 8) {
+      return ERROR_SYSCALL;
+    }
+
+    if (block_number > 0) {
+      // For a withdrawing cell, we can start calculate the maximum capacity
+      // that one can withdraw from it.
+      uint64_t dao_capacity = 0;
+      ret = calculate_dao_input_capacity(index, block_number, capacity,
+                                          &dao_capacity);
+      if (ret != CKB_SUCCESS) {
+        return ret;
+      }
+      // Like any serious smart contracts, we will perform overflow checks here.
+      if (__builtin_uaddl_overflow(*input_capacities, dao_capacity,
+                                    input_capacities)) {
+        return ERROR_OVERFLOW;
+      }
+    } else {
+      // For a deposited cell, we only need to check that a withdrawing cell for
+      // current one is generated. For simplicity, we are limiting the code so
+      // the withdrawing cell must at the same index with the deposited cell.
+      // Due to the fact that one deposited cell is mapped to exactly one
+      // withdrawing cell, this would work fine here.
+      ret = validate_withdrawing_cell(index, capacity, script_hash);
+      if (ret != CKB_SUCCESS) {
+        return ret;
+      }
+      // Note that `validate_withdrawing_cell` above already verifies that an
+      // output cell for the current input cell at the same location exists. If
+      // the current input cell has index equal to or larger than 64, it means we
+      // will also have an output cell that has index equal to or larger than
+      // 64, which will trigger an error. Hence we don't need to check for
+      // overflows for `1 << index` operation.
+      *output_withdrawing_mask |= (1 << index);
+      // Like any serious smart contracts, we will perform overflow checks here.
+      if (__builtin_uaddl_overflow(*input_capacities, capacity,
+                                    input_capacities)) {
+        return ERROR_OVERFLOW;
+      }
+    }
+  }
+
+  return ret;
+}
+
+
 int main() {
   int ret;
   unsigned char script_hash[HASH_SIZE];
@@ -443,104 +545,19 @@ int main() {
 #error "Masking solution can only work with 64 outputs at most!"
 #endif
   uint64_t output_withdrawing_mask = 0;
+  
   while (1) {
-    int dao_input = 0;
-    uint64_t capacity = 0;
-    len = 8;
-    ret = ckb_load_cell_by_field(((unsigned char *)&capacity), &len, 0, index,
-                                 CKB_SOURCE_INPUT, CKB_CELL_FIELD_CAPACITY);
+    ret = validate_input(index, &input_capacities, &output_withdrawing_mask, script_hash);
     if (ret == CKB_INDEX_OUT_OF_BOUND) {
       break;
-    } else if (ret == CKB_SUCCESS) {
-      if (len != 8) {
-        return ERROR_SYSCALL;
-      }
-      unsigned char current_script_hash[HASH_SIZE];
-      len = HASH_SIZE;
-      ret = ckb_load_cell_by_field(current_script_hash, &len, 0, index,
-                                   CKB_SOURCE_INPUT, CKB_CELL_FIELD_TYPE_HASH);
-      // When an input cell has the same type script hash as current running
-      // we know we are dealing with a script using NervosDAO script.
-      if ((ret == CKB_SUCCESS) && len == HASH_SIZE &&
-          (memcmp(script_hash, current_script_hash, HASH_SIZE) == 0)) {
-        dao_input = 1;
-      }
-    } else {
-      return ERROR_SYSCALL;
-    }
-
-    if (!dao_input) {
-      // Normal input, use its own capacity
-      if (__builtin_uaddl_overflow(input_capacities, capacity,
-                                   &input_capacities)) {
-        return ERROR_OVERFLOW;
-      }
-    } else {
-      // In a Nervos DAO transaction, we might have 2 types of input cells using
-      // Nervos DAO type script:
-      //
-      // * A deposited cell
-      // * A withdrawing cell
-      //
-      // If you are also looking at the Nervos DAO RFC, a deposited cell is created in
-      // the initial deposit phase, and spent in withdraw phase 1; a withdrawing cell
-      // is created in withdraw phase 1, then spent in withdraw phase 2.
-      //
-      // The way to tell them apart, is that a deposited cell always contains 8 bytes
-      // of 0 as cell data, while a withdrawing cell would contain a positive number
-      // denoting the original deposited block number.
-      uint64_t block_number = 0;
-      len = 8;
-      ret = ckb_load_cell_data((unsigned char *)&block_number, &len, 0, index,
-                               CKB_SOURCE_INPUT);
-      if (ret != CKB_SUCCESS) {
-        return ret;
-      }
-      if (len != 8) {
-        return ERROR_SYSCALL;
-      }
-
-      if (block_number > 0) {
-        // For a withdrawing cell, we can start calculate the maximum capacity
-        // that one can withdraw from it.
-        uint64_t dao_capacity = 0;
-        ret = calculate_dao_input_capacity(index, block_number, capacity,
-                                           &dao_capacity);
-        if (ret != CKB_SUCCESS) {
-          return ret;
-        }
-        // Like any serious smart contracts, we will perform overflow checks here.
-        if (__builtin_uaddl_overflow(input_capacities, dao_capacity,
-                                     &input_capacities)) {
-          return ERROR_OVERFLOW;
-        }
-      } else {
-        // For a deposited cell, we only need to check that a withdrawing cell for
-        // current one is generated. For simplicity, we are limiting the code so
-        // the withdrawing cell must at the same index with the deposited cell.
-        // Due to the fact that one deposited cell is mapped to exactly one
-        // withdrawing cell, this would work fine here.
-        ret = validate_withdrawing_cell(index, capacity, script_hash);
-        if (ret != CKB_SUCCESS) {
-          return ret;
-        }
-        // Note that `validate_withdrawing_cell` above already verifies that an
-        // output cell for the current input cell at the same location exists. If
-        // the current input cell has index equal to or larger than 64, it means we
-        // will also have an output cell that has index equal to or larger than
-        // 64, which will trigger an error. Hence we don't need to check for
-        // overflows for `1 << index` operation.
-        output_withdrawing_mask |= (1 << index);
-        // Like any serious smart contracts, we will perform overflow checks here.
-        if (__builtin_uaddl_overflow(input_capacities, capacity,
-                                     &input_capacities)) {
-          return ERROR_OVERFLOW;
-        }
-      }
+    }    
+    if (ret != CKB_SUCCESS ){
+      return ret;
     }
 
     index += 1;
   }
+
 
   // Now let's loop through all output cells, and calculate the sum of output
   // capacities here.
