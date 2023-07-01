@@ -487,6 +487,69 @@ static int validate_input(size_t index, uint64_t *input_capacities,
   return ret;
 }
 
+static int validate_output(size_t index, uint64_t *output_capacities, 
+                          uint64_t *output_withdrawing_mask,
+                          unsigned char *script_hash) {
+  uint64_t capacity = 0;
+  uint64_t len = 8;
+  int ret = ckb_load_cell_by_field(((unsigned char *)&capacity), &len, 0, index,
+                                CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_CAPACITY);
+  if (ret == CKB_INDEX_OUT_OF_BOUND) {
+    return ret;
+  }
+  if (ret != CKB_SUCCESS) {
+    return ret;
+  }
+  if (len != 8) {
+    return ERROR_SYSCALL;
+  }
+  // For simplicity we are limiting to 64 output cells at most, so we can use
+  // simple bit masking.
+  if (index >= MAX_OUTPUT_LENGTH) {
+    return ERROR_TOO_MANY_OUTPUT_CELLS;
+  }
+  // Like any serious smart contracts, we will perform overflow checks here.
+  if (__builtin_uaddl_overflow(*output_capacities, capacity,
+                                output_capacities)) {
+    return ERROR_OVERFLOW;
+  }
+
+  unsigned char current_script_hash[HASH_SIZE];
+  len = HASH_SIZE;
+  ret = ckb_load_cell_by_field(current_script_hash, &len, 0, index,
+                                CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH);
+  if ((ret == CKB_SUCCESS) && len == HASH_SIZE &&
+      (memcmp(script_hash, current_script_hash, HASH_SIZE) == 0)) {
+    // Similar to the above loop, we also need to check if we are creating a
+    // deposited cell, or a withdrawing cell here. This can be easily determined
+    // using `output_withdrawing_mask` here: in previous iteration we've marked
+    // all created withdrawing cells in the bit mask.
+    //
+    // For withdrawing cells, we already perform all the necessary checks when
+    // we are checking the corresponding deposited cells above. No further
+    // action is needed here.
+    //
+    // For newly deposited cells, we need to validate that the cell data part
+    // contains 8 bytes of data filled with 0.
+    if ((*output_withdrawing_mask & (1 << index)) == 0) {
+      uint64_t block_number = 0;
+      len = 8;
+      ret = ckb_load_cell_data((unsigned char *)&block_number, &len, 0, index,
+                                CKB_SOURCE_OUTPUT);
+      if (ret != CKB_SUCCESS) {
+        return ret;
+      }
+      if (len != 8) {
+        return ERROR_SYSCALL;
+      }
+      if (block_number != 0) {
+        return ERROR_NEWLY_CREATED_CELL;
+      }
+    }
+  }
+  return ret;
+}
+
 
 int main() {
   int ret;
@@ -554,7 +617,6 @@ int main() {
     if (ret != CKB_SUCCESS ){
       return ret;
     }
-
     index += 1;
   }
 
@@ -564,64 +626,13 @@ int main() {
   index = 0;
   uint64_t output_capacities = 0;
   while (1) {
-    uint64_t capacity = 0;
-    len = 8;
-    ret = ckb_load_cell_by_field(((unsigned char *)&capacity), &len, 0, index,
-                                 CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_CAPACITY);
+    ret = validate_output(index, &output_capacities, &output_withdrawing_mask, script_hash);
     if (ret == CKB_INDEX_OUT_OF_BOUND) {
       break;
-    }
-    if (ret != CKB_SUCCESS) {
+    }    
+    if (ret != CKB_SUCCESS ){
       return ret;
     }
-    if (len != 8) {
-      return ERROR_SYSCALL;
-    }
-    // For simplicity we are limiting to 64 output cells at most, so we can use
-    // simple bit masking.
-    if (index >= MAX_OUTPUT_LENGTH) {
-      return ERROR_TOO_MANY_OUTPUT_CELLS;
-    }
-    // Like any serious smart contracts, we will perform overflow checks here.
-    if (__builtin_uaddl_overflow(output_capacities, capacity,
-                                 &output_capacities)) {
-      return ERROR_OVERFLOW;
-    }
-
-    unsigned char current_script_hash[HASH_SIZE];
-    len = HASH_SIZE;
-    ret = ckb_load_cell_by_field(current_script_hash, &len, 0, index,
-                                 CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH);
-    if ((ret == CKB_SUCCESS) && len == HASH_SIZE &&
-        (memcmp(script_hash, current_script_hash, HASH_SIZE) == 0)) {
-      // Similar to the above loop, we also need to check if we are creating a
-      // deposited cell, or a withdrawing cell here. This can be easily determined
-      // using `output_withdrawing_mask` here: in previous iteration we've marked
-      // all created withdrawing cells in the bit mask.
-      //
-      // For withdrawing cells, we already perform all the necessary checks when
-      // we are checking the corresponding deposited cells above. No further
-      // action is needed here.
-      //
-      // For newly deposited cells, we need to validate that the cell data part
-      // contains 8 bytes of data filled with 0.
-      if ((output_withdrawing_mask & (1 << index)) == 0) {
-        uint64_t block_number = 0;
-        len = 8;
-        ret = ckb_load_cell_data((unsigned char *)&block_number, &len, 0, index,
-                                 CKB_SOURCE_OUTPUT);
-        if (ret != CKB_SUCCESS) {
-          return ret;
-        }
-        if (len != 8) {
-          return ERROR_SYSCALL;
-        }
-        if (block_number != 0) {
-          return ERROR_NEWLY_CREATED_CELL;
-        }
-      }
-    }
-
     index += 1;
   }
 
