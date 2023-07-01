@@ -602,37 +602,41 @@ int main() {
   // we will calculate the maximum capacity one can withdraw from it, and add up
   // the maximum withdraw capacity here. After this loop we will have a value
   // containing the *true* capacities of all the input cells here.
+
+  // Now let's loop through all output cells, and calculate the sum of output
+  // capacities here.
+
   size_t index = 0;
   uint64_t input_capacities = 0;
+  uint64_t output_capacities = 0;
 #if MAX_OUTPUT_LENGTH > 64
 #error "Masking solution can only work with 64 outputs at most!"
 #endif
   uint64_t output_withdrawing_mask = 0;
-  
-  while (1) {
-    ret = validate_input(index, &input_capacities, &output_withdrawing_mask, script_hash);
-    if (ret == CKB_INDEX_OUT_OF_BOUND) {
-      break;
-    }    
-    if (ret != CKB_SUCCESS ){
-      return ret;
-    }
-    index += 1;
-  }
 
-
-  // Now let's loop through all output cells, and calculate the sum of output
-  // capacities here.
-  index = 0;
-  uint64_t output_capacities = 0;
-  while (1) {
-    ret = validate_output(index, &output_capacities, &output_withdrawing_mask, script_hash);
-    if (ret == CKB_INDEX_OUT_OF_BOUND) {
-      break;
-    }    
-    if (ret != CKB_SUCCESS ){
-      return ret;
+  uint64_t input_exhausted = 0;
+  uint64_t output_exhausted = 0;
+  while (!input_exhausted || !output_exhausted) {
+    if (!input_exhausted) {
+      ret = validate_input(index, &input_capacities, &output_withdrawing_mask, script_hash);
+      if (ret == CKB_INDEX_OUT_OF_BOUND) {
+        input_exhausted = 1;
+      }    
+      if (ret != CKB_SUCCESS ){
+        return ret;
+      }
     }
+
+    if (!output_exhausted) {
+      ret = validate_output(index, &output_capacities, &output_withdrawing_mask, script_hash);
+      if (ret == CKB_INDEX_OUT_OF_BOUND) {
+        output_exhausted = 1;
+      }    
+      if (ret != CKB_SUCCESS ){
+        return ret;
+      }
+    }
+
     index += 1;
   }
 
