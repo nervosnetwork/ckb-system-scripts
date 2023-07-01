@@ -510,10 +510,10 @@ static int validate_output(size_t index, uint64_t *output_capacities,
                                 CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH);
   if ((ret == CKB_SUCCESS) && len == HASH_SIZE &&
       (memcmp(script_hash, current_script_hash, HASH_SIZE) == 0)) {
-    // Similar to the above loop, we also need to check if we are creating a
+    // Similarly to input, we also need to check if we are creating a
     // deposited cell, or a withdrawing cell here. This can be easily determined
-    // using `output_withdrawing_mask` here: in previous iteration we've marked
-    // all created withdrawing cells in the bit mask.
+    // using output_withdrawing here: in previous input_validation call
+    // we have marked if the cell was a withdrawing cell.
     //
     // For withdrawing cells, we already perform all the necessary checks when
     // we are checking the corresponding deposited cells above. No further
@@ -593,7 +593,7 @@ int main() {
   // the maximum withdraw capacity here. After this loop we will have a value
   // containing the *true* capacities of all the input cells here.
 
-  // Now let's loop through all output cells, and calculate the sum of output
+  // Also let's loop through all output cells, and calculate the sum of output
   // capacities here.
 
   size_t index = 0;
