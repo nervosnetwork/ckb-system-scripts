@@ -21,7 +21,6 @@
 #define ERROR_INCORRECT_CAPACITY -15
 #define ERROR_INCORRECT_EPOCH -16
 #define ERROR_INCORRECT_SINCE -17
-#define ERROR_TOO_MANY_OUTPUT_CELLS -18
 #define ERROR_NEWLY_CREATED_CELL -19
 #define ERROR_INVALID_WITHDRAWING_CELL -20
 #define ERROR_SCRIPT_TOO_LONG -21
@@ -34,11 +33,6 @@
 /* 32 KB */
 #define MAX_WITNESS_SIZE 32768
 #define SCRIPT_SIZE 32768
-
-// For simplicity, a transaction containing Nervos DAO script is limited to
-// 64 output cells so we can simplify processing. Later we might upgrade this
-// script to relax this limitation.
-#define MAX_OUTPUT_LENGTH 64
 
 // One lock period of NervosDAO is set as 180 epochs, which is roughly 30 days.
 #define LOCK_PERIOD_EPOCHS 180
@@ -387,7 +381,7 @@ static int validate_withdrawing_cell(size_t index, uint64_t input_capacity,
 }
 
 static int validate_input(size_t index, uint64_t *input_capacities, 
-                          uint64_t *output_withdrawing_mask,
+                          uint64_t *output_withdrawing,
                           unsigned char *script_hash) {
   int dao_input = 0;
   uint64_t capacity = 0;
@@ -475,7 +469,7 @@ static int validate_input(size_t index, uint64_t *input_capacities,
       // will also have an output cell that has index equal to or larger than
       // 64, which will trigger an error. Hence we don't need to check for
       // overflows for `1 << index` operation.
-      *output_withdrawing_mask |= (1 << index);
+      *output_withdrawing = 1;
       // Like any serious smart contracts, we will perform overflow checks here.
       if (__builtin_uaddl_overflow(*input_capacities, capacity,
                                     input_capacities)) {
@@ -488,7 +482,7 @@ static int validate_input(size_t index, uint64_t *input_capacities,
 }
 
 static int validate_output(size_t index, uint64_t *output_capacities, 
-                          uint64_t *output_withdrawing_mask,
+                          uint64_t output_withdrawing,
                           unsigned char *script_hash) {
   uint64_t capacity = 0;
   uint64_t len = 8;
@@ -503,11 +497,7 @@ static int validate_output(size_t index, uint64_t *output_capacities,
   if (len != 8) {
     return ERROR_SYSCALL;
   }
-  // For simplicity we are limiting to 64 output cells at most, so we can use
-  // simple bit masking.
-  if (index >= MAX_OUTPUT_LENGTH) {
-    return ERROR_TOO_MANY_OUTPUT_CELLS;
-  }
+
   // Like any serious smart contracts, we will perform overflow checks here.
   if (__builtin_uaddl_overflow(*output_capacities, capacity,
                                 output_capacities)) {
@@ -531,7 +521,7 @@ static int validate_output(size_t index, uint64_t *output_capacities,
     //
     // For newly deposited cells, we need to validate that the cell data part
     // contains 8 bytes of data filled with 0.
-    if ((*output_withdrawing_mask & (1 << index)) == 0) {
+    if (output_withdrawing == 0) {
       uint64_t block_number = 0;
       len = 8;
       ret = ckb_load_cell_data((unsigned char *)&block_number, &len, 0, index,
@@ -609,16 +599,15 @@ int main() {
   size_t index = 0;
   uint64_t input_capacities = 0;
   uint64_t output_capacities = 0;
-#if MAX_OUTPUT_LENGTH > 64
-#error "Masking solution can only work with 64 outputs at most!"
-#endif
-  uint64_t output_withdrawing_mask = 0;
+  uint64_t output_withdrawing = 0;
 
   uint64_t input_exhausted = 0;
   uint64_t output_exhausted = 0;
   while (!input_exhausted || !output_exhausted) {
+    output_withdrawing = 0;
+
     if (!input_exhausted) {
-      ret = validate_input(index, &input_capacities, &output_withdrawing_mask, script_hash);
+      ret = validate_input(index, &input_capacities, &output_withdrawing, script_hash);
       if (ret == CKB_INDEX_OUT_OF_BOUND) {
         input_exhausted = 1;
       }    
@@ -628,7 +617,7 @@ int main() {
     }
 
     if (!output_exhausted) {
-      ret = validate_output(index, &output_capacities, &output_withdrawing_mask, script_hash);
+      ret = validate_output(index, &output_capacities, output_withdrawing, script_hash);
       if (ret == CKB_INDEX_OUT_OF_BOUND) {
         output_exhausted = 1;
       }    
