@@ -70,8 +70,8 @@ fn main() {
 
         writeln!(
             &mut out_file,
-            "pub const {}: [u8; 32] = {:?};",
-            format!("CODE_HASH_{}", name.to_uppercase()),
+            "pub const CODE_HASH_{}: [u8; 32] = {:?};",
+            name.to_uppercase(),
             hash
         )
         .expect("write to code_hashes.rs");
