@@ -24,6 +24,14 @@
 #define ERROR_NEWLY_CREATED_CELL -19
 #define ERROR_INVALID_WITHDRAWING_CELL -20
 #define ERROR_SCRIPT_TOO_LONG -21
+// In case of missing deposit headers, extract_epoch_info would also return
+// CKB_INDEX_OUT_OF_BOUND, so we cannot use CKB_INDEX_OUT_OF_BOUND as marker
+// when all cells have been processed, we will need a different marker here.
+#define ERROR_MARKER_EXHAUSTED -30
+
+#if ERROR_MARKER_EXHAUSTED == CKB_INDEX_OUT_OF_BOUND
+#error "Exhausted marker cannot be the same as CKB_INDEX_OUT_OF_BOUND!"
+#endif
 
 // Common definitions here, one important limitation, is that this script only works
 // with scripts and witnesses that are no larger than 32KB. We believe this should be enough
@@ -389,7 +397,7 @@ static int validate_input(size_t index, uint64_t *input_capacities,
   int ret = ckb_load_cell_by_field(((unsigned char *)&capacity), &len, 0, index,
                                 CKB_SOURCE_INPUT, CKB_CELL_FIELD_CAPACITY);
   if (ret == CKB_INDEX_OUT_OF_BOUND) {
-    return ret;
+    return ERROR_MARKER_EXHAUSTED;
   } else if (ret == CKB_SUCCESS) {
     if (len != 8) {
       return ERROR_SYSCALL;
@@ -478,7 +486,7 @@ static int validate_input(size_t index, uint64_t *input_capacities,
     }
   }
 
-  return ret;
+  return 0;
 }
 
 static int validate_output(size_t index, uint64_t *output_capacities, 
@@ -489,7 +497,7 @@ static int validate_output(size_t index, uint64_t *output_capacities,
   int ret = ckb_load_cell_by_field(((unsigned char *)&capacity), &len, 0, index,
                                 CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_CAPACITY);
   if (ret == CKB_INDEX_OUT_OF_BOUND) {
-    return ret;
+    return ERROR_MARKER_EXHAUSTED;
   }
   if (ret != CKB_SUCCESS) {
     return ret;
@@ -537,7 +545,7 @@ static int validate_output(size_t index, uint64_t *output_capacities,
       }
     }
   }
-  return ret;
+  return 0;
 }
 
 
@@ -603,25 +611,23 @@ int main() {
 
   uint64_t input_exhausted = 0;
   uint64_t output_exhausted = 0;
-  while (!input_exhausted || !output_exhausted) {
+  while (!(input_exhausted && output_exhausted)) {
     output_withdrawing = 0;
 
     if (!input_exhausted) {
       ret = validate_input(index, &input_capacities, &output_withdrawing, script_hash);
-      if (ret == CKB_INDEX_OUT_OF_BOUND) {
+      if (ret == ERROR_MARKER_EXHAUSTED) {
         input_exhausted = 1;
-      }    
-      if (ret != CKB_SUCCESS ){
+      } else if (ret != CKB_SUCCESS ){
         return ret;
       }
     }
 
     if (!output_exhausted) {
       ret = validate_output(index, &output_capacities, output_withdrawing, script_hash);
-      if (ret == CKB_INDEX_OUT_OF_BOUND) {
+      if (ret == ERROR_MARKER_EXHAUSTED) {
         output_exhausted = 1;
-      }    
-      if (ret != CKB_SUCCESS ){
+      } else if (ret != CKB_SUCCESS ){
         return ret;
       }
     }

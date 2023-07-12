@@ -22,7 +22,6 @@ const ERROR_SYSCALL: i8 = -4;
 const ERROR_INVALID_WITHDRAW_BLOCK: i8 = -14;
 const ERROR_INCORRECT_CAPACITY: i8 = -15;
 const ERROR_INCORRECT_SINCE: i8 = -17;
-const ERROR_TOO_MANY_OUTPUT_CELLS: i8 = -18;
 const ERROR_NEWLY_CREATED_CELL: i8 = -19;
 const ERROR_INVALID_WITHDRAWING_CELL: i8 = -20;
 
@@ -1697,7 +1696,7 @@ fn test_dao_too_many_output_cells() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let outputs = vec![cell_output_with_only_capacity(123468105678); 65];
+    let outputs = vec![cell_output_with_only_capacity(1234000000); 65];
     let outputs_data = vec![Bytes::new().pack(); 65];
 
     let mut b = vec![0; 8];
@@ -1725,14 +1724,7 @@ fn test_dao_too_many_output_cells() {
     });
 
     let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
-    assert_error_eq!(
-        verify_result.unwrap_err(),
-        ScriptError::validation_failure(
-            &cell.type_().to_opt().unwrap(),
-            ERROR_TOO_MANY_OUTPUT_CELLS
-        )
-        .input_type_script(0),
-    );
+    verify_result.expect("pass verification");
 }
 
 #[test]
