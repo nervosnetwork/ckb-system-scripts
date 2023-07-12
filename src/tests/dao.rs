@@ -1683,7 +1683,7 @@ fn test_dao_too_many_output_cells() {
 
     let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell.clone(), Bytes::from(b))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
