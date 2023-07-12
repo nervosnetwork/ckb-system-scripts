@@ -16,10 +16,20 @@ use ckb_types::{
     H256,
 };
 use rand::{thread_rng, Rng, SeedableRng};
+use std::sync::Arc;
 
 const ERROR_ENCODING: i8 = -2;
 const ERROR_WITNESS_SIZE: i8 = -22;
 const ERROR_PUBKEY_BLAKE160_HASH: i8 = -31;
+
+fn gen_lock_script(lock_args: Bytes) -> Script {
+    let sighash_all_cell_data_hash = CellOutput::calc_data_hash(&SIGHASH_ALL_BIN);
+    Script::new_builder()
+        .args(lock_args.pack())
+        .code_hash(sighash_all_cell_data_hash)
+        .hash_type(ScriptHashType::Data.into())
+        .build()
+}
 
 fn gen_tx(dummy: &mut DummyDataLoader, lock_args: Bytes) -> TransactionView {
     let mut rng = thread_rng();
@@ -48,7 +58,6 @@ fn gen_tx_with_grouped_args<R: Rng>(
                 .pack(),
         )
         .build();
-    let sighash_all_cell_data_hash = CellOutput::calc_data_hash(&SIGHASH_ALL_BIN);
     dummy.cells.insert(
         sighash_all_out_point.clone(),
         (sighash_all_cell, SIGHASH_ALL_BIN.clone()),
@@ -104,11 +113,7 @@ fn gen_tx_with_grouped_args<R: Rng>(
                 buf.pack()
             };
             let previous_out_point = OutPoint::new(previous_tx_hash, 0);
-            let script = Script::new_builder()
-                .args(args.pack())
-                .code_hash(sighash_all_cell_data_hash.clone())
-                .hash_type(ScriptHashType::Data.into())
-                .build();
+            let script = gen_lock_script(args.clone());
             let previous_output_cell = CellOutput::new_builder()
                 .capacity(dummy_capacity.pack())
                 .lock(script)
@@ -120,7 +125,7 @@ fn gen_tx_with_grouped_args<R: Rng>(
             let mut random_extra_witness = [0u8; 32];
             rng.fill(&mut random_extra_witness);
             let witness_args = WitnessArgsBuilder::default()
-                .extra(Bytes::from(random_extra_witness.to_vec()).pack())
+                .input_type(Some(Bytes::from(random_extra_witness.to_vec())).pack())
                 .build();
             tx_builder = tx_builder
                 .input(CellInput::new(previous_out_point, 0))
@@ -140,7 +145,7 @@ fn sign_tx_hash(tx: TransactionView, key: &Privkey, tx_hash: &[u8]) -> Transacti
     let message = H256::from(message);
     let sig = key.sign_recoverable(&message).expect("sign");
     let witness_args = WitnessArgsBuilder::default()
-        .lock(Bytes::from(sig.serialize()).pack())
+        .lock(Some(Bytes::from(sig.serialize())).pack())
         .build();
     tx.as_advanced_builder()
         .set_witnesses(vec![witness_args.as_bytes().pack()])
@@ -187,9 +192,9 @@ fn test_sighash_all_unlock() {
     let pubkey_hash = blake160(&pubkey.serialize());
     let tx = gen_tx(&mut data_loader, pubkey_hash);
     let tx = sign_tx(tx, &privkey);
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
     let verify_result =
-        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+        TransactionScriptsVerifier::new(resolved_tx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -199,21 +204,22 @@ fn test_sighash_all_with_extra_witness_unlock() {
     let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
+    let lock_script = gen_lock_script(pubkey_hash.clone());
     let tx = gen_tx(&mut data_loader, pubkey_hash);
     let extract_witness = vec![1, 2, 3, 4];
     let tx = tx
         .as_advanced_builder()
         .set_witnesses(vec![WitnessArgs::new_builder()
-            .extra(Bytes::from(extract_witness).pack())
+            .input_type(Some(Bytes::from(extract_witness)).pack())
             .build()
             .as_bytes()
             .pack()])
         .build();
     {
         let tx = sign_tx(tx.clone(), &privkey);
-        let resolved_tx = build_resolved_tx(&data_loader, &tx);
+        let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
         let verify_result =
-            TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+            TransactionScriptsVerifier::new(resolved_tx, data_loader.clone()).verify(MAX_CYCLES);
         verify_result.expect("pass verification");
     }
     {
@@ -224,7 +230,7 @@ fn test_sighash_all_with_extra_witness_unlock() {
             .map(|w| {
                 WitnessArgs::new_unchecked(w.unpack())
                     .as_builder()
-                    .extra(Bytes::from(vec![0]).pack())
+                    .input_type(Some(Bytes::from(vec![0])).pack())
                     .build()
             })
             .unwrap();
@@ -232,12 +238,13 @@ fn test_sighash_all_with_extra_witness_unlock() {
             .as_advanced_builder()
             .set_witnesses(vec![wrong_witness.as_bytes().pack()])
             .build();
-        let resolved_tx = build_resolved_tx(&data_loader, &tx);
+        let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
         let verify_result =
-            TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+            TransactionScriptsVerifier::new(resolved_tx, data_loader).verify(MAX_CYCLES);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
+            ScriptError::validation_failure(&lock_script, ERROR_PUBKEY_BLAKE160_HASH)
+                .input_lock_script(0),
         );
     }
 }
@@ -249,12 +256,13 @@ fn test_sighash_all_with_grouped_inputs_unlock() {
     let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
+    let lock_script = gen_lock_script(pubkey_hash.clone());
     let tx = gen_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2)], &mut rng);
     {
         let tx = sign_tx(tx.clone(), &privkey);
-        let resolved_tx = build_resolved_tx(&data_loader, &tx);
+        let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
         let verify_result =
-            TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+            TransactionScriptsVerifier::new(resolved_tx, data_loader.clone()).verify(MAX_CYCLES);
         verify_result.expect("pass verification");
     }
     {
@@ -265,7 +273,7 @@ fn test_sighash_all_with_grouped_inputs_unlock() {
             .map(|w| {
                 WitnessArgs::new_unchecked(w.unpack())
                     .as_builder()
-                    .extra(Bytes::from(vec![0]).pack())
+                    .input_type(Some(Bytes::from(vec![0])).pack())
                     .build()
             })
             .unwrap();
@@ -276,12 +284,13 @@ fn test_sighash_all_with_grouped_inputs_unlock() {
                 wrong_witness.as_bytes().pack(),
             ])
             .build();
-        let resolved_tx = build_resolved_tx(&data_loader, &tx);
+        let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
         let verify_result =
-            TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+            TransactionScriptsVerifier::new(resolved_tx, data_loader.clone()).verify(MAX_CYCLES);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
+            ScriptError::validation_failure(&lock_script, ERROR_PUBKEY_BLAKE160_HASH)
+                .input_lock_script(0),
         );
     }
 }
@@ -308,9 +317,9 @@ fn test_sighash_all_with_2_different_inputs_unlock() {
     let tx = sign_tx_by_input_group(tx, &privkey, 0, 2);
     let tx = sign_tx_by_input_group(tx, &privkey2, 2, 2);
 
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
     let verify_result =
-        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+        TransactionScriptsVerifier::new(resolved_tx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -321,14 +330,16 @@ fn test_signing_with_wrong_key() {
     let wrong_privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
+    let lock_script = gen_lock_script(pubkey_hash.clone());
     let tx = gen_tx(&mut data_loader, pubkey_hash);
     let tx = sign_tx(tx, &wrong_privkey);
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
     let verify_result =
-        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+        TransactionScriptsVerifier::new(resolved_tx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
+        ScriptError::validation_failure(&lock_script, ERROR_PUBKEY_BLAKE160_HASH)
+            .input_lock_script(0),
     );
 }
 
@@ -338,6 +349,7 @@ fn test_signing_wrong_tx_hash() {
     let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
+    let lock_script = gen_lock_script(pubkey_hash.clone());
     let tx = gen_tx(&mut data_loader, pubkey_hash);
     let tx = {
         let mut rand_tx_hash = [0u8; 32];
@@ -345,12 +357,13 @@ fn test_signing_wrong_tx_hash() {
         rng.fill(&mut rand_tx_hash);
         sign_tx_hash(tx, &privkey, &rand_tx_hash[..])
     };
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
     let verify_result =
-        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+        TransactionScriptsVerifier::new(resolved_tx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
+        ScriptError::validation_failure(&lock_script, ERROR_PUBKEY_BLAKE160_HASH)
+            .input_lock_script(0),
     );
 }
 
@@ -360,12 +373,13 @@ fn test_super_long_witness() {
     let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
+    let lock_script = gen_lock_script(pubkey_hash.clone());
     let tx = gen_tx(&mut data_loader, pubkey_hash);
     let tx_hash = tx.hash();
 
     let mut buffer: Vec<u8> = vec![];
     buffer.resize(40000, 1);
-    let super_long_message = Bytes::from(&buffer[..]);
+    let super_long_message = Bytes::from(buffer);
 
     let mut blake2b = ckb_hash::new_blake2b();
     let mut message = [0u8; 32];
@@ -375,26 +389,28 @@ fn test_super_long_witness() {
     let message = H256::from(message);
     let sig = privkey.sign_recoverable(&message).expect("sign");
     let witness = WitnessArgs::new_builder()
-        .lock(Bytes::from(sig.serialize()).pack())
-        .extra(super_long_message.pack())
+        .lock(Some(Bytes::from(sig.serialize())).pack())
+        .input_type(Some(super_long_message).pack())
         .build();
     let tx = tx
         .as_advanced_builder()
         .set_witnesses(vec![witness.as_bytes().pack()])
         .build();
 
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
     let verify_result =
-        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+        TransactionScriptsVerifier::new(resolved_tx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_WITNESS_SIZE),
+        ScriptError::validation_failure(&lock_script, ERROR_WITNESS_SIZE).input_lock_script(0),
     );
 }
 
 #[test]
 fn test_sighash_all_2_in_2_out_cycles() {
-    const CONSUME_CYCLES: u64 = 3394434;
+    // Notice this is changed due to the fact that the old tests uses
+    // a different definition of WitnessArgs, hence triggering the differences.
+    const CONSUME_CYCLES: u64 = 3426207;
 
     let mut data_loader = DummyDataLoader::new();
     let mut generator = Generator::non_crypto_safe_prng(42);
@@ -418,9 +434,9 @@ fn test_sighash_all_2_in_2_out_cycles() {
     let tx = sign_tx_by_input_group(tx, &privkey, 0, 1);
     let tx = sign_tx_by_input_group(tx, &privkey2, 1, 1);
 
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
     let verify_result =
-        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+        TransactionScriptsVerifier::new(resolved_tx, data_loader).verify(MAX_CYCLES);
     let cycles = verify_result.expect("pass verification");
     assert_eq!(CONSUME_CYCLES, cycles)
 }
@@ -432,6 +448,7 @@ fn test_sighash_all_witness_append_junk_data() {
     let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
+    let lock_script = gen_lock_script(pubkey_hash.clone());
 
     // sign with 2 keys
     let tx = gen_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2)], &mut rng);
@@ -449,12 +466,12 @@ fn test_sighash_all_witness_append_junk_data() {
         .set_witnesses(witnesses.into_iter().map(|w| w.pack()).collect())
         .build();
 
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
     let verify_result =
-        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+        TransactionScriptsVerifier::new(resolved_tx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_ENCODING),
+        ScriptError::validation_failure(&lock_script, ERROR_ENCODING).input_lock_script(0),
     );
 }
 
@@ -470,20 +487,22 @@ fn test_sighash_all_witness_args_ambiguity() {
     let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
+    let lock_script = gen_lock_script(pubkey_hash.clone());
 
     let tx = gen_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2)], &mut rng);
     let tx = sign_tx_by_input_group(tx, &privkey, 0, 2);
     let witnesses: Vec<_> = Unpack::<Vec<_>>::unpack(&tx.witnesses());
-    // move extra data to type_
+    // move input_type data to output_type
     let witnesses: Vec<_> = witnesses
         .into_iter()
         .map(|witness| {
             let witness = WitnessArgs::new_unchecked(witness);
-            let data = witness.extra();
+            let data = witness.input_type();
+            let empty: Option<Bytes> = None;
             witness
                 .as_builder()
-                .extra(Bytes::new().pack())
-                .type_(data)
+                .output_type(data)
+                .input_type(empty.pack())
                 .build()
         })
         .collect();
@@ -493,12 +512,13 @@ fn test_sighash_all_witness_args_ambiguity() {
         .set_witnesses(witnesses.into_iter().map(|w| w.as_bytes().pack()).collect())
         .build();
 
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
     let verify_result =
-        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+        TransactionScriptsVerifier::new(resolved_tx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
+        ScriptError::validation_failure(&lock_script, ERROR_PUBKEY_BLAKE160_HASH)
+            .input_lock_script(0),
     );
 }
 
@@ -514,6 +534,7 @@ fn test_sighash_all_witnesses_ambiguity() {
     let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
+    let lock_script = gen_lock_script(pubkey_hash.clone());
 
     let tx = gen_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 3)], &mut rng);
     let witness = Unpack::<Vec<_>>::unpack(&tx.witnesses()).remove(0);
@@ -539,12 +560,13 @@ fn test_sighash_all_witnesses_ambiguity() {
         .build();
 
     assert_eq!(tx.witnesses().len(), tx.inputs().len());
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
     let verify_result =
-        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(MAX_CYCLES);
+        TransactionScriptsVerifier::new(resolved_tx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
+        ScriptError::validation_failure(&lock_script, ERROR_PUBKEY_BLAKE160_HASH)
+            .input_lock_script(0),
     );
 }
 
@@ -555,6 +577,7 @@ fn test_sighash_all_cover_extra_witnesses() {
     let privkey = Generator::random_privkey();
     let pubkey = privkey.pubkey().expect("pubkey");
     let pubkey_hash = blake160(&pubkey.serialize());
+    let lock_script = gen_lock_script(pubkey_hash.clone());
 
     let tx = gen_tx_with_grouped_args(&mut data_loader, vec![(pubkey_hash, 2)], &mut rng);
     let witness = Unpack::<Vec<_>>::unpack(&tx.witnesses()).remove(0);
@@ -580,11 +603,11 @@ fn test_sighash_all_cover_extra_witnesses() {
         ])
         .build();
 
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    let verify_result =
-        TransactionScriptsVerifier::new(&resolved_tx, &data_loader).verify(60000000);
+    let resolved_tx = Arc::new(build_resolved_tx(&data_loader, &tx));
+    let verify_result = TransactionScriptsVerifier::new(resolved_tx, data_loader).verify(60000000);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_PUBKEY_BLAKE160_HASH),
+        ScriptError::validation_failure(&lock_script, ERROR_PUBKEY_BLAKE160_HASH)
+            .input_lock_script(0),
     );
 }

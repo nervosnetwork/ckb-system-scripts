@@ -14,6 +14,7 @@ use ckb_types::{
     H256,
 };
 use rand::{thread_rng, Rng};
+use std::sync::Arc;
 
 const SIGNATURE_SIZE: usize = 65;
 
@@ -32,6 +33,7 @@ fn test_multisig_script_hash() {
     let keys = generate_keys(3);
     let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
     let args = blake160(&multi_sign_script);
+    let lock_script = gen_multi_sign_lock_script(args.clone());
     let raw_tx = gen_tx(&mut data_loader, args);
     {
         let wrong_multi_sign_script = gen_multi_sign_script(&keys, 2, 1);
@@ -39,7 +41,8 @@ fn test_multisig_script_hash() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_MULTSIG_SCRIPT_HASH),
+            ScriptError::validation_failure(&lock_script, ERROR_MULTSIG_SCRIPT_HASH)
+                .input_lock_script(0),
         );
     }
 }
@@ -50,6 +53,7 @@ fn test_invalid_flags() {
     let keys = generate_keys(3);
     let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
     let args = blake160(&multi_sign_script);
+    let lock_script = gen_multi_sign_lock_script(args.clone());
     let raw_tx = gen_tx(&mut data_loader, args);
     {
         let wrong_multi_sign_script = gen_multi_sign_script(&[], 2, 0);
@@ -61,7 +65,8 @@ fn test_invalid_flags() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INVALID_PUBKEYS_CNT),
+            ScriptError::validation_failure(&lock_script, ERROR_INVALID_PUBKEYS_CNT)
+                .input_lock_script(0),
         );
     }
     {
@@ -74,7 +79,8 @@ fn test_invalid_flags() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INVALID_THRESHOLD),
+            ScriptError::validation_failure(&lock_script, ERROR_INVALID_THRESHOLD)
+                .input_lock_script(0),
         );
     }
     {
@@ -83,7 +89,8 @@ fn test_invalid_flags() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INVALID_REQUIRE_FIRST_N),
+            ScriptError::validation_failure(&lock_script, ERROR_INVALID_REQUIRE_FIRST_N)
+                .input_lock_script(0),
         );
     }
 }
@@ -94,6 +101,7 @@ fn test_multisig_0_2_3_unlock() {
     let keys = generate_keys(3);
     let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
     let args = blake160(&multi_sign_script);
+    let lock_script = gen_multi_sign_lock_script(args.clone());
     let raw_tx = gen_tx(&mut data_loader, args);
     {
         let tx = multi_sign_tx(raw_tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
@@ -117,7 +125,7 @@ fn test_multisig_0_2_3_unlock() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_WITNESS_SIZE),
+            ScriptError::validation_failure(&lock_script, ERROR_WITNESS_SIZE).input_lock_script(0),
         );
     }
     {
@@ -129,7 +137,7 @@ fn test_multisig_0_2_3_unlock() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_WITNESS_SIZE),
+            ScriptError::validation_failure(&lock_script, ERROR_WITNESS_SIZE).input_lock_script(0),
         );
     }
 
@@ -143,7 +151,7 @@ fn test_multisig_0_2_3_unlock() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_VERIFICATION),
+            ScriptError::validation_failure(&lock_script, ERROR_VERIFICATION).input_lock_script(0),
         );
     }
     {
@@ -151,7 +159,7 @@ fn test_multisig_0_2_3_unlock() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_VERIFICATION),
+            ScriptError::validation_failure(&lock_script, ERROR_VERIFICATION).input_lock_script(0),
         );
     }
 }
@@ -162,6 +170,7 @@ fn test_multisig_1_2_3_unlock() {
     let keys = generate_keys(3);
     let multi_sign_script = gen_multi_sign_script(&keys, 2, 1);
     let args = blake160(&multi_sign_script);
+    let lock_script = gen_multi_sign_lock_script(args.clone());
     let tx = gen_tx(&mut data_loader, args);
     {
         let tx = multi_sign_tx(tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
@@ -180,7 +189,7 @@ fn test_multisig_1_2_3_unlock() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_VERIFICATION),
+            ScriptError::validation_failure(&lock_script, ERROR_VERIFICATION).input_lock_script(0),
         );
     }
 }
@@ -191,12 +200,13 @@ fn test_multisig_1_2_3_with_extra_witness_unlock() {
     let keys = generate_keys(3);
     let multi_sign_script = gen_multi_sign_script(&keys, 2, 1);
     let args = blake160(&multi_sign_script);
+    let lock_script = gen_multi_sign_lock_script(args.clone());
     let tx = gen_tx(&mut data_loader, args);
     let extract_witness = vec![1, 2, 3, 4];
     let tx = tx
         .as_advanced_builder()
         .set_witnesses(vec![WitnessArgs::new_builder()
-            .extra(Bytes::from(extract_witness).pack())
+            .input_type(Some(Bytes::from(extract_witness)).pack())
             .build()
             .as_bytes()
             .pack()])
@@ -218,7 +228,7 @@ fn test_multisig_1_2_3_with_extra_witness_unlock() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_VERIFICATION),
+            ScriptError::validation_failure(&lock_script, ERROR_VERIFICATION).input_lock_script(0),
         );
     }
 }
@@ -229,6 +239,7 @@ fn test_multisig_1_2_3_with_multiple_inputs_unlock() {
     let keys = generate_keys(3);
     let multi_sign_script = gen_multi_sign_script(&keys, 2, 1);
     let args = blake160(&multi_sign_script);
+    let lock_script = gen_multi_sign_lock_script(args.clone());
     let tx = gen_tx_with_extra_inputs(&mut data_loader, args, 1);
     {
         let tx = multi_sign_tx(tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
@@ -247,7 +258,7 @@ fn test_multisig_1_2_3_with_multiple_inputs_unlock() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_VERIFICATION),
+            ScriptError::validation_failure(&lock_script, ERROR_VERIFICATION).input_lock_script(0),
         );
     }
 }
@@ -258,6 +269,7 @@ fn test_multisig_0_1_1_unlock() {
     let keys = generate_keys(1);
     let multi_sign_script = gen_multi_sign_script(&keys, 1, 0);
     let args = blake160(&multi_sign_script);
+    let lock_script = gen_multi_sign_lock_script(args.clone());
     let raw_tx = gen_tx(&mut data_loader, args);
     {
         let tx = multi_sign_tx(raw_tx.clone(), &multi_sign_script, &[&keys[0]]);
@@ -269,7 +281,7 @@ fn test_multisig_0_1_1_unlock() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_VERIFICATION),
+            ScriptError::validation_failure(&lock_script, ERROR_VERIFICATION).input_lock_script(0),
         );
     }
 }
@@ -280,6 +292,7 @@ fn test_multisig_0_2_2_unlock() {
     let keys = generate_keys(2);
     let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
     let args = blake160(&multi_sign_script);
+    let lock_script = gen_multi_sign_lock_script(args.clone());
     let raw_tx = gen_tx(&mut data_loader, args);
     {
         let tx = multi_sign_tx(raw_tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
@@ -291,7 +304,7 @@ fn test_multisig_0_2_2_unlock() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_VERIFICATION),
+            ScriptError::validation_failure(&lock_script, ERROR_VERIFICATION).input_lock_script(0),
         );
     }
 }
@@ -324,7 +337,7 @@ fn multi_sign_tx(
                 let witness_without_sig = witness
                     .clone()
                     .as_builder()
-                    .lock(Bytes::from(lock_without_sig).pack())
+                    .lock(Some(Bytes::from(lock_without_sig)).pack())
                     .build();
                 let len = witness_without_sig.as_bytes().len() as u64;
                 blake2b.update(&len.to_le_bytes());
@@ -343,7 +356,7 @@ fn multi_sign_tx(
                 });
                 witness
                     .as_builder()
-                    .lock(Bytes::from(lock).pack())
+                    .lock(Some(Bytes::from(lock)).pack())
                     .build()
                     .as_bytes()
                     .pack()
@@ -369,13 +382,15 @@ fn test_multisig_0_2_3_unlock_with_since() {
         buf.extend(since.to_le_bytes().iter());
         Bytes::from(buf)
     };
+    let lock_script = gen_multi_sign_lock_script(args.clone());
     let raw_tx = gen_tx(&mut data_loader, args);
     {
         let tx = multi_sign_tx(raw_tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_VALUE),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_VALUE)
+                .input_lock_script(0),
         );
     }
     {
@@ -389,7 +404,8 @@ fn test_multisig_0_2_3_unlock_with_since() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_VALUE),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_VALUE)
+                .input_lock_script(0),
         );
     }
     {
@@ -403,7 +419,8 @@ fn test_multisig_0_2_3_unlock_with_since() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_VALUE),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_VALUE)
+                .input_lock_script(0),
         );
     }
     {
@@ -422,7 +439,8 @@ fn test_multisig_0_2_3_unlock_with_since() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_FLAG),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_FLAG)
+                .input_lock_script(0),
         );
     }
     {
@@ -459,13 +477,15 @@ fn test_multisig_0_2_3_unlock_with_since_epoch() {
         buf.extend(since.to_le_bytes().iter());
         Bytes::from(buf)
     };
+    let lock_script = gen_multi_sign_lock_script(args.clone());
     let raw_tx = gen_tx(&mut data_loader, args);
     {
         let tx = multi_sign_tx(raw_tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_FLAG),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_FLAG)
+                .input_lock_script(0),
         );
     }
     {
@@ -484,7 +504,8 @@ fn test_multisig_0_2_3_unlock_with_since_epoch() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_VALUE),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_VALUE)
+                .input_lock_script(0),
         );
     }
     {
@@ -498,7 +519,8 @@ fn test_multisig_0_2_3_unlock_with_since_epoch() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_FLAG),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_FLAG)
+                .input_lock_script(0),
         );
     }
     {
@@ -517,7 +539,8 @@ fn test_multisig_0_2_3_unlock_with_since_epoch() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_VALUE),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_VALUE)
+                .input_lock_script(0),
         );
     }
     {
@@ -612,6 +635,7 @@ fn test_genesis_time_locked_cell() {
     };
 
     let multi_sign_script = gen_multi_sign_script(&keys, 1, 0);
+    let lock_script = gen_multi_sign_lock_script(args.clone());
     let raw_tx = gen_tx(&mut data_loader, args);
 
     // locked until 2020-02-09
@@ -632,7 +656,8 @@ fn test_genesis_time_locked_cell() {
         let verify_result = verify(&data_loader, &tx);
         assert_error_eq!(
             verify_result.unwrap_err(),
-            ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE_VALUE),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_VALUE)
+                .input_lock_script(0),
         );
     }
     {
@@ -662,6 +687,15 @@ fn gen_multi_sign_script(keys: &[Privkey], threshold: u8, require_first_n: u8) -
         script.extend_from_slice(&blake160(&pubkey.serialize()));
     });
     script.into()
+}
+
+fn gen_multi_sign_lock_script(lock_args: Bytes) -> Script {
+    let dep_cell_data_hash = CellOutput::calc_data_hash(&MULTISIG_ALL_BIN);
+    Script::new_builder()
+        .args(lock_args.pack())
+        .code_hash(dep_cell_data_hash)
+        .hash_type(ScriptHashType::Data.into())
+        .build()
 }
 
 fn gen_tx_with_extra_inputs(
@@ -694,7 +728,6 @@ fn gen_tx_with_extra_inputs(
                 .pack(),
         )
         .build();
-    let dep_cell_data_hash = CellOutput::calc_data_hash(&MULTISIG_ALL_BIN);
     dummy.cells.insert(
         contract_out_point.clone(),
         (dep_cell, MULTISIG_ALL_BIN.clone()),
@@ -721,11 +754,7 @@ fn gen_tx_with_extra_inputs(
         (secp256k1_data_cell, SECP256K1_DATA_BIN.clone()),
     );
     // input unlock script
-    let script = Script::new_builder()
-        .args(lock_args.pack())
-        .code_hash(dep_cell_data_hash)
-        .hash_type(ScriptHashType::Data.into())
-        .build();
+    let script = gen_multi_sign_lock_script(lock_args);
     let previous_output_cell = CellOutput::new_builder()
         .capacity(capacity.pack())
         .lock(script)
@@ -767,7 +796,7 @@ fn gen_tx_with_extra_inputs(
                 .input(CellInput::new(extra_out_point, 0))
                 .witness(
                     WitnessArgs::new_builder()
-                        .extra(Bytes::from(random_extra.to_vec()).pack())
+                        .input_type(Some(Bytes::from(random_extra.to_vec())).pack())
                         .build()
                         .as_bytes()
                         .pack(),
@@ -826,6 +855,6 @@ fn generate_keys(n: usize) -> Vec<Privkey> {
 }
 
 fn verify(data_loader: &DummyDataLoader, tx: &TransactionView) -> Result<u64, Error> {
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
-    TransactionScriptsVerifier::new(&resolved_tx, data_loader).verify(MAX_CYCLES)
+    let resolved_tx = Arc::new(build_resolved_tx(data_loader, tx));
+    TransactionScriptsVerifier::new(resolved_tx, data_loader.clone()).verify(MAX_CYCLES)
 }

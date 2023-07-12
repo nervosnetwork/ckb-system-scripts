@@ -16,6 +16,7 @@ use ckb_types::{
     prelude::*,
 };
 use rand::{thread_rng, Rng};
+use std::sync::Arc;
 
 const ERROR_SYSCALL: i8 = -4;
 const ERROR_INVALID_WITHDRAW_BLOCK: i8 = -14;
@@ -235,9 +236,9 @@ fn test_dao_single_cell() {
         .epoches
         .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -250,10 +251,10 @@ fn test_dao_single_cell() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
@@ -267,14 +268,14 @@ fn test_dao_single_cell() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -304,9 +305,9 @@ fn test_dao_single_cell_epoch_edge() {
         .epoches
         .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -319,10 +320,10 @@ fn test_dao_single_cell_epoch_edge() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
@@ -336,14 +337,14 @@ fn test_dao_single_cell_epoch_edge() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -373,9 +374,9 @@ fn test_dao_single_cell_start_of_epoch() {
         .epoches
         .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1000);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -388,10 +389,10 @@ fn test_dao_single_cell_start_of_epoch() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e800000002f3))
@@ -405,14 +406,14 @@ fn test_dao_single_cell_start_of_epoch() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -442,9 +443,9 @@ fn test_dao_single_cell_end_of_epoch() {
         .epoches
         .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1999);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -457,10 +458,10 @@ fn test_dao_single_cell_end_of_epoch() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e803e70002f3))
@@ -474,14 +475,14 @@ fn test_dao_single_cell_end_of_epoch() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -511,9 +512,9 @@ fn test_dao_single_cell_with_fees() {
         .epoches
         .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -526,10 +527,10 @@ fn test_dao_single_cell_with_fees() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e800000002f4))
@@ -543,14 +544,14 @@ fn test_dao_single_cell_with_fees() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -580,9 +581,9 @@ fn test_dao_single_cell_with_dao_output_cell() {
         .epoches
         .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -595,10 +596,10 @@ fn test_dao_single_cell_with_dao_output_cell() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let type_ = Script::new_builder()
         .code_hash(dao_code_hash())
@@ -621,14 +622,14 @@ fn test_dao_single_cell_with_dao_output_cell() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -677,9 +678,9 @@ fn test_dao_multiple_cells() {
         .epoches
         .insert(withdraw_header2.hash(), withdraw_epoch2);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -688,9 +689,9 @@ fn test_dao_multiple_cells() {
             index: 0,
         })
         .build();
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1564);
-    let input_cell_meta2 = CellMetaBuilder::from_cell_output(cell2, Bytes::from(&b[..]))
+    let input_cell_meta2 = CellMetaBuilder::from_cell_output(cell2, Bytes::from(b))
         .out_point(previous_out_point2.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header2.hash(),
@@ -703,15 +704,15 @@ fn test_dao_multiple_cells() {
     let resolved_inputs = vec![input_cell_meta, input_cell_meta2];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 2);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
-    let mut b2 = [0; 8];
+    let mut b2 = vec![0; 8];
     LittleEndian::write_u64(&mut b2, 3);
     let witness2 = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b2[..]).pack())
+        .input_type(Some(Bytes::from(b2)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e800000002f4))
@@ -730,14 +731,14 @@ fn test_dao_multiple_cells() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -765,9 +766,9 @@ fn test_dao_missing_deposit_header() {
         .index(cell_out_point.index())
         .build();
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell.clone(), Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -780,10 +781,10 @@ fn test_dao_missing_deposit_header() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e80000000320))
@@ -796,17 +797,17 @@ fn test_dao_missing_deposit_header() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(1),
+        ScriptError::validation_failure(&cell.type_().to_opt().unwrap(), 1).input_type_script(0),
     );
 }
 
@@ -830,9 +831,9 @@ fn test_dao_missing_withdraw_header() {
         .epoches
         .insert(deposit_header.hash(), deposit_epoch);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell.clone(), Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -845,10 +846,10 @@ fn test_dao_missing_withdraw_header() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 0);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e80000000320))
@@ -861,17 +862,17 @@ fn test_dao_missing_withdraw_header() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(2),
+        ScriptError::validation_failure(&cell.type_().to_opt().unwrap(), 2).input_type_script(0),
     );
 }
 
@@ -901,9 +902,9 @@ fn test_dao_invalid_deposit_header() {
         .epoches
         .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell.clone(), Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -916,10 +917,10 @@ fn test_dao_invalid_deposit_header() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 0);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e80000000320))
@@ -932,17 +933,21 @@ fn test_dao_invalid_deposit_header() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_INVALID_WITHDRAW_BLOCK),
+        ScriptError::validation_failure(
+            &cell.type_().to_opt().unwrap(),
+            ERROR_INVALID_WITHDRAW_BLOCK
+        )
+        .input_type_script(0),
     );
 }
 
@@ -972,9 +977,9 @@ fn test_dao_invalid_withdraw_amount() {
         .epoches
         .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell.clone(), Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -987,10 +992,10 @@ fn test_dao_invalid_withdraw_amount() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
@@ -1004,17 +1009,18 @@ fn test_dao_invalid_withdraw_amount() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_INCORRECT_CAPACITY),
+        ScriptError::validation_failure(&cell.type_().to_opt().unwrap(), ERROR_INCORRECT_CAPACITY)
+            .input_type_script(0),
     );
 }
 
@@ -1044,9 +1050,9 @@ fn test_dao_invalid_since() {
         .epoches
         .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell.clone(), Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -1059,10 +1065,10 @@ fn test_dao_invalid_since() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e802290002f3))
@@ -1077,17 +1083,18 @@ fn test_dao_invalid_since() {
         resolved_cell_deps.push(dep);
     }
 
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_INCORRECT_SINCE),
+        ScriptError::validation_failure(&cell.type_().to_opt().unwrap(), ERROR_INCORRECT_SINCE)
+            .input_type_script(0),
     );
 }
 
@@ -1117,7 +1124,7 @@ fn test_dao_invalid_withdraw_from_deposited_cell() {
         .epoches
         .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&[0; 8][..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell.clone(), Bytes::from(&[0; 8][..]))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -1130,10 +1137,10 @@ fn test_dao_invalid_withdraw_from_deposited_cell() {
     let resolved_inputs = vec![input_cell_meta];
     let mut resolved_cell_deps = vec![];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
@@ -1147,17 +1154,17 @@ fn test_dao_invalid_withdraw_from_deposited_cell() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(2),
+        ScriptError::validation_failure(&cell.type_().to_opt().unwrap(), 2).input_type_script(0),
     );
 }
 
@@ -1199,14 +1206,14 @@ fn test_dao_deposit_cell() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -1240,7 +1247,7 @@ fn test_dao_deposit_invalid_cell() {
     let witness = WitnessArgs::new_builder().build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0))
-        .output(output_cell)
+        .output(output_cell.clone())
         .output_data(Bytes::from(&[1; 8][..]).pack())
         .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
@@ -1248,17 +1255,21 @@ fn test_dao_deposit_invalid_cell() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_NEWLY_CREATED_CELL),
+        ScriptError::validation_failure(
+            &output_cell.type_().to_opt().unwrap(),
+            ERROR_NEWLY_CREATED_CELL
+        )
+        .output_type_script(0),
     );
 }
 
@@ -1292,7 +1303,7 @@ fn test_dao_deposit_cell_missing_data() {
     let witness = WitnessArgs::new_builder().build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0))
-        .output(output_cell)
+        .output(output_cell.clone())
         .output_data(Bytes::new().pack())
         .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
@@ -1300,17 +1311,18 @@ fn test_dao_deposit_cell_missing_data() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_SYSCALL),
+        ScriptError::validation_failure(&output_cell.type_().to_opt().unwrap(), ERROR_SYSCALL)
+            .output_type_script(0),
     );
 }
 
@@ -1352,13 +1364,13 @@ fn test_dao_create_withdrawing_cell() {
         lock_args,
     );
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
     let witness = WitnessArgs::new_builder().build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0))
         .output(output_cell)
-        .output_data(Bytes::from(&b[..]).pack())
+        .output_data(Bytes::from(b).pack())
         .header_dep(deposit_header.hash())
         .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
@@ -1366,14 +1378,14 @@ fn test_dao_create_withdrawing_cell() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -1416,13 +1428,13 @@ fn test_dao_create_withdrawing_cell_with_different_lock() {
         lock_args2,
     );
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
     let witness = WitnessArgs::new_builder().build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0))
         .output(output_cell)
-        .output_data(Bytes::from(&b[..]).pack())
+        .output_data(Bytes::from(b).pack())
         .header_dep(deposit_header.hash())
         .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
@@ -1430,14 +1442,14 @@ fn test_dao_create_withdrawing_cell_with_different_lock() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
 
@@ -1460,7 +1472,7 @@ fn test_dao_create_withdrawing_cell_with_invalid_type() {
         .epoches
         .insert(deposit_header.hash(), deposit_epoch);
 
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&[0; 8][..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell.clone(), Bytes::from(&[0; 8][..]))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
@@ -1479,13 +1491,13 @@ fn test_dao_create_withdrawing_cell_with_invalid_type() {
         lock_args,
     );
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
     let witness = WitnessArgs::new_builder().build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0))
         .output(output_cell)
-        .output_data(Bytes::from(&b[..]).pack())
+        .output_data(Bytes::from(b).pack())
         .header_dep(deposit_header.hash())
         .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
@@ -1493,17 +1505,17 @@ fn test_dao_create_withdrawing_cell_with_invalid_type() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(2),
+        ScriptError::validation_failure(&cell.type_().to_opt().unwrap(), 2).input_type_script(0),
     );
 }
 
@@ -1526,7 +1538,7 @@ fn test_dao_create_withdrawing_cell_with_invalid_data() {
         .epoches
         .insert(deposit_header.hash(), deposit_epoch);
 
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&[0; 8][..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell.clone(), Bytes::from(&[0; 8][..]))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
@@ -1545,13 +1557,13 @@ fn test_dao_create_withdrawing_cell_with_invalid_data() {
         lock_args,
     );
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1590);
     let witness = WitnessArgs::new_builder().build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0))
         .output(output_cell)
-        .output_data(Bytes::from(&b[..]).pack())
+        .output_data(Bytes::from(b).pack())
         .header_dep(deposit_header.hash())
         .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
@@ -1559,17 +1571,21 @@ fn test_dao_create_withdrawing_cell_with_invalid_data() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_INVALID_WITHDRAWING_CELL),
+        ScriptError::validation_failure(
+            &cell.type_().to_opt().unwrap(),
+            ERROR_INVALID_WITHDRAWING_CELL
+        )
+        .input_type_script(0),
     );
 }
 
@@ -1592,7 +1608,7 @@ fn test_dao_create_withdrawing_cell_with_invalid_capacity() {
         .epoches
         .insert(deposit_header.hash(), deposit_epoch);
 
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&[0; 8][..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell.clone(), Bytes::from(&[0; 8][..]))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: deposit_header.hash(),
@@ -1608,13 +1624,13 @@ fn test_dao_create_withdrawing_cell_with_invalid_capacity() {
     let (output_cell, _) =
         gen_dao_cell(&mut data_loader, Capacity::shannons(1234567800), lock_args);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
     let witness = WitnessArgs::new_builder().build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0))
         .output(output_cell)
-        .output_data(Bytes::from(&b[..]).pack())
+        .output_data(Bytes::from(b).pack())
         .header_dep(deposit_header.hash())
         .witness(witness.as_bytes().pack());
     let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
@@ -1622,17 +1638,21 @@ fn test_dao_create_withdrawing_cell_with_invalid_capacity() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_INVALID_WITHDRAWING_CELL),
+        ScriptError::validation_failure(
+            &cell.type_().to_opt().unwrap(),
+            ERROR_INVALID_WITHDRAWING_CELL
+        )
+        .input_type_script(0),
     );
 }
 
@@ -1662,9 +1682,9 @@ fn test_dao_too_many_output_cells() {
         .epoches
         .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell.clone(), Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -1680,10 +1700,10 @@ fn test_dao_too_many_output_cells() {
     let outputs = vec![cell_output_with_only_capacity(123468105678); 65];
     let outputs_data = vec![Bytes::new().pack(); 65];
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
@@ -1697,17 +1717,21 @@ fn test_dao_too_many_output_cells() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     assert_error_eq!(
         verify_result.unwrap_err(),
-        ScriptError::ValidationFailure(ERROR_TOO_MANY_OUTPUT_CELLS),
+        ScriptError::validation_failure(
+            &cell.type_().to_opt().unwrap(),
+            ERROR_TOO_MANY_OUTPUT_CELLS
+        )
+        .input_type_script(0),
     );
 }
 
@@ -1742,9 +1766,9 @@ fn test_dao_all_dao_actions() {
         .epoches
         .insert(withdraw_header.hash(), withdraw_epoch);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1554);
-    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(&b[..]))
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(b))
         .out_point(previous_out_point.clone())
         .transaction_info(TransactionInfo {
             block_hash: withdraw_header.hash(),
@@ -1769,12 +1793,12 @@ fn test_dao_all_dao_actions() {
     let (withdrawing_cell, _) =
         gen_dao_cell(&mut data_loader, Capacity::shannons(1234567890), lock_args);
 
-    let mut b = [0; 8];
+    let mut b = vec![0; 8];
     LittleEndian::write_u64(&mut b, 1);
-    let mut b2 = [0; 8];
+    let mut b2 = vec![0; 8];
     LittleEndian::write_u64(&mut b2, 1554);
     let witness = WitnessArgs::new_builder()
-        .type_(Bytes::from(&b[..]).pack())
+        .input_type(Some(Bytes::from(b)).pack())
         .build();
     let type_ = Script::new_builder()
         .code_hash(dao_code_hash())
@@ -1792,7 +1816,7 @@ fn test_dao_all_dao_actions() {
                 .build(),
         )
         .output_data(Bytes::new().pack())
-        .output_data(Bytes::from(&b2[..]).pack())
+        .output_data(Bytes::from(b2).pack())
         .output_data(Bytes::from(&[0u8; 8][..]).pack())
         .header_dep(withdraw_header.hash())
         .header_dep(deposit_header.hash())
@@ -1804,13 +1828,13 @@ fn test_dao_all_dao_actions() {
     for dep in resolved_cell_deps2.drain(..) {
         resolved_cell_deps.push(dep);
     }
-    let rtx = ResolvedTransaction {
+    let rtx = Arc::new(ResolvedTransaction {
         transaction: tx,
         resolved_inputs,
         resolved_cell_deps,
         resolved_dep_groups: vec![],
-    };
+    });
 
-    let verify_result = TransactionScriptsVerifier::new(&rtx, &data_loader).verify(MAX_CYCLES);
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
     verify_result.expect("pass verification");
 }
