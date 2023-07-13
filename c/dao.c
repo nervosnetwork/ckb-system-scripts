@@ -612,6 +612,8 @@ int main() {
   uint64_t input_exhausted = 0;
   uint64_t output_exhausted = 0;
   while (!(input_exhausted && output_exhausted)) {
+    // Reset the flag to ensure that it does not retain the value from the last iteration when
+    // inputs have been exhausted.
     output_withdrawing = 0;
 
     if (!input_exhausted) {
