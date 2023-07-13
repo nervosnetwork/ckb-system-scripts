@@ -24,7 +24,7 @@
 #define ERROR_NEWLY_CREATED_CELL -19
 #define ERROR_INVALID_WITHDRAWING_CELL -20
 #define ERROR_SCRIPT_TOO_LONG -21
-// In case of missing deposit headers, extract_epoch_info would also return
+// In case of missing deposit headers, load_dao_header_data would also return
 // CKB_INDEX_OUT_OF_BOUND, so we cannot use CKB_INDEX_OUT_OF_BOUND as marker
 // when all cells have been processed, we will need a different marker here.
 #define ERROR_MARKER_EXHAUSTED -30
