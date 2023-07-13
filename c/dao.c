@@ -472,11 +472,7 @@ static int validate_input(size_t index, uint64_t *input_capacities,
         return ret;
       }
       // Note that `validate_withdrawing_cell` above already verifies that an
-      // output cell for the current input cell at the same location exists. If
-      // the current input cell has index equal to or larger than 64, it means we
-      // will also have an output cell that has index equal to or larger than
-      // 64, which will trigger an error. Hence we don't need to check for
-      // overflows for `1 << index` operation.
+      // output cell for the current input cell at the same location exists.
       *output_withdrawing = 1;
       // Like any serious smart contracts, we will perform overflow checks here.
       if (__builtin_uaddl_overflow(*input_capacities, capacity,

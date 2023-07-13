@@ -968,11 +968,7 @@ withdrawing cell, this would work fine here.</p>
                 <a class="pilcrow" href="#section-37">&#182;</a>
               </div>
               <p>Note that <code>validate_withdrawing_cell</code> above already verifies that an
-output cell for the current input cell at the same location exists. If
-the current input cell has index equal to or larger than 64, it means we
-will also have an output cell that has index equal to or larger than
-64, which will trigger an error. Hence we don’t need to check for
-overflows for <code>1 &lt;&lt; index</code> operation.</p>
+output cell for the current input cell at the same location exists.</p>
 
             </div>
             
@@ -1193,8 +1189,23 @@ capacities here.</p>
 
   <span class="hljs-keyword">uint64_t</span> input_exhausted = <span class="hljs-number">0</span>;
   <span class="hljs-keyword">uint64_t</span> output_exhausted = <span class="hljs-number">0</span>;
-  <span class="hljs-keyword">while</span> (!(input_exhausted &amp;&amp; output_exhausted)) {
-    output_withdrawing = <span class="hljs-number">0</span>;
+  <span class="hljs-keyword">while</span> (!(input_exhausted &amp;&amp; output_exhausted)) {</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-45">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-45">&#182;</a>
+              </div>
+              <p>Reset the flag to ensure that it does not retain the value from the last iteration when
+inputs have been exhausted.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    output_withdrawing = <span class="hljs-number">0</span>;
 
     <span class="hljs-keyword">if</span> (!input_exhausted) {
       ret = validate_input(index, &amp;input_capacities, &amp;output_withdrawing, script_hash);
@@ -1220,11 +1231,11 @@ capacities here.</p>
         </li>
         
         
-        <li id="section-45">
+        <li id="section-46">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-45">&#182;</a>
+                <a class="pilcrow" href="#section-46">&#182;</a>
               </div>
               <p>The final thing we need to check here, is that the sum of capacities in output
 cells, cannot exceed the sum of capacities in all input cells with Nervos DAO
