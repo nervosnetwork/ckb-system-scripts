@@ -1,11 +1,13 @@
 // # DAO
 //
-// This file provides NervosDAO on chain script implementation. It is designed to
-// work as the type script of a cell. Please refer to [Nervos DAO RFC](https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0023-dao-deposit-withdraw/0023-dao-deposit-withdraw.md)
+// This file provides NervosDAO on chain script implementation. It is designed
+// to work as the type script of a cell. Please refer to [Nervos DAO
+// RFC](https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0023-dao-deposit-withdraw/0023-dao-deposit-withdraw.md)
 // on more details.
 
 // Necessary headers. This script will need to perform syscalls to read current
-// transaction structure, then parse WitnessArgs data structure in molecule format.
+// transaction structure, then parse WitnessArgs data structure in molecule
+// format.
 #include "ckb_syscalls.h"
 #include "protocol.h"
 
@@ -15,7 +17,6 @@
 #define ERROR_SYSCALL -4
 #define ERROR_BUFFER_NOT_ENOUGH -10
 #define ERROR_ENCODING -11
-#define ERROR_WITNESS_TOO_LONG -12
 #define ERROR_OVERFLOW -13
 #define ERROR_INVALID_WITHDRAW_BLOCK -14
 #define ERROR_INCORRECT_CAPACITY -15
@@ -33,9 +34,13 @@
 #error "Exhausted marker cannot be the same as CKB_INDEX_OUT_OF_BOUND!"
 #endif
 
-// Common definitions here, one important limitation, is that this script only works
-// with scripts and witnesses that are no larger than 32KB. We believe this should be enough
-// for most cases.
+#define CWHR_DEBUG(...)
+#define CWHR_ERROR_CODE -22
+#include "witness_args_handwritten_reader.h"
+
+// Common definitions here, one important limitation, is that this script only
+// works with scripts and witnesses that are no larger than 32KB. We believe
+// this should be enough for most cases.
 #define HASH_SIZE 32
 #define HEADER_SIZE 4096
 /* 32 KB */
@@ -62,39 +67,40 @@
 // WitnessArgs. The value is kept as a 64-bit unsigned little endian value.
 static int extract_deposit_header_index(size_t input_index, size_t *index) {
   int ret;
-  uint64_t len = 0;
   unsigned char witness[MAX_WITNESS_SIZE];
 
-  len = MAX_WITNESS_SIZE;
-  ret = ckb_load_witness(witness, &len, 0, input_index, CKB_SOURCE_INPUT);
+  cwhr_cursor_t cursor;
+  ret = cwhr_cursor_initialize(
+      &cursor, cwhr_witness_loader_create(input_index, CKB_SOURCE_INPUT),
+      witness, MAX_WITNESS_SIZE);
   if (ret != CKB_SUCCESS) {
-    return ERROR_SYSCALL;
+    return ret;
   }
-  if (len > MAX_WITNESS_SIZE) {
-    return ERROR_WITNESS_TOO_LONG;
+  cwhr_witness_args_reader_t reader;
+  ret = cwhr_witness_args_reader_create(&reader, &cursor);
+  if (ret != CKB_SUCCESS) {
+    return ret;
   }
-
-  mol_seg_t witness_seg;
-  witness_seg.ptr = (uint8_t *)witness;
-  witness_seg.size = len;
-
-  if (MolReader_WitnessArgs_verify(&witness_seg, false) != MOL_OK) {
-    return ERROR_ENCODING;
-  }
-  // Load `input_type`
-  mol_seg_t type_seg = MolReader_WitnessArgs_get_input_type(&witness_seg);
-
-  if (MolReader_BytesOpt_is_none(&type_seg)) {
+  ret = cwhr_witness_args_reader_verify(&reader, 0);
+  if (ret != CKB_SUCCESS) {
     return ERROR_ENCODING;
   }
 
-  mol_seg_t type_bytes_seg = MolReader_Bytes_raw_bytes(&type_seg);
-  if (type_bytes_seg.size != 8) {
+  if (!cwhr_witness_args_reader_has_input_type(&reader)) {
     return ERROR_ENCODING;
   }
 
-  *index = *type_bytes_seg.ptr;
-  return CKB_SUCCESS;
+  cwhr_bytes_reader_t input_type;
+  ret = cwhr_witness_args_reader_input_type(&reader, &input_type);
+  if (ret != CKB_SUCCESS) {
+    return ret;
+  }
+
+  if (cwhr_bytes_reader_length(&input_type) != 8) {
+    return ERROR_ENCODING;
+  }
+
+  return cwhr_bytes_reader_memcpy(&input_type, index);
 }
 
 // Parses epoch info from the epoch field in block header.
@@ -166,12 +172,14 @@ static int load_dao_header_data(size_t index, size_t source,
 
 // Validates an input cell is indeed deposited to NervosDAO in
 // `deposited_block_number`, then calculates the capacity one can withdraw from
-// this deposited cell. The function will tries to first read an index value from
-// the witness of the position as provided input cell index. Then use the read
-// index value as an index into `header_deps` section of current transaction for
-// a header. The header is then used as withdraw header to calculate deposit period.
+// this deposited cell. The function will tries to first read an index value
+// from the witness of the position as provided input cell index. Then use the
+// read index value as an index into `header_deps` section of current
+// transaction for a header. The header is then used as withdraw header to
+// calculate deposit period.
 static int calculate_dao_input_capacity(size_t input_index,
                                         uint64_t deposited_block_number,
+                                        uint64_t deposited_occupied_capacity,
                                         uint64_t original_capacity,
                                         uint64_t *calculated_capacity) {
   uint64_t len = 0;
@@ -230,19 +238,19 @@ static int calculate_dao_input_capacity(size_t input_index,
     deposited_epochs++;
   }
   uint64_t lock_epochs = (deposited_epochs + (LOCK_PERIOD_EPOCHS - 1)) /
-                          LOCK_PERIOD_EPOCHS * LOCK_PERIOD_EPOCHS;
+                         LOCK_PERIOD_EPOCHS * LOCK_PERIOD_EPOCHS;
   // Cell must at least be locked for one full lock period(180 epochs)
   if (lock_epochs < LOCK_PERIOD_EPOCHS) {
     return ERROR_INVALID_WITHDRAW_BLOCK;
   }
   // Since actually just stores an epoch integer with a fraction part, it is
   // not necessary a valid epoch number with fraction.
-  uint64_t minimal_since_epoch_number =
-      deposit_data.epoch_number + lock_epochs;
+  uint64_t minimal_since_epoch_number = deposit_data.epoch_number + lock_epochs;
   uint64_t minimal_since_epoch_index = deposit_data.epoch_index;
   uint64_t minimal_since_epoch_length = deposit_data.epoch_length;
 
-  // Loads since value from current input to make sure correct lock period is set.
+  // Loads since value from current input to make sure correct lock period is
+  // set.
   uint64_t input_since = 0;
   len = 8;
   ret = ckb_load_input_by_field(((unsigned char *)&input_since), &len, 0,
@@ -279,28 +287,14 @@ static int calculate_dao_input_capacity(size_t input_index,
     return ERROR_INCORRECT_SINCE;
   }
 
-  // Now we can calculate the maximum amount one can withdraw from this cell. Please
-  // refer to Nervos DAO RFC for more details on the formula used here.
+  // Now we can calculate the maximum amount one can withdraw from this cell.
+  // Please refer to Nervos DAO RFC for more details on the formula used here.
   uint64_t deposit_accumulate_rate = *((uint64_t *)(&deposit_data.dao[8]));
   uint64_t withdraw_accumulate_rate = *((uint64_t *)(&withdraw_data.dao[8]));
 
-  // Nervos DAO interest is only calculated on *occupied capacity*, which means all
-  // capacities that are not used as storage cost in a cell.
-  uint64_t occupied_capacity = 0;
-  len = 8;
-  ret = ckb_load_cell_by_field(((unsigned char *)&occupied_capacity), &len, 0,
-                               input_index, CKB_SOURCE_INPUT,
-                               CKB_CELL_FIELD_OCCUPIED_CAPACITY);
-  if (ret != CKB_SUCCESS) {
-    return ERROR_SYSCALL;
-  }
-  if (len != 8) {
-    return ERROR_SYSCALL;
-  }
-
   // Like any serious smart contracts, we will perform overflow checks here.
   uint64_t counted_capacity = 0;
-  if (__builtin_usubl_overflow(original_capacity, occupied_capacity,
+  if (__builtin_usubl_overflow(original_capacity, deposited_occupied_capacity,
                                &counted_capacity)) {
     return ERROR_OVERFLOW;
   }
@@ -310,7 +304,7 @@ static int calculate_dao_input_capacity(size_t input_index,
                                        ((__int128)deposit_accumulate_rate);
 
   uint64_t withdraw_capacity = 0;
-  if (__builtin_uaddl_overflow(occupied_capacity,
+  if (__builtin_uaddl_overflow(deposited_occupied_capacity,
                                (uint64_t)withdraw_counted_capacity,
                                &withdraw_capacity)) {
     return ERROR_OVERFLOW;
@@ -341,7 +335,7 @@ static int validate_withdrawing_cell(size_t index, uint64_t input_capacity,
   // Check type script
   len = HASH_SIZE;
   int ret = ckb_load_cell_by_field(hash1, &len, 0, index, CKB_SOURCE_OUTPUT,
-                               CKB_CELL_FIELD_TYPE_HASH);
+                                   CKB_CELL_FIELD_TYPE_HASH);
   if (ret != CKB_SUCCESS) {
     return ret;
   }
@@ -372,30 +366,63 @@ static int validate_withdrawing_cell(size_t index, uint64_t input_capacity,
   if (ret != CKB_SUCCESS) {
     return ret;
   }
-  uint64_t stored_block_number = 0;
-  len = 8;
-  ret = ckb_load_cell_data((unsigned char *)&stored_block_number, &len, 0,
-                           index, CKB_SOURCE_OUTPUT);
+  uint8_t output_data[16];
+  len = 16;
+  ret = ckb_load_cell_data(output_data, &len, 0, index, CKB_SOURCE_OUTPUT);
   if (ret != CKB_SUCCESS) {
     return ret;
   }
-  if (len != 8) {
+  if (len != 8 && len != 16) {
     return ERROR_SYSCALL;
   }
+  uint64_t stored_block_number = *((uint64_t *)output_data);
   if (stored_block_number != deposit_header.block_number) {
     return ERROR_INVALID_WITHDRAWING_CELL;
+  }
+  if (len == 16) {
+    uint64_t stored_occupied_capacity = *((uint64_t *)(&output_data[8]));
+    uint64_t actual_occupied_capacity = 0;
+    len = 8;
+    ret = ckb_load_cell_by_field((unsigned char *)&actual_occupied_capacity,
+                                 &len, 0, index, CKB_SOURCE_INPUT,
+                                 CKB_CELL_FIELD_OCCUPIED_CAPACITY);
+    if (ret != CKB_SUCCESS) {
+      return ret;
+    }
+    if (len != 8) {
+      return ERROR_SYSCALL;
+    }
+    if (stored_occupied_capacity != actual_occupied_capacity) {
+      return ERROR_INVALID_WITHDRAWING_CELL;
+    }
+  } else {
+    uint64_t input_lock_length = 0;
+    ret = ckb_load_cell_by_field(NULL, &input_lock_length, 0, index,
+                                 CKB_SOURCE_INPUT, CKB_CELL_FIELD_LOCK);
+    if (ret != CKB_SUCCESS) {
+      return ret;
+    }
+    uint64_t output_lock_length = 0;
+    ret = ckb_load_cell_by_field(NULL, &output_lock_length, 0, index,
+                                 CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_LOCK);
+    if (ret != CKB_SUCCESS) {
+      return ret;
+    }
+    if (input_lock_length != output_lock_length) {
+      return ERROR_INVALID_WITHDRAWING_CELL;
+    }
   }
   return CKB_SUCCESS;
 }
 
-static int validate_input(size_t index, uint64_t *input_capacities, 
+static int validate_input(size_t index, uint64_t *input_capacities,
                           uint64_t *output_withdrawing,
                           unsigned char *script_hash) {
   int dao_input = 0;
   uint64_t capacity = 0;
   uint64_t len = 8;
   int ret = ckb_load_cell_by_field(((unsigned char *)&capacity), &len, 0, index,
-                                CKB_SOURCE_INPUT, CKB_CELL_FIELD_CAPACITY);
+                                   CKB_SOURCE_INPUT, CKB_CELL_FIELD_CAPACITY);
   if (ret == CKB_INDEX_OUT_OF_BOUND) {
     return ERROR_MARKER_EXHAUSTED;
   } else if (ret == CKB_SUCCESS) {
@@ -405,7 +432,7 @@ static int validate_input(size_t index, uint64_t *input_capacities,
     unsigned char current_script_hash[HASH_SIZE];
     len = HASH_SIZE;
     ret = ckb_load_cell_by_field(current_script_hash, &len, 0, index,
-                                  CKB_SOURCE_INPUT, CKB_CELL_FIELD_TYPE_HASH);
+                                 CKB_SOURCE_INPUT, CKB_CELL_FIELD_TYPE_HASH);
     // When an input cell has the same type script hash as current running
     // we know we are dealing with a script using NervosDAO script.
     if ((ret == CKB_SUCCESS) && len == HASH_SIZE &&
@@ -419,49 +446,69 @@ static int validate_input(size_t index, uint64_t *input_capacities,
   if (!dao_input) {
     // Normal input, use its own capacity
     if (__builtin_uaddl_overflow(*input_capacities, capacity,
-                                  input_capacities)) {
+                                 input_capacities)) {
       return ERROR_OVERFLOW;
     }
   } else {
+    uint8_t data[16];
+    len = 16;
+    ret = ckb_load_cell_data(data, &len, 0, index, CKB_SOURCE_INPUT);
+    if (ret != CKB_SUCCESS) {
+      return ret;
+    }
+    if (len != 8 && len != 16) {
+      return ERROR_SYSCALL;
+    }
     // In a Nervos DAO transaction, we might have 2 types of input cells using
     // Nervos DAO type script:
     //
     // * A deposited cell
     // * A withdrawing cell
     //
-    // If you are also looking at the Nervos DAO RFC, a deposited cell is created in
-    // the initial deposit phase, and spent in withdraw phase 1; a withdrawing cell
-    // is created in withdraw phase 1, then spent in withdraw phase 2.
+    // If you are also looking at the Nervos DAO RFC, a deposited cell is
+    // created in the initial deposit phase, and spent in withdraw phase 1; a
+    // withdrawing cell is created in withdraw phase 1, then spent in withdraw
+    // phase 2.
     //
-    // The way to tell them apart, is that a deposited cell always contains 8 bytes
-    // of 0 as cell data, while a withdrawing cell would contain a positive number
-    // denoting the original deposited block number.
-    uint64_t block_number = 0;
-    len = 8;
-    ret = ckb_load_cell_data((unsigned char *)&block_number, &len, 0, index,
-                              CKB_SOURCE_INPUT);
-    if (ret != CKB_SUCCESS) {
-      return ret;
-    }
-    if (len != 8) {
-      return ERROR_SYSCALL;
-    }
+    // The way to tell them apart, is that a deposited cell always contains 8
+    // bytes of 0 as cell data, while a withdrawing cell would contain a
+    // positive number denoting the original deposited block number.
+    uint64_t block_number = *((uint64_t *)data);
 
     if (block_number > 0) {
+      uint64_t occupied_capacity = 0xFFFFFFFFFFFFFFFF;
+      if (len == 16) {
+        occupied_capacity = *((uint64_t *)(&data[8]));
+      } else {
+        len = 8;
+        ret = ckb_load_cell_by_field(((unsigned char *)&occupied_capacity),
+                                     &len, 0, index, CKB_SOURCE_INPUT,
+                                     CKB_CELL_FIELD_OCCUPIED_CAPACITY);
+        if (ret != CKB_SUCCESS) {
+          return ERROR_SYSCALL;
+        }
+        if (len != 8) {
+          return ERROR_SYSCALL;
+        }
+      }
+
       // For a withdrawing cell, we can start calculate the maximum capacity
       // that one can withdraw from it.
       uint64_t dao_capacity = 0;
-      ret = calculate_dao_input_capacity(index, block_number, capacity,
-                                          &dao_capacity);
+      ret = calculate_dao_input_capacity(index, block_number, occupied_capacity,
+                                         capacity, &dao_capacity);
       if (ret != CKB_SUCCESS) {
         return ret;
       }
       // Like any serious smart contracts, we will perform overflow checks here.
       if (__builtin_uaddl_overflow(*input_capacities, dao_capacity,
-                                    input_capacities)) {
+                                   input_capacities)) {
         return ERROR_OVERFLOW;
       }
     } else {
+      if (len != 8) {
+        return ERROR_SYSCALL;
+      }
       // For a deposited cell, we only need to check that a withdrawing cell for
       // current one is generated. For simplicity, we are limiting the code so
       // the withdrawing cell must at the same index with the deposited cell.
@@ -476,7 +523,7 @@ static int validate_input(size_t index, uint64_t *input_capacities,
       *output_withdrawing = 1;
       // Like any serious smart contracts, we will perform overflow checks here.
       if (__builtin_uaddl_overflow(*input_capacities, capacity,
-                                    input_capacities)) {
+                                   input_capacities)) {
         return ERROR_OVERFLOW;
       }
     }
@@ -485,13 +532,13 @@ static int validate_input(size_t index, uint64_t *input_capacities,
   return 0;
 }
 
-static int validate_output(size_t index, uint64_t *output_capacities, 
-                          uint64_t output_withdrawing,
-                          unsigned char *script_hash) {
+static int validate_output(size_t index, uint64_t *output_capacities,
+                           uint64_t output_withdrawing,
+                           unsigned char *script_hash) {
   uint64_t capacity = 0;
   uint64_t len = 8;
   int ret = ckb_load_cell_by_field(((unsigned char *)&capacity), &len, 0, index,
-                                CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_CAPACITY);
+                                   CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_CAPACITY);
   if (ret == CKB_INDEX_OUT_OF_BOUND) {
     return ERROR_MARKER_EXHAUSTED;
   }
@@ -504,14 +551,14 @@ static int validate_output(size_t index, uint64_t *output_capacities,
 
   // Like any serious smart contracts, we will perform overflow checks here.
   if (__builtin_uaddl_overflow(*output_capacities, capacity,
-                                output_capacities)) {
+                               output_capacities)) {
     return ERROR_OVERFLOW;
   }
 
   unsigned char current_script_hash[HASH_SIZE];
   len = HASH_SIZE;
   ret = ckb_load_cell_by_field(current_script_hash, &len, 0, index,
-                                CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH);
+                               CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH);
   if ((ret == CKB_SUCCESS) && len == HASH_SIZE &&
       (memcmp(script_hash, current_script_hash, HASH_SIZE) == 0)) {
     // Similarly to input, we also need to check if we are creating a
@@ -529,7 +576,7 @@ static int validate_output(size_t index, uint64_t *output_capacities,
       uint64_t block_number = 0;
       len = 8;
       ret = ckb_load_cell_data((unsigned char *)&block_number, &len, 0, index,
-                                CKB_SOURCE_OUTPUT);
+                               CKB_SOURCE_OUTPUT);
       if (ret != CKB_SUCCESS) {
         return ret;
       }
@@ -544,7 +591,6 @@ static int validate_output(size_t index, uint64_t *output_capacities,
   return 0;
 }
 
-
 int main() {
   int ret;
   unsigned char script_hash[HASH_SIZE];
@@ -554,9 +600,9 @@ int main() {
   mol_seg_t args_seg;
   mol_seg_t bytes_seg;
 
-  // NervosDAO script requires script args part to be empty, this way we can ensure
-  // that all DAO related scripts in a transaction is mapped to the same group, and
-  // processed together in one execution.
+  // NervosDAO script requires script args part to be empty, this way we can
+  // ensure that all DAO related scripts in a transaction is mapped to the same
+  // group, and processed together in one execution.
   len = SCRIPT_SIZE;
   ret = ckb_load_script(script, &len, 0);
   if (ret != CKB_SUCCESS) {
@@ -608,24 +654,26 @@ int main() {
   uint64_t input_exhausted = 0;
   uint64_t output_exhausted = 0;
   while (!(input_exhausted && output_exhausted)) {
-    // Reset the flag to ensure that it does not retain the value from the last iteration when
-    // inputs have been exhausted.
+    // Reset the flag to ensure that it does not retain the value from the last
+    // iteration when inputs have been exhausted.
     output_withdrawing = 0;
 
     if (!input_exhausted) {
-      ret = validate_input(index, &input_capacities, &output_withdrawing, script_hash);
+      ret = validate_input(index, &input_capacities, &output_withdrawing,
+                           script_hash);
       if (ret == ERROR_MARKER_EXHAUSTED) {
         input_exhausted = 1;
-      } else if (ret != CKB_SUCCESS ){
+      } else if (ret != CKB_SUCCESS) {
         return ret;
       }
     }
 
     if (!output_exhausted) {
-      ret = validate_output(index, &output_capacities, output_withdrawing, script_hash);
+      ret = validate_output(index, &output_capacities, output_withdrawing,
+                            script_hash);
       if (ret == ERROR_MARKER_EXHAUSTED) {
         output_exhausted = 1;
-      } else if (ret != CKB_SUCCESS ){
+      } else if (ret != CKB_SUCCESS) {
         return ret;
       }
     }
@@ -633,9 +681,9 @@ int main() {
     index += 1;
   }
 
-  // The final thing we need to check here, is that the sum of capacities in output
-  // cells, cannot exceed the sum of capacities in all input cells with Nervos DAO
-  // issuance considered.
+  // The final thing we need to check here, is that the sum of capacities in
+  // output cells, cannot exceed the sum of capacities in all input cells with
+  // Nervos DAO issuance considered.
   if (output_capacities > input_capacities) {
     return ERROR_INCORRECT_CAPACITY;
   }

@@ -3,7 +3,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use ckb_crypto::secp::{Generator, Privkey};
 use ckb_dao_utils::pack_dao_data;
 use ckb_error::assert_error_eq;
-use ckb_script::{ScriptError, TransactionScriptsVerifier};
+use ckb_script::{ScriptError, ScriptGroupType, TransactionScriptsVerifier};
 use ckb_types::{
     bytes::Bytes,
     core::{
@@ -275,6 +275,84 @@ fn test_dao_single_cell() {
     });
 
     let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify(MAX_CYCLES);
+    verify_result.expect("pass verification");
+}
+
+#[test]
+fn test_dao_single_cell_long_witness() {
+    let mut data_loader = DummyDataLoader::new();
+    let (privkey, lock_args) = gen_lock();
+
+    let (deposit_header, deposit_epoch) = gen_header(1554, 10000000, 35, 1000, 1000);
+    let (withdraw_header, withdraw_epoch) = gen_header(2000610, 10001000, 575, 2000000, 1100);
+    let (cell, previous_out_point) = gen_dao_cell(
+        &mut data_loader,
+        Capacity::shannons(123456780000),
+        lock_args,
+    );
+    let type_script_hash = cell.type_().to_opt().unwrap().calc_script_hash();
+
+    data_loader
+        .headers
+        .insert(deposit_header.hash(), deposit_header.clone());
+    data_loader
+        .headers
+        .insert(withdraw_header.hash(), withdraw_header.clone());
+    data_loader
+        .epoches
+        .insert(deposit_header.hash(), deposit_epoch);
+    data_loader
+        .epoches
+        .insert(withdraw_header.hash(), withdraw_epoch);
+
+    let mut b = vec![0; 8];
+    LittleEndian::write_u64(&mut b, 1554);
+    let input_cell_meta = CellMetaBuilder::from_cell_output(cell, Bytes::from(b))
+        .out_point(previous_out_point.clone())
+        .transaction_info(TransactionInfo {
+            block_hash: withdraw_header.hash(),
+            block_number: withdraw_header.number(),
+            block_epoch: EpochNumberWithFraction::new(575, 610, 1100),
+            index: 0,
+        })
+        .build();
+
+    let resolved_inputs = vec![input_cell_meta];
+    let mut resolved_cell_deps = vec![];
+
+    let mut b = vec![0; 8];
+    LittleEndian::write_u64(&mut b, 1);
+    let witness = WitnessArgs::new_builder()
+        .input_type(Some(Bytes::from(b)).pack())
+        .output_type(Some(Bytes::from(vec![1; 200 * 1024])).pack())
+        .build();
+    let builder = TransactionBuilder::default()
+        .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
+        .output(cell_output_with_only_capacity(123468105678))
+        .output_data(Bytes::new().pack())
+        .header_dep(withdraw_header.hash())
+        .header_dep(deposit_header.hash())
+        .witness(witness.as_bytes().pack());
+    let (tx, mut resolved_cell_deps2) = complete_tx(&mut data_loader, builder);
+    let tx = sign_tx(tx, &privkey);
+    for dep in resolved_cell_deps2.drain(..) {
+        resolved_cell_deps.push(dep);
+    }
+    let rtx = Arc::new(ResolvedTransaction {
+        transaction: tx,
+        resolved_inputs,
+        resolved_cell_deps,
+        resolved_dep_groups: vec![],
+    });
+
+    // Note that the lock scripts included in this repo all suffer from 32K witness limit
+    // for now, which means verifying the full transaction here would fail. So we only verify
+    // the Nervos DAO script here.
+    let verify_result = TransactionScriptsVerifier::new(rtx, data_loader).verify_single(
+        ScriptGroupType::Type,
+        &type_script_hash,
+        MAX_CYCLES,
+    );
     verify_result.expect("pass verification");
 }
 
