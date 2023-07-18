@@ -336,7 +336,7 @@ version = "0.110.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a23d09e2994f8696c6a73e16a44500d012ece93085cf44d4d872b82920b8a4c0"
 dependencies = [
- "ckb-system-scripts 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ckb-system-scripts 0.5.4",
  "ckb-types",
  "includedir",
  "includedir_codegen",
@@ -366,6 +366,19 @@ dependencies = [
 [[package]]
 name = "ckb-system-scripts"
 version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa5c59063142de7a68cfad4449c6b3863563856219a2925dfb8c5f019ec2aa47"
+dependencies = [
+ "blake2b-rs",
+ "faster-hex",
+ "includedir",
+ "includedir_codegen",
+ "phf",
+]
+
+[[package]]
+name = "ckb-system-scripts"
+version = "0.6.0-alpha.1"
 dependencies = [
  "blake2b-rs",
  "byteorder",
@@ -386,19 +399,6 @@ dependencies = [
  "ripemd160",
  "secp256k1 0.15.5",
  "sha2",
-]
-
-[[package]]
-name = "ckb-system-scripts"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa5c59063142de7a68cfad4449c6b3863563856219a2925dfb8c5f019ec2aa47"
-dependencies = [
- "blake2b-rs",
- "faster-hex",
- "includedir",
- "includedir_codegen",
- "phf",
 ]
 
 [[package]]
