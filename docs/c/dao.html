@@ -50,8 +50,9 @@
                 <a class="pilcrow" href="#section-1">&#182;</a>
               </div>
               <h1 id="dao">DAO</h1>
-<p>This file provides NervosDAO on chain script implementation. It is designed to
-work as the type script of a cell. Please refer to <a href="https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0023-dao-deposit-withdraw/0023-dao-deposit-withdraw.md">Nervos DAO RFC</a>
+<p>This file provides NervosDAO on chain script implementation. It is designed
+to work as the type script of a cell. Please refer to <a href="https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0023-dao-deposit-withdraw/0023-dao-deposit-withdraw.md">Nervos DAO
+RFC</a>
 on more details.</p>
 
             </div>
@@ -66,7 +67,8 @@ on more details.</p>
                 <a class="pilcrow" href="#section-2">&#182;</a>
               </div>
               <p>Necessary headers. This script will need to perform syscalls to read current
-transaction structure, then parse WitnessArgs data structure in molecule format.</p>
+transaction structure, then parse WitnessArgs data structure in molecule
+format.</p>
 
             </div>
             
@@ -91,7 +93,6 @@ transaction structure, then parse WitnessArgs data structure in molecule format.
 <span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_SYSCALL -4</span>
 <span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_BUFFER_NOT_ENOUGH -10</span>
 <span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_ENCODING -11</span>
-<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_WITNESS_TOO_LONG -12</span>
 <span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_OVERFLOW -13</span>
 <span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_INVALID_WITHDRAW_BLOCK -14</span>
 <span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ERROR_INCORRECT_CAPACITY -15</span>
@@ -120,7 +121,14 @@ when all cells have been processed, we will need a different marker here.</p>
 
 <span class="hljs-meta">#<span class="hljs-meta-keyword">if</span> ERROR_MARKER_EXHAUSTED == CKB_INDEX_OUT_OF_BOUND</span>
 <span class="hljs-meta">#<span class="hljs-meta-keyword">error</span> <span class="hljs-meta-string">&quot;Exhausted marker cannot be the same as CKB_INDEX_OUT_OF_BOUND!&quot;</span></span>
-<span class="hljs-meta">#<span class="hljs-meta-keyword">endif</span></span></pre></div></div>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">endif</span></span>
+
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> CWHR_DEBUG(...)</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> CWHR_ERROR_CODE -22</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&quot;witness_args_handwritten_reader.h&quot;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> HASH_SIZE 32</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> HEADER_SIZE 4096</span></pre></div></div>
             
         </li>
         
@@ -131,17 +139,13 @@ when all cells have been processed, we will need a different marker here.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-5">&#182;</a>
               </div>
-              <p>Common definitions here, one important limitation, is that this script only works
-with scripts and witnesses that are no larger than 32KB. We believe this should be enough
-for most cases.</p>
+              <p>Note witness will be loaded via a reader that supports arbitrary length. The
+32KB size here is merely the temporary buffer used to hold part of witness, it
+does not necessary limit the total witness size to 32KB.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> HASH_SIZE 32</span>
-<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> HEADER_SIZE 4096</span>
-<span class="hljs-comment">/* 32 KB */</span>
-<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> MAX_WITNESS_SIZE 32768</span>
-<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> SCRIPT_SIZE 32768</span></pre></div></div>
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> WITNESS_BUF_SIZE 32768</span></pre></div></div>
             
         </li>
         
@@ -152,11 +156,13 @@ for most cases.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-6">&#182;</a>
               </div>
-              <p>One lock period of NervosDAO is set as 180 epochs, which is roughly 30 days.</p>
+              <p>The only script that will be loaded by Nervos DAO contract, is Nervos DAO type
+script itself. This type script has empty args, which means the type script will
+never exceed 32K. We are safe keeping this value here.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> LOCK_PERIOD_EPOCHS 180</span></pre></div></div>
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> SCRIPT_SIZE 32768</span></pre></div></div>
             
         </li>
         
@@ -166,6 +172,21 @@ for most cases.</p>
               
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <p>One lock period of NervosDAO is set as 180 epochs, which is roughly 30 days.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> LOCK_PERIOD_EPOCHS 180</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-8">&#182;</a>
               </div>
               <p>Common definitions to parse epoch value in block headers.</p>
 
@@ -184,11 +205,11 @@ for most cases.</p>
         </li>
         
         
-        <li id="section-8">
+        <li id="section-9">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-8">&#182;</a>
+                <a class="pilcrow" href="#section-9">&#182;</a>
               </div>
               <p>Fetches deposit header index. The index is kept in the witness of the same
 index as the input cell. The witness is first treated as a WitnessArgs object
@@ -199,52 +220,40 @@ WitnessArgs. The value is kept as a 64-bit unsigned little endian value.</p>
             
             <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">int</span> <span class="hljs-title">extract_deposit_header_index</span><span class="hljs-params">(<span class="hljs-keyword">size_t</span> input_index, <span class="hljs-keyword">size_t</span> *index)</span> </span>{
   <span class="hljs-keyword">int</span> ret;
-  <span class="hljs-keyword">uint64_t</span> len = <span class="hljs-number">0</span>;
-  <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> witness[MAX_WITNESS_SIZE];
+  <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> witness[WITNESS_BUF_SIZE];
 
-  len = MAX_WITNESS_SIZE;
-  ret = ckb_load_witness(witness, &amp;len, <span class="hljs-number">0</span>, input_index, CKB_SOURCE_INPUT);
+  <span class="hljs-keyword">cwhr_cursor_t</span> cursor;
+  ret = cwhr_cursor_initialize(
+      &amp;cursor, cwhr_witness_loader_create(input_index, CKB_SOURCE_INPUT),
+      witness, WITNESS_BUF_SIZE);
   <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
-    <span class="hljs-keyword">return</span> ERROR_SYSCALL;
+    <span class="hljs-keyword">return</span> ret;
   }
-  <span class="hljs-keyword">if</span> (len &gt; MAX_WITNESS_SIZE) {
-    <span class="hljs-keyword">return</span> ERROR_WITNESS_TOO_LONG;
+  <span class="hljs-keyword">cwhr_witness_args_reader_t</span> reader;
+  ret = cwhr_witness_args_reader_create(&amp;reader, &amp;cursor);
+  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+    <span class="hljs-keyword">return</span> ret;
   }
-
-  <span class="hljs-keyword">mol_seg_t</span> witness_seg;
-  witness_seg.ptr = (<span class="hljs-keyword">uint8_t</span> *)witness;
-  witness_seg.size = len;
-
-  <span class="hljs-keyword">if</span> (MolReader_WitnessArgs_verify(&amp;witness_seg, <span class="hljs-literal">false</span>) != MOL_OK) {
-    <span class="hljs-keyword">return</span> ERROR_ENCODING;
-  }</pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-9">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-9">&#182;</a>
-              </div>
-              <p>Load <code>input_type</code></p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">mol_seg_t</span> type_seg = MolReader_WitnessArgs_get_input_type(&amp;witness_seg);
-
-  <span class="hljs-keyword">if</span> (MolReader_BytesOpt_is_none(&amp;type_seg)) {
+  ret = cwhr_witness_args_reader_verify(&amp;reader, <span class="hljs-number">0</span>);
+  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
     <span class="hljs-keyword">return</span> ERROR_ENCODING;
   }
 
-  <span class="hljs-keyword">mol_seg_t</span> type_bytes_seg = MolReader_Bytes_raw_bytes(&amp;type_seg);
-  <span class="hljs-keyword">if</span> (type_bytes_seg.size != <span class="hljs-number">8</span>) {
+  <span class="hljs-keyword">if</span> (!cwhr_witness_args_reader_has_input_type(&amp;reader)) {
     <span class="hljs-keyword">return</span> ERROR_ENCODING;
   }
 
-  *index = *type_bytes_seg.ptr;
-  <span class="hljs-keyword">return</span> CKB_SUCCESS;
+  <span class="hljs-keyword">cwhr_bytes_reader_t</span> input_type;
+  ret = cwhr_witness_args_reader_input_type(&amp;reader, &amp;input_type);
+  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+    <span class="hljs-keyword">return</span> ret;
+  }
+
+  <span class="hljs-keyword">if</span> (cwhr_bytes_reader_length(&amp;input_type) != <span class="hljs-number">8</span>) {
+    <span class="hljs-keyword">return</span> ERROR_ENCODING;
+  }
+
+  <span class="hljs-keyword">return</span> cwhr_bytes_reader_memcpy(&amp;input_type, index);
 }</pre></div></div>
             
         </li>
@@ -373,15 +382,17 @@ script.</p>
               </div>
               <p>Validates an input cell is indeed deposited to NervosDAO in
 <code>deposited_block_number</code>, then calculates the capacity one can withdraw from
-this deposited cell. The function will tries to first read an index value from
-the witness of the position as provided input cell index. Then use the read
-index value as an index into <code>header_deps</code> section of current transaction for
-a header. The header is then used as withdraw header to calculate deposit period.</p>
+this deposited cell. The function will tries to first read an index value
+from the witness of the position as provided input cell index. Then use the
+read index value as an index into <code>header_deps</code> section of current
+transaction for a header. The header is then used as withdraw header to
+calculate deposit period.</p>
 
             </div>
             
             <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">int</span> <span class="hljs-title">calculate_dao_input_capacity</span><span class="hljs-params">(<span class="hljs-keyword">size_t</span> input_index,
                                         <span class="hljs-keyword">uint64_t</span> deposited_block_number,
+                                        <span class="hljs-keyword">uint64_t</span> deposited_occupied_capacity,
                                         <span class="hljs-keyword">uint64_t</span> original_capacity,
                                         <span class="hljs-keyword">uint64_t</span> *calculated_capacity)</span> </span>{
   <span class="hljs-keyword">uint64_t</span> len = <span class="hljs-number">0</span>;
@@ -489,7 +500,7 @@ anything for a round-up operation.</p>
     deposited_epochs++;
   }
   <span class="hljs-keyword">uint64_t</span> lock_epochs = (deposited_epochs + (LOCK_PERIOD_EPOCHS - <span class="hljs-number">1</span>)) /
-                          LOCK_PERIOD_EPOCHS * LOCK_PERIOD_EPOCHS;</pre></div></div>
+                         LOCK_PERIOD_EPOCHS * LOCK_PERIOD_EPOCHS;</pre></div></div>
             
         </li>
         
@@ -522,8 +533,7 @@ not necessary a valid epoch number with fraction.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">uint64_t</span> minimal_since_epoch_number =
-      deposit_data.epoch_number + lock_epochs;
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">uint64_t</span> minimal_since_epoch_number = deposit_data.epoch_number + lock_epochs;
   <span class="hljs-keyword">uint64_t</span> minimal_since_epoch_index = deposit_data.epoch_index;
   <span class="hljs-keyword">uint64_t</span> minimal_since_epoch_length = deposit_data.epoch_length;</pre></div></div>
             
@@ -536,7 +546,8 @@ not necessary a valid epoch number with fraction.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-21">&#182;</a>
               </div>
-              <p>Loads since value from current input to make sure correct lock period is set.</p>
+              <p>Loads since value from current input to make sure correct lock period is
+set.</p>
 
             </div>
             
@@ -610,8 +621,8 @@ via absolute epoch number.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-24">&#182;</a>
               </div>
-              <p>Now we can calculate the maximum amount one can withdraw from this cell. Please
-refer to Nervos DAO RFC for more details on the formula used here.</p>
+              <p>Now we can calculate the maximum amount one can withdraw from this cell.
+Please refer to Nervos DAO RFC for more details on the formula used here.</p>
 
             </div>
             
@@ -627,38 +638,12 @@ refer to Nervos DAO RFC for more details on the formula used here.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-25">&#182;</a>
               </div>
-              <p>Nervos DAO interest is only calculated on <em>occupied capacity</em>, which means all
-capacities that are not used as storage cost in a cell.</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">uint64_t</span> occupied_capacity = <span class="hljs-number">0</span>;
-  len = <span class="hljs-number">8</span>;
-  ret = ckb_load_cell_by_field(((<span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> *)&amp;occupied_capacity), &amp;len, <span class="hljs-number">0</span>,
-                               input_index, CKB_SOURCE_INPUT,
-                               CKB_CELL_FIELD_OCCUPIED_CAPACITY);
-  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
-    <span class="hljs-keyword">return</span> ERROR_SYSCALL;
-  }
-  <span class="hljs-keyword">if</span> (len != <span class="hljs-number">8</span>) {
-    <span class="hljs-keyword">return</span> ERROR_SYSCALL;
-  }</pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-26">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-26">&#182;</a>
-              </div>
               <p>Like any serious smart contracts, we will perform overflow checks here.</p>
 
             </div>
             
             <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">uint64_t</span> counted_capacity = <span class="hljs-number">0</span>;
-  <span class="hljs-keyword">if</span> (__builtin_usubl_overflow(original_capacity, occupied_capacity,
+  <span class="hljs-keyword">if</span> (__builtin_usubl_overflow(original_capacity, deposited_occupied_capacity,
                                &amp;counted_capacity)) {
     <span class="hljs-keyword">return</span> ERROR_OVERFLOW;
   }
@@ -668,7 +653,7 @@ capacities that are not used as storage cost in a cell.</p>
                                        ((__int128)deposit_accumulate_rate);
 
   <span class="hljs-keyword">uint64_t</span> withdraw_capacity = <span class="hljs-number">0</span>;
-  <span class="hljs-keyword">if</span> (__builtin_uaddl_overflow(occupied_capacity,
+  <span class="hljs-keyword">if</span> (__builtin_uaddl_overflow(deposited_occupied_capacity,
                                (<span class="hljs-keyword">uint64_t</span>)withdraw_counted_capacity,
                                &amp;withdraw_capacity)) {
     <span class="hljs-keyword">return</span> ERROR_OVERFLOW;
@@ -681,11 +666,11 @@ capacities that are not used as storage cost in a cell.</p>
         </li>
         
         
-        <li id="section-27">
+        <li id="section-26">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-27">&#182;</a>
+                <a class="pilcrow" href="#section-26">&#182;</a>
               </div>
               <p>In the phase 1 of NervosDAO script, we will consume a deposited cell, and
 create a withdrawing cell. The withdrawing cell must be put in the same index
@@ -712,11 +697,11 @@ validate the lock script cannot be tampered.</p>
         </li>
         
         
-        <li id="section-28">
+        <li id="section-27">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-28">&#182;</a>
+                <a class="pilcrow" href="#section-27">&#182;</a>
               </div>
               <p>Check type script</p>
 
@@ -724,7 +709,7 @@ validate the lock script cannot be tampered.</p>
             
             <div class="content"><div class='highlight'><pre>  len = HASH_SIZE;
   <span class="hljs-keyword">int</span> ret = ckb_load_cell_by_field(hash1, &amp;len, <span class="hljs-number">0</span>, index, CKB_SOURCE_OUTPUT,
-                               CKB_CELL_FIELD_TYPE_HASH);
+                                   CKB_CELL_FIELD_TYPE_HASH);
   <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
     <span class="hljs-keyword">return</span> ret;
   }
@@ -738,11 +723,11 @@ validate the lock script cannot be tampered.</p>
         </li>
         
         
-        <li id="section-29">
+        <li id="section-28">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-29">&#182;</a>
+                <a class="pilcrow" href="#section-28">&#182;</a>
               </div>
               <p>Check capacity</p>
 
@@ -766,11 +751,11 @@ validate the lock script cannot be tampered.</p>
         </li>
         
         
-        <li id="section-30">
+        <li id="section-29">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-30">&#182;</a>
+                <a class="pilcrow" href="#section-29">&#182;</a>
               </div>
               <p>Check cell data</p>
 
@@ -781,30 +766,63 @@ validate the lock script cannot be tampered.</p>
   <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
     <span class="hljs-keyword">return</span> ret;
   }
-  <span class="hljs-keyword">uint64_t</span> stored_block_number = <span class="hljs-number">0</span>;
-  len = <span class="hljs-number">8</span>;
-  ret = ckb_load_cell_data((<span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> *)&amp;stored_block_number, &amp;len, <span class="hljs-number">0</span>,
-                           index, CKB_SOURCE_OUTPUT);
+  <span class="hljs-keyword">uint8_t</span> output_data[<span class="hljs-number">16</span>];
+  len = <span class="hljs-number">16</span>;
+  ret = ckb_load_cell_data(output_data, &amp;len, <span class="hljs-number">0</span>, index, CKB_SOURCE_OUTPUT);
   <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
     <span class="hljs-keyword">return</span> ret;
   }
-  <span class="hljs-keyword">if</span> (len != <span class="hljs-number">8</span>) {
+  <span class="hljs-keyword">if</span> (len != <span class="hljs-number">8</span> &amp;&amp; len != <span class="hljs-number">16</span>) {
     <span class="hljs-keyword">return</span> ERROR_SYSCALL;
   }
+  <span class="hljs-keyword">uint64_t</span> stored_block_number = *((<span class="hljs-keyword">uint64_t</span> *)output_data);
   <span class="hljs-keyword">if</span> (stored_block_number != deposit_header.block_number) {
     <span class="hljs-keyword">return</span> ERROR_INVALID_WITHDRAWING_CELL;
+  }
+  <span class="hljs-keyword">if</span> (len == <span class="hljs-number">16</span>) {
+    <span class="hljs-keyword">uint64_t</span> stored_occupied_capacity = *((<span class="hljs-keyword">uint64_t</span> *)(&amp;output_data[<span class="hljs-number">8</span>]));
+    <span class="hljs-keyword">uint64_t</span> actual_occupied_capacity = <span class="hljs-number">0</span>;
+    len = <span class="hljs-number">8</span>;
+    ret = ckb_load_cell_by_field((<span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> *)&amp;actual_occupied_capacity,
+                                 &amp;len, <span class="hljs-number">0</span>, index, CKB_SOURCE_INPUT,
+                                 CKB_CELL_FIELD_OCCUPIED_CAPACITY);
+    <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+      <span class="hljs-keyword">return</span> ret;
+    }
+    <span class="hljs-keyword">if</span> (len != <span class="hljs-number">8</span>) {
+      <span class="hljs-keyword">return</span> ERROR_SYSCALL;
+    }
+    <span class="hljs-keyword">if</span> (stored_occupied_capacity != actual_occupied_capacity) {
+      <span class="hljs-keyword">return</span> ERROR_INVALID_WITHDRAWING_CELL;
+    }
+  } <span class="hljs-keyword">else</span> {
+    <span class="hljs-keyword">uint64_t</span> input_lock_length = <span class="hljs-number">0</span>;
+    ret = ckb_load_cell_by_field(<span class="hljs-literal">NULL</span>, &amp;input_lock_length, <span class="hljs-number">0</span>, index,
+                                 CKB_SOURCE_INPUT, CKB_CELL_FIELD_LOCK);
+    <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+      <span class="hljs-keyword">return</span> ret;
+    }
+    <span class="hljs-keyword">uint64_t</span> output_lock_length = <span class="hljs-number">0</span>;
+    ret = ckb_load_cell_by_field(<span class="hljs-literal">NULL</span>, &amp;output_lock_length, <span class="hljs-number">0</span>, index,
+                                 CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_LOCK);
+    <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+      <span class="hljs-keyword">return</span> ret;
+    }
+    <span class="hljs-keyword">if</span> (input_lock_length != output_lock_length) {
+      <span class="hljs-keyword">return</span> ERROR_INVALID_WITHDRAWING_CELL;
+    }
   }
   <span class="hljs-keyword">return</span> CKB_SUCCESS;
 }
 
-<span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">int</span> <span class="hljs-title">validate_input</span><span class="hljs-params">(<span class="hljs-keyword">size_t</span> index, <span class="hljs-keyword">uint64_t</span> *input_capacities, 
+<span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">int</span> <span class="hljs-title">validate_input</span><span class="hljs-params">(<span class="hljs-keyword">size_t</span> index, <span class="hljs-keyword">uint64_t</span> *input_capacities,
                           <span class="hljs-keyword">uint64_t</span> *output_withdrawing,
                           <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> *script_hash)</span> </span>{
   <span class="hljs-keyword">int</span> dao_input = <span class="hljs-number">0</span>;
   <span class="hljs-keyword">uint64_t</span> capacity = <span class="hljs-number">0</span>;
   <span class="hljs-keyword">uint64_t</span> len = <span class="hljs-number">8</span>;
   <span class="hljs-keyword">int</span> ret = ckb_load_cell_by_field(((<span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> *)&amp;capacity), &amp;len, <span class="hljs-number">0</span>, index,
-                                CKB_SOURCE_INPUT, CKB_CELL_FIELD_CAPACITY);
+                                   CKB_SOURCE_INPUT, CKB_CELL_FIELD_CAPACITY);
   <span class="hljs-keyword">if</span> (ret == CKB_INDEX_OUT_OF_BOUND) {
     <span class="hljs-keyword">return</span> ERROR_MARKER_EXHAUSTED;
   } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (ret == CKB_SUCCESS) {
@@ -814,16 +832,16 @@ validate the lock script cannot be tampered.</p>
     <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> current_script_hash[HASH_SIZE];
     len = HASH_SIZE;
     ret = ckb_load_cell_by_field(current_script_hash, &amp;len, <span class="hljs-number">0</span>, index,
-                                  CKB_SOURCE_INPUT, CKB_CELL_FIELD_TYPE_HASH);</pre></div></div>
+                                 CKB_SOURCE_INPUT, CKB_CELL_FIELD_TYPE_HASH);</pre></div></div>
             
         </li>
         
         
-        <li id="section-31">
+        <li id="section-30">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-31">&#182;</a>
+                <a class="pilcrow" href="#section-30">&#182;</a>
               </div>
               <p>When an input cell has the same type script hash as current running
 we know we are dealing with a script using NervosDAO script.</p>
@@ -843,21 +861,74 @@ we know we are dealing with a script using NervosDAO script.</p>
         </li>
         
         
-        <li id="section-32">
+        <li id="section-31">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-32">&#182;</a>
+                <a class="pilcrow" href="#section-31">&#182;</a>
               </div>
               <p>Normal input, use its own capacity</p>
 
             </div>
             
             <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">if</span> (__builtin_uaddl_overflow(*input_capacities, capacity,
-                                  input_capacities)) {
+                                 input_capacities)) {
       <span class="hljs-keyword">return</span> ERROR_OVERFLOW;
     }
-  } <span class="hljs-keyword">else</span> {</pre></div></div>
+  } <span class="hljs-keyword">else</span> {
+    <span class="hljs-keyword">uint8_t</span> data[<span class="hljs-number">16</span>];
+    len = <span class="hljs-number">16</span>;
+    ret = ckb_load_cell_data(data, &amp;len, <span class="hljs-number">0</span>, index, CKB_SOURCE_INPUT);
+    <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+      <span class="hljs-keyword">return</span> ret;
+    }
+    <span class="hljs-keyword">if</span> (len != <span class="hljs-number">8</span> &amp;&amp; len != <span class="hljs-number">16</span>) {
+      <span class="hljs-keyword">return</span> ERROR_SYSCALL;
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-32">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-32">&#182;</a>
+              </div>
+              <p>In a Nervos DAO transaction, we might have 2 types of input cells using
+Nervos DAO type script:</p>
+<ul>
+<li>A deposited cell</li>
+<li>A withdrawing cell</li>
+</ul>
+<p>If you are also looking at the Nervos DAO RFC, a deposited cell is
+created in the initial deposit phase, and spent in withdraw phase 1; a
+withdrawing cell is created in withdraw phase 1, then spent in withdraw
+phase 2.</p>
+<p>The way to tell them apart, is that a deposited cell always contains 8
+bytes of 0 as cell data, while a withdrawing cell would contain a
+positive number denoting the original deposited block number.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">uint64_t</span> block_number = *((<span class="hljs-keyword">uint64_t</span> *)data);
+
+    <span class="hljs-keyword">if</span> (block_number &gt; <span class="hljs-number">0</span>) {
+      <span class="hljs-keyword">uint64_t</span> occupied_capacity = <span class="hljs-number">0xFFFFFFFFFFFFFFFF</span>;
+      <span class="hljs-keyword">if</span> (len == <span class="hljs-number">16</span>) {
+        occupied_capacity = *((<span class="hljs-keyword">uint64_t</span> *)(&amp;data[<span class="hljs-number">8</span>]));
+      } <span class="hljs-keyword">else</span> {
+        len = <span class="hljs-number">8</span>;
+        ret = ckb_load_cell_by_field(((<span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> *)&amp;occupied_capacity),
+                                     &amp;len, <span class="hljs-number">0</span>, index, CKB_SOURCE_INPUT,
+                                     CKB_CELL_FIELD_OCCUPIED_CAPACITY);
+        <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+          <span class="hljs-keyword">return</span> ERROR_SYSCALL;
+        }
+        <span class="hljs-keyword">if</span> (len != <span class="hljs-number">8</span>) {
+          <span class="hljs-keyword">return</span> ERROR_SYSCALL;
+        }
+      }</pre></div></div>
             
         </li>
         
@@ -868,33 +939,17 @@ we know we are dealing with a script using NervosDAO script.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-33">&#182;</a>
               </div>
-              <p>In a Nervos DAO transaction, we might have 2 types of input cells using
-Nervos DAO type script:</p>
-<ul>
-<li>A deposited cell</li>
-<li>A withdrawing cell</li>
-</ul>
-<p>If you are also looking at the Nervos DAO RFC, a deposited cell is created in
-the initial deposit phase, and spent in withdraw phase 1; a withdrawing cell
-is created in withdraw phase 1, then spent in withdraw phase 2.</p>
-<p>The way to tell them apart, is that a deposited cell always contains 8 bytes
-of 0 as cell data, while a withdrawing cell would contain a positive number
-denoting the original deposited block number.</p>
+              <p>For a withdrawing cell, we can start calculate the maximum capacity
+that one can withdraw from it.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">uint64_t</span> block_number = <span class="hljs-number">0</span>;
-    len = <span class="hljs-number">8</span>;
-    ret = ckb_load_cell_data((<span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> *)&amp;block_number, &amp;len, <span class="hljs-number">0</span>, index,
-                              CKB_SOURCE_INPUT);
-    <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
-      <span class="hljs-keyword">return</span> ret;
-    }
-    <span class="hljs-keyword">if</span> (len != <span class="hljs-number">8</span>) {
-      <span class="hljs-keyword">return</span> ERROR_SYSCALL;
-    }
-
-    <span class="hljs-keyword">if</span> (block_number &gt; <span class="hljs-number">0</span>) {</pre></div></div>
+            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">uint64_t</span> dao_capacity = <span class="hljs-number">0</span>;
+      ret = calculate_dao_input_capacity(index, block_number, occupied_capacity,
+                                         capacity, &amp;dao_capacity);
+      <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+        <span class="hljs-keyword">return</span> ret;
+      }</pre></div></div>
             
         </li>
         
@@ -905,16 +960,17 @@ denoting the original deposited block number.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-34">&#182;</a>
               </div>
-              <p>For a withdrawing cell, we can start calculate the maximum capacity
-that one can withdraw from it.</p>
+              <p>Like any serious smart contracts, we will perform overflow checks here.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">uint64_t</span> dao_capacity = <span class="hljs-number">0</span>;
-      ret = calculate_dao_input_capacity(index, block_number, capacity,
-                                          &amp;dao_capacity);
-      <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
-        <span class="hljs-keyword">return</span> ret;
+            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">if</span> (__builtin_uaddl_overflow(*input_capacities, dao_capacity,
+                                   input_capacities)) {
+        <span class="hljs-keyword">return</span> ERROR_OVERFLOW;
+      }
+    } <span class="hljs-keyword">else</span> {
+      <span class="hljs-keyword">if</span> (len != <span class="hljs-number">8</span>) {
+        <span class="hljs-keyword">return</span> ERROR_SYSCALL;
       }</pre></div></div>
             
         </li>
@@ -925,25 +981,6 @@ that one can withdraw from it.</p>
               
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-35">&#182;</a>
-              </div>
-              <p>Like any serious smart contracts, we will perform overflow checks here.</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">if</span> (__builtin_uaddl_overflow(*input_capacities, dao_capacity,
-                                    input_capacities)) {
-        <span class="hljs-keyword">return</span> ERROR_OVERFLOW;
-      }
-    } <span class="hljs-keyword">else</span> {</pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-36">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-36">&#182;</a>
               </div>
               <p>For a deposited cell, we only need to check that a withdrawing cell for
 current one is generated. For simplicity, we are limiting the code so
@@ -961,11 +998,11 @@ withdrawing cell, this would work fine here.</p>
         </li>
         
         
-        <li id="section-37">
+        <li id="section-36">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-37">&#182;</a>
+                <a class="pilcrow" href="#section-36">&#182;</a>
               </div>
               <p>Note that <code>validate_withdrawing_cell</code> above already verifies that an
 output cell for the current input cell at the same location exists.</p>
@@ -973,6 +1010,46 @@ output cell for the current input cell at the same location exists.</p>
             </div>
             
             <div class="content"><div class='highlight'><pre>      *output_withdrawing = <span class="hljs-number">1</span>;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-37">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-37">&#182;</a>
+              </div>
+              <p>Like any serious smart contracts, we will perform overflow checks here.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">if</span> (__builtin_uaddl_overflow(*input_capacities, capacity,
+                                   input_capacities)) {
+        <span class="hljs-keyword">return</span> ERROR_OVERFLOW;
+      }
+    }
+  }
+
+  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">int</span> <span class="hljs-title">validate_output</span><span class="hljs-params">(<span class="hljs-keyword">size_t</span> index, <span class="hljs-keyword">uint64_t</span> *output_capacities,
+                           <span class="hljs-keyword">uint64_t</span> output_withdrawing,
+                           <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> *script_hash)</span> </span>{
+  <span class="hljs-keyword">uint64_t</span> capacity = <span class="hljs-number">0</span>;
+  <span class="hljs-keyword">uint64_t</span> len = <span class="hljs-number">8</span>;
+  <span class="hljs-keyword">int</span> ret = ckb_load_cell_by_field(((<span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> *)&amp;capacity), &amp;len, <span class="hljs-number">0</span>, index,
+                                   CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_CAPACITY);
+  <span class="hljs-keyword">if</span> (ret == CKB_INDEX_OUT_OF_BOUND) {
+    <span class="hljs-keyword">return</span> ERROR_MARKER_EXHAUSTED;
+  }
+  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+    <span class="hljs-keyword">return</span> ret;
+  }
+  <span class="hljs-keyword">if</span> (len != <span class="hljs-number">8</span>) {
+    <span class="hljs-keyword">return</span> ERROR_SYSCALL;
+  }</pre></div></div>
             
         </li>
         
@@ -987,32 +1064,17 @@ output cell for the current input cell at the same location exists.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">if</span> (__builtin_uaddl_overflow(*input_capacities, capacity,
-                                    input_capacities)) {
-        <span class="hljs-keyword">return</span> ERROR_OVERFLOW;
-      }
-    }
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">if</span> (__builtin_uaddl_overflow(*output_capacities, capacity,
+                               output_capacities)) {
+    <span class="hljs-keyword">return</span> ERROR_OVERFLOW;
   }
 
-  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
-}
-
-<span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">int</span> <span class="hljs-title">validate_output</span><span class="hljs-params">(<span class="hljs-keyword">size_t</span> index, <span class="hljs-keyword">uint64_t</span> *output_capacities, 
-                          <span class="hljs-keyword">uint64_t</span> output_withdrawing,
-                          <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> *script_hash)</span> </span>{
-  <span class="hljs-keyword">uint64_t</span> capacity = <span class="hljs-number">0</span>;
-  <span class="hljs-keyword">uint64_t</span> len = <span class="hljs-number">8</span>;
-  <span class="hljs-keyword">int</span> ret = ckb_load_cell_by_field(((<span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> *)&amp;capacity), &amp;len, <span class="hljs-number">0</span>, index,
-                                CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_CAPACITY);
-  <span class="hljs-keyword">if</span> (ret == CKB_INDEX_OUT_OF_BOUND) {
-    <span class="hljs-keyword">return</span> ERROR_MARKER_EXHAUSTED;
-  }
-  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
-    <span class="hljs-keyword">return</span> ret;
-  }
-  <span class="hljs-keyword">if</span> (len != <span class="hljs-number">8</span>) {
-    <span class="hljs-keyword">return</span> ERROR_SYSCALL;
-  }</pre></div></div>
+  <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> current_script_hash[HASH_SIZE];
+  len = HASH_SIZE;
+  ret = ckb_load_cell_by_field(current_script_hash, &amp;len, <span class="hljs-number">0</span>, index,
+                               CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH);
+  <span class="hljs-keyword">if</span> ((ret == CKB_SUCCESS) &amp;&amp; len == HASH_SIZE &amp;&amp;
+      (<span class="hljs-built_in">memcmp</span>(script_hash, current_script_hash, HASH_SIZE) == <span class="hljs-number">0</span>)) {</pre></div></div>
             
         </li>
         
@@ -1022,31 +1084,6 @@ output cell for the current input cell at the same location exists.</p>
               
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-39">&#182;</a>
-              </div>
-              <p>Like any serious smart contracts, we will perform overflow checks here.</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">if</span> (__builtin_uaddl_overflow(*output_capacities, capacity,
-                                output_capacities)) {
-    <span class="hljs-keyword">return</span> ERROR_OVERFLOW;
-  }
-
-  <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> current_script_hash[HASH_SIZE];
-  len = HASH_SIZE;
-  ret = ckb_load_cell_by_field(current_script_hash, &amp;len, <span class="hljs-number">0</span>, index,
-                                CKB_SOURCE_OUTPUT, CKB_CELL_FIELD_TYPE_HASH);
-  <span class="hljs-keyword">if</span> ((ret == CKB_SUCCESS) &amp;&amp; len == HASH_SIZE &amp;&amp;
-      (<span class="hljs-built_in">memcmp</span>(script_hash, current_script_hash, HASH_SIZE) == <span class="hljs-number">0</span>)) {</pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-40">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-40">&#182;</a>
               </div>
               <p>Similarly to input, we also need to check if we are creating a
 deposited cell, or a withdrawing cell here. This can be easily determined
@@ -1064,7 +1101,7 @@ contains 8 bytes of data filled with 0.</p>
       <span class="hljs-keyword">uint64_t</span> block_number = <span class="hljs-number">0</span>;
       len = <span class="hljs-number">8</span>;
       ret = ckb_load_cell_data((<span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> *)&amp;block_number, &amp;len, <span class="hljs-number">0</span>, index,
-                                CKB_SOURCE_OUTPUT);
+                               CKB_SOURCE_OUTPUT);
       <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
         <span class="hljs-keyword">return</span> ret;
       }
@@ -1079,7 +1116,6 @@ contains 8 bytes of data filled with 0.</p>
   <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
 }
 
-
 <span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span> </span>{
   <span class="hljs-keyword">int</span> ret;
   <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> script_hash[HASH_SIZE];
@@ -1092,15 +1128,15 @@ contains 8 bytes of data filled with 0.</p>
         </li>
         
         
-        <li id="section-41">
+        <li id="section-40">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-41">&#182;</a>
+                <a class="pilcrow" href="#section-40">&#182;</a>
               </div>
-              <p>NervosDAO script requires script args part to be empty, this way we can ensure
-that all DAO related scripts in a transaction is mapped to the same group, and
-processed together in one execution.</p>
+              <p>NervosDAO script requires script args part to be empty, this way we can
+ensure that all DAO related scripts in a transaction is mapped to the same
+group, and processed together in one execution.</p>
 
             </div>
             
@@ -1126,11 +1162,11 @@ processed together in one execution.</p>
         </li>
         
         
-        <li id="section-42">
+        <li id="section-41">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-42">&#182;</a>
+                <a class="pilcrow" href="#section-41">&#182;</a>
               </div>
               <p>Load current script hash. Unlike a lock script which only cares for cells
 using its own lock script. The NervosDAO script here will need to loop
@@ -1152,11 +1188,11 @@ type script.</p>
         </li>
         
         
-        <li id="section-43">
+        <li id="section-42">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-43">&#182;</a>
+                <a class="pilcrow" href="#section-42">&#182;</a>
               </div>
               <p>First, we will need to loop against all input cells in current transaction.
 For a normal transaction, we will just add up its own capacity. For a
@@ -1170,11 +1206,11 @@ containing the <em>true</em> capacities of all the input cells here.</p>
         </li>
         
         
-        <li id="section-44">
+        <li id="section-43">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-44">&#182;</a>
+                <a class="pilcrow" href="#section-43">&#182;</a>
               </div>
               <p>Also let’s loop through all output cells, and calculate the sum of output
 capacities here.</p>
@@ -1194,33 +1230,35 @@ capacities here.</p>
         </li>
         
         
-        <li id="section-45">
+        <li id="section-44">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-45">&#182;</a>
+                <a class="pilcrow" href="#section-44">&#182;</a>
               </div>
-              <p>Reset the flag to ensure that it does not retain the value from the last iteration when
-inputs have been exhausted.</p>
+              <p>Reset the flag to ensure that it does not retain the value from the last
+iteration when inputs have been exhausted.</p>
 
             </div>
             
             <div class="content"><div class='highlight'><pre>    output_withdrawing = <span class="hljs-number">0</span>;
 
     <span class="hljs-keyword">if</span> (!input_exhausted) {
-      ret = validate_input(index, &amp;input_capacities, &amp;output_withdrawing, script_hash);
+      ret = validate_input(index, &amp;input_capacities, &amp;output_withdrawing,
+                           script_hash);
       <span class="hljs-keyword">if</span> (ret == ERROR_MARKER_EXHAUSTED) {
         input_exhausted = <span class="hljs-number">1</span>;
-      } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS ){
+      } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
         <span class="hljs-keyword">return</span> ret;
       }
     }
 
     <span class="hljs-keyword">if</span> (!output_exhausted) {
-      ret = validate_output(index, &amp;output_capacities, output_withdrawing, script_hash);
+      ret = validate_output(index, &amp;output_capacities, output_withdrawing,
+                            script_hash);
       <span class="hljs-keyword">if</span> (ret == ERROR_MARKER_EXHAUSTED) {
         output_exhausted = <span class="hljs-number">1</span>;
-      } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS ){
+      } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
         <span class="hljs-keyword">return</span> ret;
       }
     }
@@ -1231,15 +1269,15 @@ inputs have been exhausted.</p>
         </li>
         
         
-        <li id="section-46">
+        <li id="section-45">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-46">&#182;</a>
+                <a class="pilcrow" href="#section-45">&#182;</a>
               </div>
-              <p>The final thing we need to check here, is that the sum of capacities in output
-cells, cannot exceed the sum of capacities in all input cells with Nervos DAO
-issuance considered.</p>
+              <p>The final thing we need to check here, is that the sum of capacities in
+output cells, cannot exceed the sum of capacities in all input cells with
+Nervos DAO issuance considered.</p>
 
             </div>
             
