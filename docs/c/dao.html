@@ -125,7 +125,10 @@ when all cells have been processed, we will need a different marker here.</p>
 
 <span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> CWHR_DEBUG(...)</span>
 <span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> CWHR_ERROR_CODE -22</span>
-<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&quot;witness_args_handwritten_reader.h&quot;</span></span></pre></div></div>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&quot;witness_args_handwritten_reader.h&quot;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> HASH_SIZE 32</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> HEADER_SIZE 4096</span></pre></div></div>
             
         </li>
         
@@ -136,17 +139,13 @@ when all cells have been processed, we will need a different marker here.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-5">&#182;</a>
               </div>
-              <p>Common definitions here, one important limitation, is that this script only
-works with scripts and witnesses that are no larger than 32KB. We believe
-this should be enough for most cases.</p>
+              <p>Note witness will be loaded via a reader that supports arbitrary length. The
+32KB size here is merely the temporary buffer used to hold part of witness, it
+does not necessary limit the total witness size to 32KB.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> HASH_SIZE 32</span>
-<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> HEADER_SIZE 4096</span>
-<span class="hljs-comment">/* 32 KB */</span>
-<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> MAX_WITNESS_SIZE 32768</span>
-<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> SCRIPT_SIZE 32768</span></pre></div></div>
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> WITNESS_BUF_SIZE 32768</span></pre></div></div>
             
         </li>
         
@@ -157,11 +156,13 @@ this should be enough for most cases.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-6">&#182;</a>
               </div>
-              <p>One lock period of NervosDAO is set as 180 epochs, which is roughly 30 days.</p>
+              <p>The only script that will be loaded by Nervos DAO contract, is Nervos DAO type
+script itself. This type script has empty args, which means the type script will
+never exceed 32K. We are safe keeping this value here.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> LOCK_PERIOD_EPOCHS 180</span></pre></div></div>
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> SCRIPT_SIZE 32768</span></pre></div></div>
             
         </li>
         
@@ -171,6 +172,21 @@ this should be enough for most cases.</p>
               
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <p>One lock period of NervosDAO is set as 180 epochs, which is roughly 30 days.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> LOCK_PERIOD_EPOCHS 180</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-8">&#182;</a>
               </div>
               <p>Common definitions to parse epoch value in block headers.</p>
 
@@ -189,11 +205,11 @@ this should be enough for most cases.</p>
         </li>
         
         
-        <li id="section-8">
+        <li id="section-9">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-8">&#182;</a>
+                <a class="pilcrow" href="#section-9">&#182;</a>
               </div>
               <p>Fetches deposit header index. The index is kept in the witness of the same
 index as the input cell. The witness is first treated as a WitnessArgs object
@@ -204,12 +220,12 @@ WitnessArgs. The value is kept as a 64-bit unsigned little endian value.</p>
             
             <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">int</span> <span class="hljs-title">extract_deposit_header_index</span><span class="hljs-params">(<span class="hljs-keyword">size_t</span> input_index, <span class="hljs-keyword">size_t</span> *index)</span> </span>{
   <span class="hljs-keyword">int</span> ret;
-  <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> witness[MAX_WITNESS_SIZE];
+  <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> witness[WITNESS_BUF_SIZE];
 
   <span class="hljs-keyword">cwhr_cursor_t</span> cursor;
   ret = cwhr_cursor_initialize(
       &amp;cursor, cwhr_witness_loader_create(input_index, CKB_SOURCE_INPUT),
-      witness, MAX_WITNESS_SIZE);
+      witness, WITNESS_BUF_SIZE);
   <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
     <span class="hljs-keyword">return</span> ret;
   }
@@ -243,11 +259,11 @@ WitnessArgs. The value is kept as a 64-bit unsigned little endian value.</p>
         </li>
         
         
-        <li id="section-9">
+        <li id="section-10">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-9">&#182;</a>
+                <a class="pilcrow" href="#section-10">&#182;</a>
               </div>
               <p>Parses epoch info from the epoch field in block header.</p>
 
@@ -278,11 +294,11 @@ WitnessArgs. The value is kept as a 64-bit unsigned little endian value.</p>
         </li>
         
         
-        <li id="section-10">
+        <li id="section-11">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-10">&#182;</a>
+                <a class="pilcrow" href="#section-11">&#182;</a>
               </div>
               <p>All that information that will be needed from a block header by the NervosDAO
 script.</p>
@@ -300,11 +316,11 @@ script.</p>
         </li>
         
         
-        <li id="section-11">
+        <li id="section-12">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-11">&#182;</a>
+                <a class="pilcrow" href="#section-12">&#182;</a>
               </div>
               <p>Load a block header and extract all the useful data.</p>
 
@@ -325,11 +341,11 @@ script.</p>
         </li>
         
         
-        <li id="section-12">
+        <li id="section-13">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-12">&#182;</a>
+                <a class="pilcrow" href="#section-13">&#182;</a>
               </div>
               <p>The header is also serialized in molecule format.</p>
 
@@ -358,11 +374,11 @@ script.</p>
         </li>
         
         
-        <li id="section-13">
+        <li id="section-14">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-13">&#182;</a>
+                <a class="pilcrow" href="#section-14">&#182;</a>
               </div>
               <p>Validates an input cell is indeed deposited to NervosDAO in
 <code>deposited_block_number</code>, then calculates the capacity one can withdraw from
@@ -397,11 +413,11 @@ calculate deposit period.</p>
         </li>
         
         
-        <li id="section-14">
+        <li id="section-15">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-14">&#182;</a>
+                <a class="pilcrow" href="#section-15">&#182;</a>
               </div>
               <p>deposited_block_number must match actual deposited block</p>
 
@@ -425,11 +441,11 @@ calculate deposit period.</p>
         </li>
         
         
-        <li id="section-15">
+        <li id="section-16">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-15">&#182;</a>
+                <a class="pilcrow" href="#section-16">&#182;</a>
               </div>
               <p>Withdraw header must be after deposit header.</p>
 
@@ -444,11 +460,11 @@ calculate deposit period.</p>
         </li>
         
         
-        <li id="section-16">
+        <li id="section-17">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-16">&#182;</a>
+                <a class="pilcrow" href="#section-17">&#182;</a>
               </div>
               <p>Full deposited epochs</p>
 
@@ -460,11 +476,11 @@ calculate deposit period.</p>
         </li>
         
         
-        <li id="section-17">
+        <li id="section-18">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-17">&#182;</a>
+                <a class="pilcrow" href="#section-18">&#182;</a>
               </div>
               <p>This is essentially a round-up operation. Suppose withdraw epoch is
 a + b / c, deposit epoch is d + e / f, the deposited epochs will be:</p>
@@ -489,11 +505,11 @@ anything for a round-up operation.</p>
         </li>
         
         
-        <li id="section-18">
+        <li id="section-19">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-18">&#182;</a>
+                <a class="pilcrow" href="#section-19">&#182;</a>
               </div>
               <p>Cell must at least be locked for one full lock period(180 epochs)</p>
 
@@ -506,11 +522,11 @@ anything for a round-up operation.</p>
         </li>
         
         
-        <li id="section-19">
+        <li id="section-20">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-19">&#182;</a>
+                <a class="pilcrow" href="#section-20">&#182;</a>
               </div>
               <p>Since actually just stores an epoch integer with a fraction part, it is
 not necessary a valid epoch number with fraction.</p>
@@ -524,11 +540,11 @@ not necessary a valid epoch number with fraction.</p>
         </li>
         
         
-        <li id="section-20">
+        <li id="section-21">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-20">&#182;</a>
+                <a class="pilcrow" href="#section-21">&#182;</a>
               </div>
               <p>Loads since value from current input to make sure correct lock period is
 set.</p>
@@ -550,11 +566,11 @@ set.</p>
         </li>
         
         
-        <li id="section-21">
+        <li id="section-22">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-21">&#182;</a>
+                <a class="pilcrow" href="#section-22">&#182;</a>
               </div>
               <p>NervosDAO requires DAO input field to have a since value represented
 via absolute epoch number.</p>
@@ -576,11 +592,11 @@ via absolute epoch number.</p>
         </li>
         
         
-        <li id="section-22">
+        <li id="section-23">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-22">&#182;</a>
+                <a class="pilcrow" href="#section-23">&#182;</a>
               </div>
               <p>Validates that correct since value is set to ensure 180 epochs lock period.</p>
 
@@ -599,11 +615,11 @@ via absolute epoch number.</p>
         </li>
         
         
-        <li id="section-23">
+        <li id="section-24">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-23">&#182;</a>
+                <a class="pilcrow" href="#section-24">&#182;</a>
               </div>
               <p>Now we can calculate the maximum amount one can withdraw from this cell.
 Please refer to Nervos DAO RFC for more details on the formula used here.</p>
@@ -616,11 +632,11 @@ Please refer to Nervos DAO RFC for more details on the formula used here.</p>
         </li>
         
         
-        <li id="section-24">
+        <li id="section-25">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-24">&#182;</a>
+                <a class="pilcrow" href="#section-25">&#182;</a>
               </div>
               <p>Like any serious smart contracts, we will perform overflow checks here.</p>
 
@@ -650,11 +666,11 @@ Please refer to Nervos DAO RFC for more details on the formula used here.</p>
         </li>
         
         
-        <li id="section-25">
+        <li id="section-26">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-25">&#182;</a>
+                <a class="pilcrow" href="#section-26">&#182;</a>
               </div>
               <p>In the phase 1 of NervosDAO script, we will consume a deposited cell, and
 create a withdrawing cell. The withdrawing cell must be put in the same index
@@ -681,11 +697,11 @@ validate the lock script cannot be tampered.</p>
         </li>
         
         
-        <li id="section-26">
+        <li id="section-27">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-26">&#182;</a>
+                <a class="pilcrow" href="#section-27">&#182;</a>
               </div>
               <p>Check type script</p>
 
@@ -707,11 +723,11 @@ validate the lock script cannot be tampered.</p>
         </li>
         
         
-        <li id="section-27">
+        <li id="section-28">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-27">&#182;</a>
+                <a class="pilcrow" href="#section-28">&#182;</a>
               </div>
               <p>Check capacity</p>
 
@@ -735,11 +751,11 @@ validate the lock script cannot be tampered.</p>
         </li>
         
         
-        <li id="section-28">
+        <li id="section-29">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-28">&#182;</a>
+                <a class="pilcrow" href="#section-29">&#182;</a>
               </div>
               <p>Check cell data</p>
 
@@ -821,11 +837,11 @@ validate the lock script cannot be tampered.</p>
         </li>
         
         
-        <li id="section-29">
+        <li id="section-30">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-29">&#182;</a>
+                <a class="pilcrow" href="#section-30">&#182;</a>
               </div>
               <p>When an input cell has the same type script hash as current running
 we know we are dealing with a script using NervosDAO script.</p>
@@ -845,11 +861,11 @@ we know we are dealing with a script using NervosDAO script.</p>
         </li>
         
         
-        <li id="section-30">
+        <li id="section-31">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-30">&#182;</a>
+                <a class="pilcrow" href="#section-31">&#182;</a>
               </div>
               <p>Normal input, use its own capacity</p>
 
@@ -873,11 +889,11 @@ we know we are dealing with a script using NervosDAO script.</p>
         </li>
         
         
-        <li id="section-31">
+        <li id="section-32">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-31">&#182;</a>
+                <a class="pilcrow" href="#section-32">&#182;</a>
               </div>
               <p>In a Nervos DAO transaction, we might have 2 types of input cells using
 Nervos DAO type script:</p>
@@ -917,11 +933,11 @@ positive number denoting the original deposited block number.</p>
         </li>
         
         
-        <li id="section-32">
+        <li id="section-33">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-32">&#182;</a>
+                <a class="pilcrow" href="#section-33">&#182;</a>
               </div>
               <p>For a withdrawing cell, we can start calculate the maximum capacity
 that one can withdraw from it.</p>
@@ -938,11 +954,11 @@ that one can withdraw from it.</p>
         </li>
         
         
-        <li id="section-33">
+        <li id="section-34">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-33">&#182;</a>
+                <a class="pilcrow" href="#section-34">&#182;</a>
               </div>
               <p>Like any serious smart contracts, we will perform overflow checks here.</p>
 
@@ -960,11 +976,11 @@ that one can withdraw from it.</p>
         </li>
         
         
-        <li id="section-34">
+        <li id="section-35">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-34">&#182;</a>
+                <a class="pilcrow" href="#section-35">&#182;</a>
               </div>
               <p>For a deposited cell, we only need to check that a withdrawing cell for
 current one is generated. For simplicity, we are limiting the code so
@@ -982,11 +998,11 @@ withdrawing cell, this would work fine here.</p>
         </li>
         
         
-        <li id="section-35">
+        <li id="section-36">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-35">&#182;</a>
+                <a class="pilcrow" href="#section-36">&#182;</a>
               </div>
               <p>Note that <code>validate_withdrawing_cell</code> above already verifies that an
 output cell for the current input cell at the same location exists.</p>
@@ -998,11 +1014,11 @@ output cell for the current input cell at the same location exists.</p>
         </li>
         
         
-        <li id="section-36">
+        <li id="section-37">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-36">&#182;</a>
+                <a class="pilcrow" href="#section-37">&#182;</a>
               </div>
               <p>Like any serious smart contracts, we will perform overflow checks here.</p>
 
@@ -1038,11 +1054,11 @@ output cell for the current input cell at the same location exists.</p>
         </li>
         
         
-        <li id="section-37">
+        <li id="section-38">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-37">&#182;</a>
+                <a class="pilcrow" href="#section-38">&#182;</a>
               </div>
               <p>Like any serious smart contracts, we will perform overflow checks here.</p>
 
@@ -1063,11 +1079,11 @@ output cell for the current input cell at the same location exists.</p>
         </li>
         
         
-        <li id="section-38">
+        <li id="section-39">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-38">&#182;</a>
+                <a class="pilcrow" href="#section-39">&#182;</a>
               </div>
               <p>Similarly to input, we also need to check if we are creating a
 deposited cell, or a withdrawing cell here. This can be easily determined
@@ -1112,11 +1128,11 @@ contains 8 bytes of data filled with 0.</p>
         </li>
         
         
-        <li id="section-39">
+        <li id="section-40">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-39">&#182;</a>
+                <a class="pilcrow" href="#section-40">&#182;</a>
               </div>
               <p>NervosDAO script requires script args part to be empty, this way we can
 ensure that all DAO related scripts in a transaction is mapped to the same
@@ -1146,11 +1162,11 @@ group, and processed together in one execution.</p>
         </li>
         
         
-        <li id="section-40">
+        <li id="section-41">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-40">&#182;</a>
+                <a class="pilcrow" href="#section-41">&#182;</a>
               </div>
               <p>Load current script hash. Unlike a lock script which only cares for cells
 using its own lock script. The NervosDAO script here will need to loop
@@ -1172,11 +1188,11 @@ type script.</p>
         </li>
         
         
-        <li id="section-41">
+        <li id="section-42">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-41">&#182;</a>
+                <a class="pilcrow" href="#section-42">&#182;</a>
               </div>
               <p>First, we will need to loop against all input cells in current transaction.
 For a normal transaction, we will just add up its own capacity. For a
@@ -1190,11 +1206,11 @@ containing the <em>true</em> capacities of all the input cells here.</p>
         </li>
         
         
-        <li id="section-42">
+        <li id="section-43">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-42">&#182;</a>
+                <a class="pilcrow" href="#section-43">&#182;</a>
               </div>
               <p>Also let’s loop through all output cells, and calculate the sum of output
 capacities here.</p>
@@ -1214,11 +1230,11 @@ capacities here.</p>
         </li>
         
         
-        <li id="section-43">
+        <li id="section-44">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-43">&#182;</a>
+                <a class="pilcrow" href="#section-44">&#182;</a>
               </div>
               <p>Reset the flag to ensure that it does not retain the value from the last
 iteration when inputs have been exhausted.</p>
@@ -1253,11 +1269,11 @@ iteration when inputs have been exhausted.</p>
         </li>
         
         
-        <li id="section-44">
+        <li id="section-45">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-44">&#182;</a>
+                <a class="pilcrow" href="#section-45">&#182;</a>
               </div>
               <p>The final thing we need to check here, is that the sum of capacities in
 output cells, cannot exceed the sum of capacities in all input cells with

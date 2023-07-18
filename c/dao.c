@@ -38,13 +38,15 @@
 #define CWHR_ERROR_CODE -22
 #include "witness_args_handwritten_reader.h"
 
-// Common definitions here, one important limitation, is that this script only
-// works with scripts and witnesses that are no larger than 32KB. We believe
-// this should be enough for most cases.
 #define HASH_SIZE 32
 #define HEADER_SIZE 4096
-/* 32 KB */
-#define MAX_WITNESS_SIZE 32768
+// Note witness will be loaded via a reader that supports arbitrary length. The
+// 32KB size here is merely the temporary buffer used to hold part of witness, it
+// does not necessary limit the total witness size to 32KB.
+#define WITNESS_BUF_SIZE 32768
+// The only script that will be loaded by Nervos DAO contract, is Nervos DAO type
+// script itself. This type script has empty args, which means the type script will
+// never exceed 32K. We are safe keeping this value here.
 #define SCRIPT_SIZE 32768
 
 // One lock period of NervosDAO is set as 180 epochs, which is roughly 30 days.
@@ -67,12 +69,12 @@
 // WitnessArgs. The value is kept as a 64-bit unsigned little endian value.
 static int extract_deposit_header_index(size_t input_index, size_t *index) {
   int ret;
-  unsigned char witness[MAX_WITNESS_SIZE];
+  unsigned char witness[WITNESS_BUF_SIZE];
 
   cwhr_cursor_t cursor;
   ret = cwhr_cursor_initialize(
       &cursor, cwhr_witness_loader_create(input_index, CKB_SOURCE_INPUT),
-      witness, MAX_WITNESS_SIZE);
+      witness, WITNESS_BUF_SIZE);
   if (ret != CKB_SUCCESS) {
     return ret;
   }
