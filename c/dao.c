@@ -8,6 +8,7 @@
 // transaction structure, then parse WitnessArgs data structure in molecule format.
 #include "ckb_syscalls.h"
 #include "protocol.h"
+#include "big_num.c"
 
 // Error definitions
 #define ERROR_UNKNOWN -1

@@ -27,7 +27,7 @@ fn gen_lock_script(lock_args: Bytes) -> Script {
     Script::new_builder()
         .args(lock_args.pack())
         .code_hash(sighash_all_cell_data_hash)
-        .hash_type(ScriptHashType::Data.into())
+        .hash_type(ScriptHashType::Data1.into())
         .build()
 }
 
@@ -410,7 +410,7 @@ fn test_super_long_witness() {
 fn test_sighash_all_2_in_2_out_cycles() {
     // Notice this is changed due to the fact that the old tests uses
     // a different definition of WitnessArgs, hence triggering the differences.
-    const CONSUME_CYCLES: u64 = 3426207;
+    const CONSUME_CYCLES: u64 = 3033463;
 
     let mut data_loader = DummyDataLoader::new();
     let mut generator = Generator::non_crypto_safe_prng(42);

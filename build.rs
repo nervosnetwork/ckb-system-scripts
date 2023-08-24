@@ -13,22 +13,22 @@ const BUF_SIZE: usize = 8 * 1024;
 const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 
 const BINARIES: &[(&str, &str)] = &[
-    (
-        "secp256k1_blake160_sighash_all",
-        "709f3fda12f561cfacf92273c57a98fede188a3f1a59b1f888d113f9cce08649",
-    ),
-    (
-        "secp256k1_data",
-        "9799bee251b975b82c45a02154ce28cec89c5853ecc14d12b7b8cccfc19e0af4",
-    ),
-    (
-        "dao",
-        "2f7e76d1a866f7a064e251bf4f2b212a28b532dd6df19a87011784bdbe69726b",
-    ),
-    (
-        "secp256k1_blake160_multisig_all",
-        "43400de165f0821abf63dcac299bbdf7fd73898675ee4ddb099b0a0d8db63bfb",
-    ),
+    // (
+    //     "secp256k1_blake160_sighash_all",
+    //     "709f3fda12f561cfacf92273c57a98fede188a3f1a59b1f888d113f9cce08649",
+    // ),
+    // (
+    //     "secp256k1_data",
+    //     "9799bee251b975b82c45a02154ce28cec89c5853ecc14d12b7b8cccfc19e0af4",
+    // ),
+    // (
+    //     "dao",
+    //     "2f7e76d1a866f7a064e251bf4f2b212a28b532dd6df19a87011784bdbe69726b",
+    // ),
+    // (
+    //     "secp256k1_blake160_multisig_all",
+    //     "43400de165f0821abf63dcac299bbdf7fd73898675ee4ddb099b0a0d8db63bfb",
+    // ),
 ];
 
 fn main() {

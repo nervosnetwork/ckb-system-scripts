@@ -73,7 +73,7 @@ fn gen_normal_cell(
     let lock = Script::new_builder()
         .args(lock_args.pack())
         .code_hash(secp_code_hash())
-        .hash_type(ScriptHashType::Data.into())
+        .hash_type(ScriptHashType::Data1.into())
         .build();
     let cell = CellOutput::new_builder()
         .capacity(capacity.pack())
@@ -96,12 +96,12 @@ fn gen_dao_cell(
     let lock = Script::new_builder()
         .args(lock_args.pack())
         .code_hash(secp_code_hash())
-        .hash_type(ScriptHashType::Data.into())
+        .hash_type(ScriptHashType::Data1.into())
         .build();
     let type_ = Script::new_builder()
         .args(Bytes::new().pack())
         .code_hash(dao_code_hash())
-        .hash_type(ScriptHashType::Data.into())
+        .hash_type(ScriptHashType::Data1.into())
         .build();
     let cell = CellOutput::new_builder()
         .capacity(capacity.pack())
@@ -602,7 +602,7 @@ fn test_dao_single_cell_with_dao_output_cell() {
         .build();
     let type_ = Script::new_builder()
         .code_hash(dao_code_hash())
-        .hash_type(ScriptHashType::Data.into())
+        .hash_type(ScriptHashType::Data1.into())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))
@@ -1794,7 +1794,7 @@ fn test_dao_all_dao_actions() {
         .build();
     let type_ = Script::new_builder()
         .code_hash(dao_code_hash())
-        .hash_type(ScriptHashType::Data.into())
+        .hash_type(ScriptHashType::Data1.into())
         .build();
     let builder = TransactionBuilder::default()
         .input(CellInput::new(previous_out_point, 0x2003e8022a0002f3))

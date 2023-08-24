@@ -1,10 +1,13 @@
-TARGET := riscv64-unknown-linux-gnu
-CC := $(TARGET)-gcc
-LD := $(TARGET)-gcc
-OBJCOPY := $(TARGET)-objcopy
+CC := clang-16
+LD := ld.lld-16
+OBJCOPY := llvm-objcopy-16
+AR := llvm-ar-16
 
-CFLAGS := -fPIC -O3 -fno-builtin-printf -fno-builtin-memcmp -nostdinc -nostdlib -nostartfiles -fvisibility=hidden -fdata-sections -ffunction-sections -Wall -Werror -Wno-nonnull -Wno-nonnull-compare -Wno-unused-function -Wno-dangling-pointer -g -I deps/molecule -I deps/secp256k1/src -I deps/secp256k1 -I c -I build -I deps/ckb-c-stdlib -I deps/ckb-c-stdlib/libc -Wno-array-bounds -Wno-stringop-overflow
-LDFLAGS := -Wl,-static -fdata-sections -ffunction-sections -Wl,--gc-sections
+# LD_SCRIPT := -T c/ld_interface.ld
+
+CFLAGS := --target=riscv64 -march=rv64imc_zba_zbb_zbc_zbs -O3 -fno-builtin-printf -fno-builtin-memcmp -nostdinc -nostdlib -fvisibility=hidden -fdata-sections -ffunction-sections -I deps/molecule -I deps/secp256k1/src -I deps/secp256k1 -I c -I build -I deps/ckb-c-stdlib -I deps/ckb-c-stdlib/libc
+LDFLAGS := -Wl,--gc-sections
+
 SECP256K1_SRC := deps/secp256k1/src/ecmult_static_pre_context.h
 MOLC := moleculec
 MOLC_VERSION := 0.4.1
@@ -13,26 +16,23 @@ PROTOCOL_SCHEMA := c/blockchain.mol
 PROTOCOL_VERSION := d75e4c56ffa40e17fd2fe477da3f98c5578edcd1
 PROTOCOL_URL := https://raw.githubusercontent.com/nervosnetwork/ckb/${PROTOCOL_VERSION}/util/types/schemas/blockchain.mol
 
-# docker pull nervos/ckb-riscv-gnu-toolchain:gnu-jammy-20230214
-BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:d3f649ef8079395eb25a21ceaeb15674f47eaa2d8cc23adc8bcdae3d5abce6ec
-
 all: specs/cells/secp256k1_blake160_sighash_all specs/cells/dao specs/cells/secp256k1_blake160_multisig_all
 
-all-via-docker: ${PROTOCOL_HEADER}
-	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
-
 specs/cells/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c ${PROTOCOL_HEADER} c/common.h c/utils.h build/secp256k1_data_info.h $(SECP256K1_SRC)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -fPIE -c -o $@.o $<
+	$(LD) $(LD_SCRIPT) --gc-sections -o $@ $@.o
 	$(OBJCOPY) --only-keep-debug $@ $(subst specs/cells,build,$@.debug)
 	$(OBJCOPY) --strip-debug --strip-all $@
 
 specs/cells/secp256k1_blake160_multisig_all: c/secp256k1_blake160_multisig_all.c ${PROTOCOL_HEADER} c/common.h c/utils.h build/secp256k1_data_info.h $(SECP256K1_SRC)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -fPIE -c -o $@.o $<
+	$(LD) $(LD_SCRIPT) --gc-sections -o $@ $@.o
 	$(OBJCOPY) --only-keep-debug $@ $(subst specs/cells,build,$@.debug)
 	$(OBJCOPY) --strip-debug --strip-all $@
 
 specs/cells/dao: c/dao.c ${PROTOCOL_HEADER}
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -fPIE -c -o $@.o $<
+	$(LD) $(LD_SCRIPT) --gc-sections -o $@ $@.o
 	$(OBJCOPY) --only-keep-debug $@ $(subst specs/cells,build,$@.debug)
 	$(OBJCOPY) --strip-debug --strip-all $@
 
@@ -41,12 +41,12 @@ build/secp256k1_data_info.h: build/dump_secp256k1_data
 
 build/dump_secp256k1_data: c/dump_secp256k1_data.c $(SECP256K1_SRC)
 	mkdir -p build
-	gcc -I deps/ckb-c-stdlib -I deps/secp256k1/src -I deps/secp256k1 -o $@ $<
+	$(CC) -I deps/ckb-c-stdlib -I deps/secp256k1/src -I deps/secp256k1 -o $@ $<
 
 $(SECP256K1_SRC):
 	cd deps/secp256k1 && \
 		./autogen.sh && \
-		CC=$(CC) LD=$(LD) ./configure --with-bignum=no --enable-ecmult-static-precomputation --enable-endomorphism --enable-module-recovery --host=$(TARGET) && \
+		./configure --with-bignum=no --enable-ecmult-static-precomputation --enable-endomorphism --enable-module-recovery --with-asm=no && \
 		make src/ecmult_static_pre_context.h src/ecmult_static_context.h
 
 generate-protocol: check-moleculec-version ${PROTOCOL_HEADER}

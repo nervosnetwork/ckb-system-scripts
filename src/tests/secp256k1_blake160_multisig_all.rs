@@ -694,7 +694,7 @@ fn gen_multi_sign_lock_script(lock_args: Bytes) -> Script {
     Script::new_builder()
         .args(lock_args.pack())
         .code_hash(dep_cell_data_hash)
-        .hash_type(ScriptHashType::Data.into())
+        .hash_type(ScriptHashType::Data1.into())
         .build()
 }
 
