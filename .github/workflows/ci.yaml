@@ -32,8 +32,10 @@ jobs:
           toolchain: 1.67.1
           override: true
           components: clippy
+      - name: Install llvm 16
+        run: sudo apt-get purge --auto-remove llvm python3-lldb-14 llvm-14 && wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 16
       - run: |
-          make all-via-docker
+          make -f Makefile.clang all
           cargo clippy --all --all-targets --all-features
   docco:
     name: Check / Docco
@@ -59,6 +61,8 @@ jobs:
           profile: minimal
           toolchain: 1.67.1
           override: true
+      - name: Install llvm 16
+        run: sudo apt-get purge --auto-remove llvm python3-lldb-14 llvm-14 && wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 16
       - run: |
-          make all-via-docker
+          make -f Makefile.clang all
           cargo test --all --verbose
