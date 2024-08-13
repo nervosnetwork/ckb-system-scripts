@@ -44,6 +44,7 @@ jobs:
         with:
           node-version: '16'
       - run: |
+          npm config set strict-ssl false
           npm ci --prefix .npm
           .npm/node_modules/docco/bin/docco c/secp256k1_blake160_sighash_all.c c/secp256k1_blake160_multisig_all.c c/dao.c
           git diff --exit-code
