@@ -1,5 +1,5 @@
 {
   "dependencies": {
-    "docco": "=0.8.0"
+    "docco": "=0.9.1"
   }
 }
