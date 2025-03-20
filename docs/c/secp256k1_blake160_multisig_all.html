@@ -271,8 +271,10 @@ or 28 bytes(containing blake160 hash and since value).</p>
             </div>
             
             <div class="content"><div class='highlight'><pre>  <span class="hljs-type">uint64_t</span> since = <span class="hljs-number">0</span>;
+  <span class="hljs-type">bool</span> has_since = <span class="hljs-literal">false</span>;
   <span class="hljs-keyword">if</span> (args_bytes_seg.size == BLAKE160_SIZE + <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">uint64_t</span>)) {
     since = *(<span class="hljs-type">uint64_t</span> *)&amp;args_bytes_seg.ptr[BLAKE160_SIZE];
+    has_since = <span class="hljs-literal">true</span>;
   }</pre></div></div>
             
         </li>
@@ -435,7 +437,9 @@ is not included here.</p>
 
   <span class="hljs-keyword">if</span> (<span class="hljs-built_in">memcmp</span>(args_bytes_seg.ptr, temp, BLAKE160_SIZE) != <span class="hljs-number">0</span>) {
     <span class="hljs-keyword">return</span> ERROR_MULTSIG_SCRIPT_HASH;
-  }</pre></div></div>
+  }
+
+  <span class="hljs-keyword">if</span> (has_since) {</pre></div></div>
             
         </li>
         
@@ -450,9 +454,10 @@ is not included here.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>  ret = check_since(since);
-  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
-    <span class="hljs-keyword">return</span> ret;
+            <div class="content"><div class='highlight'><pre>    ret = check_since(since);
+    <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+      <span class="hljs-keyword">return</span> ret;
+    }
   }</pre></div></div>
             
         </li>
