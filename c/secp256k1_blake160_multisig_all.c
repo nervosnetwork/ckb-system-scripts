@@ -114,11 +114,13 @@ int main() {
     return ERROR_ARGUMENTS_LEN;
   }
   // Extract optional since value.
-  uint64_t since = 0;
-  bool has_since = false;
   if (args_bytes_seg.size == BLAKE160_SIZE + sizeof(uint64_t)) {
-    since = *(uint64_t *)&args_bytes_seg.ptr[BLAKE160_SIZE];
-    has_since = true;
+    uint64_t since = *(uint64_t *)&args_bytes_seg.ptr[BLAKE160_SIZE];
+    // Check lock period logic, we have prepared a handy utility function for this.
+    ret = check_since(since);
+    if (ret != CKB_SUCCESS) {
+      return ret;
+    }
   }
 
   // Load the first witness, or the witness of the same index as the first input using
@@ -195,14 +197,6 @@ int main() {
 
   if (memcmp(args_bytes_seg.ptr, temp, BLAKE160_SIZE) != 0) {
     return ERROR_MULTSIG_SCRIPT_HASH;
-  }
-
-  if (has_since) {
-    // Check lock period logic, we have prepared a handy utility function for this.
-    ret = check_since(since);
-    if (ret != CKB_SUCCESS) {
-      return ret;
-    }
   }
 
   // Load the current transaction hash.
