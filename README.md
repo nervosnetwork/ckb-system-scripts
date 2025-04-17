@@ -15,6 +15,10 @@ make all-via-docker
 cargo test --all
 ```
 
+## Docs
+
+The codebase is well-documented, with detailed comments throughout the source files. Additionally, there are HTML files generated from the code comments in the [docs/](docs/) directory, you can clone the repo and open them locally or use a service like [htmlpreview](https://htmlpreview.github.io/).
+
 ## Release
 
 Tag and publish the release. GitHub Actions will publish the crate.
