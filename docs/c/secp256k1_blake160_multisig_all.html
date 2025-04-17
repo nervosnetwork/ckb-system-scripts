@@ -270,10 +270,8 @@ or 28 bytes(containing blake160 hash and since value).</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>  <span class="hljs-type">uint64_t</span> since = <span class="hljs-number">0</span>;
-  <span class="hljs-keyword">if</span> (args_bytes_seg.size == BLAKE160_SIZE + <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">uint64_t</span>)) {
-    since = *(<span class="hljs-type">uint64_t</span> *)&amp;args_bytes_seg.ptr[BLAKE160_SIZE];
-  }</pre></div></div>
+            <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">if</span> (args_bytes_seg.size == BLAKE160_SIZE + <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">uint64_t</span>)) {
+    <span class="hljs-type">uint64_t</span> since = *(<span class="hljs-type">uint64_t</span> *)&amp;args_bytes_seg.ptr[BLAKE160_SIZE];</pre></div></div>
             
         </li>
         
@@ -283,6 +281,25 @@ or 28 bytes(containing blake160 hash and since value).</p>
               
               <div class="sswrap ">
                 <a class="ss" href="#section-11">&#x00a7;</a>
+              </div>
+              <p>Check lock period logic, we have prepared a handy utility function for this.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    ret = check_since(since);
+    <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
+      <span class="hljs-keyword">return</span> ret;
+    }
+  }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-12">
+            <div class="annotation">
+              
+              <div class="sswrap ">
+                <a class="ss" href="#section-12">&#x00a7;</a>
               </div>
               <p>Load the first witness, or the witness of the same index as the first input using
 current script.</p>
@@ -302,11 +319,11 @@ current script.</p>
         </li>
         
         
-        <li id="section-12">
+        <li id="section-13">
             <div class="annotation">
               
               <div class="sswrap ">
-                <a class="ss" href="#section-12">&#x00a7;</a>
+                <a class="ss" href="#section-13">&#x00a7;</a>
               </div>
               <p>We will treat the first witness as WitnessArgs object, and extract the lock field
 from the object.</p>
@@ -326,11 +343,11 @@ from the object.</p>
         </li>
         
         
-        <li id="section-13">
+        <li id="section-14">
             <div class="annotation">
               
               <div class="sswrap ">
-                <a class="ss" href="#section-13">&#x00a7;</a>
+                <a class="ss" href="#section-14">&#x00a7;</a>
               </div>
               <p>This is more of a safe guard, since lock is a field in witness, it
 cannot exceed the maximum size of the enclosing witness, this way
@@ -346,11 +363,11 @@ code has a bug.</p>
         </li>
         
         
-        <li id="section-14">
+        <li id="section-15">
             <div class="annotation">
               
               <div class="sswrap ">
-                <a class="ss" href="#section-14">&#x00a7;</a>
+                <a class="ss" href="#section-15">&#x00a7;</a>
               </div>
               <p>Keep the full lock field somewhere, since later we will modify this field in place.</p>
 
@@ -363,11 +380,11 @@ code has a bug.</p>
         </li>
         
         
-        <li id="section-15">
+        <li id="section-16">
             <div class="annotation">
               
               <div class="sswrap ">
-                <a class="ss" href="#section-15">&#x00a7;</a>
+                <a class="ss" href="#section-16">&#x00a7;</a>
               </div>
               <p>Extract multisig script flags.</p>
 
@@ -396,11 +413,11 @@ code has a bug.</p>
         </li>
         
         
-        <li id="section-16">
+        <li id="section-17">
             <div class="annotation">
               
               <div class="sswrap ">
-                <a class="ss" href="#section-16">&#x00a7;</a>
+                <a class="ss" href="#section-17">&#x00a7;</a>
               </div>
               <p>Based on the number of public keys and thresholds, we can calculate
 the required length of the lock field.</p>
@@ -417,11 +434,11 @@ the required length of the lock field.</p>
         </li>
         
         
-        <li id="section-17">
+        <li id="section-18">
             <div class="annotation">
               
               <div class="sswrap ">
-                <a class="ss" href="#section-17">&#x00a7;</a>
+                <a class="ss" href="#section-18">&#x00a7;</a>
               </div>
               <p>Perform hash check of the <code>multisig_script</code> part, notice the signature part
 is not included here.</p>
@@ -435,24 +452,6 @@ is not included here.</p>
 
   <span class="hljs-keyword">if</span> (<span class="hljs-built_in">memcmp</span>(args_bytes_seg.ptr, temp, BLAKE160_SIZE) != <span class="hljs-number">0</span>) {
     <span class="hljs-keyword">return</span> ERROR_MULTSIG_SCRIPT_HASH;
-  }</pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-18">
-            <div class="annotation">
-              
-              <div class="sswrap ">
-                <a class="ss" href="#section-18">&#x00a7;</a>
-              </div>
-              <p>Check lock period logic, we have prepared a handy utility function for this.</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>  ret = check_since(since);
-  <span class="hljs-keyword">if</span> (ret != CKB_SUCCESS) {
-    <span class="hljs-keyword">return</span> ret;
   }</pre></div></div>
             
         </li>

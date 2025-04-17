@@ -466,6 +466,42 @@ fn test_multisig_0_2_3_unlock_with_since() {
 }
 
 #[test]
+fn test_multisig_0_2_3_unlock_without_since() {
+    let mut data_loader = DummyDataLoader::new();
+    let keys = generate_keys(3);
+    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
+    // no since value
+    let args = blake160(&multi_sign_script);
+    let _lock_script = gen_multi_sign_lock_script(args.clone());
+    let raw_tx = gen_tx(&mut data_loader, args);
+
+    {
+        // relative since
+        let since = 0x8000_0000_8888_8888u64;
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| i.as_builder().since(since.pack()).build())
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+    {
+        // absolute since
+        let since = 0x2000_0000_0000_0000u64;
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| i.as_builder().since(since.pack()).build())
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+}
+
+#[test]
 fn test_multisig_0_2_3_unlock_with_since_epoch() {
     let mut data_loader = DummyDataLoader::new();
     let keys = generate_keys(3);
