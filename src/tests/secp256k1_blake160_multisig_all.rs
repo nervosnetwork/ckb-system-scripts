@@ -647,6 +647,256 @@ fn test_multisig_0_2_3_unlock_with_since_epoch() {
 }
 
 #[test]
+fn test_multisig_0_2_3_unlock_with_since_relative_epoch() {
+    let mut data_loader = DummyDataLoader::new();
+    let keys = generate_keys(3);
+    let since_epoch = EpochNumberWithFraction::new(200, 5, 100);
+    // relative epoch flag: 0b10100000 << 56
+    let since = 0xa000_0000_0000_0000u64 + since_epoch.full_value();
+    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
+    let args = {
+        let mut buf = blake160(&multi_sign_script).to_vec();
+        buf.extend(since.to_le_bytes().iter());
+        Bytes::from(buf)
+    };
+    let lock_script = gen_multi_sign_lock_script(args.clone());
+    let raw_tx = gen_tx(&mut data_loader, args);
+    {
+        // default since is 0, flags mismatch
+        let tx = multi_sign_tx(raw_tx.clone(), &multi_sign_script, &[&keys[0], &keys[1]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_FLAG)
+                .input_lock_script(0),
+        );
+    }
+    {
+        // absolute epoch flag instead of relative
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0x2000_0000_0000_0000u64 + since_epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_FLAG)
+                .input_lock_script(0),
+        );
+    }
+    {
+        // smaller fraction: 200 + 2/200 < 200 + 5/100
+        let epoch = EpochNumberWithFraction::new(200, 2, 200);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0xa000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_VALUE)
+                .input_lock_script(0),
+        );
+    }
+    {
+        // smaller fraction: 200 + 1/600 < 200 + 5/100
+        let epoch = EpochNumberWithFraction::new(200, 1, 600);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0xa000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_VALUE)
+                .input_lock_script(0),
+        );
+    }
+    {
+        // larger fraction with different encoding: 200 + 6/50 > 200 + 5/100
+        let epoch = EpochNumberWithFraction::new(200, 6, 50);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0xa000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+    {
+        // larger fraction: 200 + 1/2 > 200 + 5/100
+        // packed integer is smaller (length in high bits), so integer compare would wrongly fail
+        let epoch = EpochNumberWithFraction::new(200, 1, 2);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0xa000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+    {
+        let epoch = EpochNumberWithFraction::new(200, 6, 100);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0xa000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+    {
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| i.as_builder().since(since.pack()).build())
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+    {
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| i.as_builder().since((since + 1).pack()).build())
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+}
+
+#[test]
+fn test_multisig_0_2_3_unlock_with_since_epoch_length_zero() {
+    let mut data_loader = DummyDataLoader::new();
+    let keys = generate_keys(3);
+    let since_epoch = EpochNumberWithFraction::new(200, 5, 100);
+    let since = 0x2000_0000_0000_0000u64 + since_epoch.full_value();
+    let multi_sign_script = gen_multi_sign_script(&keys, 2, 0);
+    let args = {
+        let mut buf = blake160(&multi_sign_script).to_vec();
+        buf.extend(since.to_le_bytes().iter());
+        Bytes::from(buf)
+    };
+    let lock_script = gen_multi_sign_lock_script(args.clone());
+    let raw_tx = gen_tx(&mut data_loader, args);
+
+    {
+        let input_since = 0x2000_0000_0000_0000u64 | (100u64 << 24) | 200u64;
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| i.as_builder().since(input_since.pack()).build())
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_VALUE)
+                .input_lock_script(0),
+        );
+    }
+
+    {
+        let input_since = 0x2000_0000_0000_0000u64 | 201u64;
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| i.as_builder().since(input_since.pack()).build())
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+
+    {
+        let epoch = EpochNumberWithFraction::new(200, 4, 100);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0x2000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        let verify_result = verify(&data_loader, &tx);
+        assert_error_eq!(
+            verify_result.unwrap_err(),
+            ScriptError::validation_failure(&lock_script, ERROR_INCORRECT_SINCE_VALUE)
+                .input_lock_script(0),
+        );
+    }
+
+    {
+        let epoch = EpochNumberWithFraction::new(200, 6, 100);
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| {
+                i.as_builder()
+                    .since((0x2000_0000_0000_0000u64 + epoch.full_value()).pack())
+                    .build()
+            })
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+
+    {
+        let inputs: Vec<CellInput> = raw_tx
+            .inputs()
+            .into_iter()
+            .map(|i| i.as_builder().since(since.pack()).build())
+            .collect();
+        let raw_tx = raw_tx.as_advanced_builder().set_inputs(inputs).build();
+        let tx = multi_sign_tx(raw_tx, &multi_sign_script, &[&keys[1], &keys[2]]);
+        verify(&data_loader, &tx).expect("pass verification");
+    }
+}
+
+#[test]
 fn test_genesis_time_locked_cell() {
     // Test against ckb1qyqxs3hhwx2ttqcrk2yk2nsgqteglvfjt4hsjpzgxs,5200,2020-02-09
     let mut data_loader = DummyDataLoader::new();

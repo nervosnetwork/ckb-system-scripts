@@ -29,11 +29,19 @@ int epoch_number_with_fraction_cmp(uint64_t a, uint64_t b) {
   uint64_t a_epoch = (a >> NUMBER_OFFSET) & NUMBER_MASK;
   uint64_t a_index = (a >> INDEX_OFFSET) & INDEX_MASK;
   uint64_t a_len = (a >> LENGTH_OFFSET) & LENGTH_MASK;
+  if (a_len == 0) {
+    a_index = 0;
+    a_len = 1;
+  }
 
   /* extract b epoch */
   uint64_t b_epoch = (b >> NUMBER_OFFSET) & NUMBER_MASK;
   uint64_t b_index = (b >> INDEX_OFFSET) & INDEX_MASK;
   uint64_t b_len = (b >> LENGTH_OFFSET) & LENGTH_MASK;
+  if (b_len == 0) {
+    b_index = 0;
+    b_len = 1;
+  }
 
   if (a_epoch < b_epoch) {
     return -1;

@@ -26,7 +26,8 @@ Defines commonly used high level functions and constants.
 /* since */
 #define SINCE_VALUE_BITS 56
 #define SINCE_VALUE_MASK 0x00ffffffffffffff
-#define SINCE_EPOCH_FRACTION_FLAG 0b00100000
+#define SINCE_EPOCH_FRACTION_ABSOLUTE_FLAG 0b00100000
+#define SINCE_EPOCH_FRACTION_RELATIVE_FLAG 0b10100000
 
 /* calculate inputs length */
 int calculate_inputs_len() {
@@ -111,7 +112,8 @@ int check_since(uint64_t since) {
     if (since_flags != input_since_flags) {
       return ERROR_INCORRECT_SINCE_FLAGS;
     }
-    if (input_since_flags == SINCE_EPOCH_FRACTION_FLAG) {
+    if (input_since_flags == SINCE_EPOCH_FRACTION_ABSOLUTE_FLAG ||
+        input_since_flags == SINCE_EPOCH_FRACTION_RELATIVE_FLAG) {
       ret = epoch_number_with_fraction_cmp(input_since_value, since_value);
       if (ret < 0) {
         return ERROR_INCORRECT_SINCE_VALUE;
